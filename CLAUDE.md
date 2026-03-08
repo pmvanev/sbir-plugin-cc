@@ -55,3 +55,24 @@ sbir-plugin-cc/
 - PES Python code: TDD with pytest, ports-and-adapters enables isolated testing
 - Agents/commands/skills: validated via nWave forge checklist (no unit tests for markdown)
 - Integration: end-to-end scenarios from user stories (39 scenarios in Phase C1)
+
+## Mutation Testing Strategy
+
+- **Strategy**: per-feature
+- **Scope**: `scripts/pes/` (Python PES code only)
+- **Tool**: mutmut (configured in `pyproject.toml`)
+- **When**: After each feature delivery, scoped to modified Python files
+- **Kill rate gate**: >= 80%
+- **Rationale**: Under 50k LOC project with per-feature delivery cadence. PES enforces proposal invariants -- mutation testing validates that enforcement logic is meaningfully tested, not just covered.
+- **Run command**: `mutmut run --paths-to-mutate scripts/pes/`
+- **Results**: `mutmut results`
+
+## CI/CD
+
+- **Platform**: GitHub Actions
+- **Workflows**: `.github/workflows/ci.yml` (PR/push), `.github/workflows/release.yml` (tag push)
+- **Branch strategy**: Trunk-based development. Short-lived feature branches, PR to main, CI gates required.
+- **Release**: Semantic versioning via git tags (`vMAJOR.MINOR.PATCH`)
+- **Branch protection**: PR required, status checks required, linear history enforced
+- **Quality gates**: lint (ruff), type check (mypy), test (pytest >= 80% coverage), security (bandit)
+- **Design docs**: `docs/design/sbir-proposal-plugin/`
