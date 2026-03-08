@@ -1,0 +1,9 @@
+{"event":"HOOK_INVOKED","handler":"pre_tool_use","hook_id":"69ac33dd-60c1-42d1-9f89-068fd511e987","input_summary":{"subagent_type":"nw:nw-product-discoverer"},"timestamp":"2026-03-08T17:03:10.943946+00:00"}
+{"context":"non_des_task","event":"HOOK_PRE_TOOL_USE_ALLOWED","hook_id":"69ac33dd-60c1-42d1-9f89-068fd511e987","timestamp":"2026-03-08T17:03:10.945545+00:00"}
+{"decision":"allow","duration_ms":3.4914,"event":"HOOK_COMPLETED","exit_code":0,"handler":"pre_tool_use","hook_id":"69ac33dd-60c1-42d1-9f89-068fd511e987","timestamp":"2026-03-08T17:03:10.946306+00:00"}
+{"event":"HOOK_INVOKED","handler":"subagent_stop","hook_id":"dff13fda-35f3-434f-9629-aa33105c4111","input_summary":{"agent_id":"aae29dd93041704a4","agent_type":"nw:nw-product-discoverer","has_transcript":true},"timestamp":"2026-03-08T17:03:56.709025+00:00"}
+{"error":"'charmap' codec can't decode byte 0x81 in position 897: character maps to <undefined>","error_type":"UnicodeDecodeError","event":"HOOK_ERROR","handler":"subagent_stop","stderr_capture":"","timestamp":"2026-03-08T17:03:56.710659+00:00"}
+{"decision":"error","duration_ms":3.2017,"event":"HOOK_COMPLETED","exit_code":1,"handler":"subagent_stop","hook_id":"dff13fda-35f3-434f-9629-aa33105c4111","timestamp":"2026-03-08T17:03:56.711512+00:00"}
+{"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"c1d0eadd-cd54-4813-855c-e046a5d85ea8","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-08T17:03:57.027752+00:00"}
+{"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"c1d0eadd-cd54-4813-855c-e046a5d85ea8","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-08T17:03:57.046640+00:00"}
+{"decision":"allow","duration_ms":20.2956,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"c1d0eadd-cd54-4813-855c-e046a5d85ea8","timestamp":"2026-03-08T17:03:57.047305+00:00"}
