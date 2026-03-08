@@ -1,0 +1,387 @@
+journey:
+  name: "SBIR Proposal Lifecycle"
+  goal: "Write a winning SBIR/STTR proposal faster with less effort using AI the engineer can trust"
+  persona: "Phil Santos -- small business engineer, 2-3 proposals/year, 10-15 hours each, CLI-native"
+
+  emotional_arc:
+    start: "Curious but uncertain -- is this worth pursuing?"
+    middle: "Grounded and engaged -- I know what they want and I am building it"
+    end: "Confident and relieved -- complete, compliant, submitted"
+
+  phases:
+    c1_mvp:
+      label: "Phase C1 -- Walking Skeleton"
+      jobs: [J1, J2, J4]
+      waves: [0, 1]
+      description: "Corpus search, compliance tracking, solicitation understanding"
+    c2_drafting:
+      label: "Phase C2 -- Guardrailed Drafting"
+      jobs: [J3, J5, J8]
+      waves: [2, 3, 4]
+      description: "Research, discrimination, drafting with confidence flagging"
+    c3_lifecycle:
+      label: "Phase C3 -- Full Lifecycle"
+      jobs: [J6, J7]
+      waves: [5, 6, 7, 8, 9]
+      description: "Formatting, review, submission, learning"
+
+steps:
+  - id: 0
+    name: "Entry & Reorientation"
+    wave: null
+    phase: c1_mvp
+    commands:
+      - "/proposal new"
+      - "/proposal status"
+    jobs: []
+
+    tui_mockup: |
+      +-- /proposal status -----------------------------------------------+
+      |  PROPOSAL STATUS -- ${topic_id}                                    |
+      |  "${topic_title}"                                                  |
+      |  ${current_wave_label} | ${days_to_deadline} days to deadline       |
+      |                                                                    |
+      |  Progress:                                                         |
+      |    Wave 0  Intelligence & Fit      [${wave_0_status}]              |
+      |    Wave 1  Requirements & Strategy [${wave_1_status}]              |
+      |      > ${wave_1_detail_line_1}                                     |
+      |      > ${wave_1_detail_line_2}                                     |
+      |    ...                                                             |
+      |                                                                    |
+      |  Next action: ${next_action_suggestion}                            |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: topic_id
+        source: proposal-state.json#topic.id
+        displayed_as: "${topic_id}"
+        consumers: ["status display", "all checkpoint headers", "artifact filenames"]
+      - name: topic_title
+        source: proposal-state.json#topic.title
+        displayed_as: "${topic_title}"
+        consumers: ["status display", "checkpoint headers"]
+      - name: current_wave_label
+        source: proposal-state.json#current_wave
+        displayed_as: "${current_wave_label}"
+        consumers: ["status display"]
+      - name: days_to_deadline
+        source: "computed from proposal-state.json#topic.deadline"
+        displayed_as: "${days_to_deadline}"
+        consumers: ["status display", "PES deadline warnings"]
+      - name: next_action_suggestion
+        source: "computed from proposal-state.json wave statuses"
+        displayed_as: "${next_action_suggestion}"
+        consumers: ["status display"]
+
+    emotional_state:
+      entry: "Disoriented (returning after days away) or curious (new proposal)"
+      exit: "Oriented -- knows exactly where to pick up"
+
+    integration_checkpoint: |
+      proposal-state.json must exist and pass integrity check.
+      If corrupt or missing, PES session startup recovers or guides creation.
+
+  - id: 1
+    name: "Intelligence & Fit"
+    wave: 0
+    phase: c1_mvp
+    commands:
+      - "/proposal new"
+      - "/proposal corpus add <directory>"
+    jobs: [J1]
+
+    tui_mockup: |
+      +-- /proposal new ---------------------------------------------------+
+      |  NEW PROPOSAL PROJECT                                              |
+      |  Solicitation URL or file path: > ${solicitation_source}           |
+      |                                                                    |
+      |  Parsing solicitation...                                           |
+      |    Topic: ${topic_id} | Agency: ${agency} | Phase: ${phase}        |
+      |    Deadline: ${deadline} (${days_to_deadline} days)                 |
+      |    Title: "${topic_title}"                                         |
+      |                                                                    |
+      |  Checking corpus for relevant past work...                         |
+      |    Found ${corpus_match_count} related proposals                   |
+      |                                                                    |
+      |  Scoring company fit...                                            |
+      |    Subject matter: ${fit_subject}                                  |
+      |    Past performance: ${fit_performance}                            |
+      |    Certifications: ${fit_certs}                                    |
+      |                                                                    |
+      |  RECOMMENDATION: ${go_recommendation}                              |
+      |                                                                    |
+      |  CHECKPOINT: Go/No-Go Decision                                    |
+      |    (g) go  (n) no-go  (d) defer                                   |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: solicitation_source
+        source: "user input (URL or file path)"
+        displayed_as: "${solicitation_source}"
+        consumers: ["proposal-state.json#topic.solicitation_url"]
+      - name: go_no_go
+        source: proposal-state.json#go_no_go
+        displayed_as: "${go_no_go}"
+        consumers: ["status display", "PES wave ordering gate"]
+      - name: corpus_matches
+        source: "corpus search results"
+        displayed_as: "${corpus_match_count} related proposals"
+        consumers: ["fit scoring", "wave 3 exemplars", "wave 4 reference material"]
+
+    emotional_state:
+      entry: "Curious -- found an interesting solicitation"
+      exit: "Grounded -- data-driven Go/No-Go, not gut feel"
+
+    integration_checkpoint: |
+      Go/No-Go must be recorded in proposal-state.json before Wave 1 can start.
+      Corpus search results persist for reference in later waves.
+
+  - id: 2
+    name: "Requirements & Strategy"
+    wave: 1
+    phase: c1_mvp
+    commands:
+      - "/proposal wave strategy"
+      - "/proposal compliance check"
+      - "/proposal tpoc questions"
+      - "/proposal tpoc ingest"
+    jobs: [J2, J4]
+
+    substeps:
+      - id: "2a"
+        name: "Compliance Matrix Generation"
+        description: "Parse solicitation for all shall-statements; map to sections; flag ambiguities"
+        artifacts_produced:
+          - "./artifacts/wave-1-strategy/compliance-matrix.md"
+      - id: "2b"
+        name: "TPOC Question Generation"
+        description: "Generate prioritized questions from gaps and ambiguities"
+        artifacts_produced:
+          - "./artifacts/wave-1-strategy/tpoc-questions.md"
+        async_event: "TPOC call -- days between generation and ingestion"
+      - id: "2c"
+        name: "TPOC Answer Ingestion"
+        description: "Ingest call notes; match to questions; run delta analysis"
+        artifacts_produced:
+          - "./artifacts/wave-1-strategy/tpoc-qa-log.md"
+          - "./artifacts/wave-1-strategy/solicitation-delta.md"
+        note: "May never happen -- tool handles pending state gracefully"
+      - id: "2d"
+        name: "Strategy Alignment Checkpoint"
+        description: "Review strategy brief; approve before research begins"
+        artifacts_produced:
+          - "./artifacts/wave-1-strategy/strategy-brief.md"
+
+    shared_artifacts:
+      - name: compliance_matrix
+        source: "./artifacts/wave-1-strategy/compliance-matrix.md"
+        displayed_as: "Compliance matrix (${compliance_item_count} items)"
+        consumers: ["wave 4 drafting", "wave 6 formatting", "wave 7 final review", "PES compliance gate"]
+      - name: tpoc_questions
+        source: "./artifacts/wave-1-strategy/tpoc-questions.md"
+        displayed_as: "TPOC questions (${tpoc_question_count} questions)"
+        consumers: ["tpoc ingestion", "strategy brief"]
+      - name: tpoc_status
+        source: proposal-state.json#tpoc_insights
+        displayed_as: "${tpoc_status}"
+        consumers: ["status display -- shows PENDING CALL or COMPLETED"]
+      - name: strategy_brief
+        source: "./artifacts/wave-1-strategy/strategy-brief.md"
+        displayed_as: "Strategy brief"
+        consumers: ["wave 2 research direction", "wave 3 discrimination table", "wave 4 drafting"]
+
+    emotional_state:
+      entry: "Uncertain -- what does this solicitation really want?"
+      exit: "Grounded and confident -- I know the real requirements and have a strategy"
+
+    integration_checkpoint: |
+      Strategy brief must be approved before Wave 2 can start.
+      Compliance matrix must exist (even if TPOC call never happened).
+      TPOC status can be "pending" indefinitely -- does not block progress.
+
+  - id: 3
+    name: "Research"
+    wave: 2
+    phase: c2_drafting
+    commands:
+      - "/proposal wave research"
+    jobs: [J8]
+
+    shared_artifacts:
+      - name: technical_landscape
+        source: "./artifacts/wave-2-research/technical-landscape.md"
+        consumers: ["wave 3 discrimination table", "wave 4 section 3 drafting"]
+      - name: market_research
+        source: "./artifacts/wave-2-research/market-research.md"
+        consumers: ["wave 4 section 6 commercialization drafting"]
+      - name: trl_assessment
+        source: "./artifacts/wave-2-research/trl-assessment.md"
+        consumers: ["wave 3 discrimination table", "wave 4 section 3 drafting", "PDC checks"]
+
+    emotional_state:
+      entry: "Engaged -- building the evidence base"
+      exit: "Informed -- have data to write from"
+
+    integration_checkpoint: |
+      Research review checkpoint must be approved before Wave 3.
+      TRL assessment feeds discrimination table -- must be consistent.
+
+  - id: 4
+    name: "Discrimination & Outline"
+    wave: 3
+    phase: c2_drafting
+    commands:
+      - "/proposal wave outline"
+      - "/proposal iterate discrimination"
+      - "/proposal:distill --all"
+    jobs: [J5]
+
+    shared_artifacts:
+      - name: discrimination_table
+        source: "./artifacts/wave-3-outline/discrimination-table.md"
+        consumers: ["wave 4 drafting (every section references discriminators)", "PDC Tier 3 checks"]
+      - name: proposal_outline
+        source: "./artifacts/wave-3-outline/proposal-outline.md"
+        consumers: ["wave 4 drafting (section structure and page budgets)", "PES section validation"]
+      - name: pdcs
+        source: "./pdcs/*.pdc"
+        consumers: ["wave 4 /proposal:check", "wave 7 final review"]
+
+    emotional_state:
+      entry: "Informed -- have research and strategy"
+      exit: "Focused -- know exactly what argument to make in every section"
+
+    integration_checkpoint: |
+      Discrimination table approved before outline.
+      Outline approved before drafting.
+      PDCs generated before first draft.
+      PES enforces: no draft without compliance matrix entry.
+
+  - id: 5
+    name: "Drafting"
+    wave: 4
+    phase: c2_drafting
+    commands:
+      - "/proposal draft <section>"
+      - "/proposal:check <section>"
+      - "/proposal iterate <section>"
+      - "/proposal review <section>"
+      - "/proposal:approve <section>"
+    jobs: [J3]
+
+    emotional_state:
+      entry: "Focused -- know the argument structure"
+      exit: "Engaged, possibly fatigued -- most hours spent here"
+
+    integration_checkpoint: |
+      Every section must have all Tier 1+2 PDCs GREEN before human review.
+      Every approved section must be cross-checked against compliance matrix.
+      Confidence flags on uncertain claims must be resolved before approval.
+
+  - id: 6
+    name: "Visual Assets & Formatting"
+    wave: "5-6"
+    phase: c3_lifecycle
+    commands:
+      - "/proposal wave visuals"
+      - "/proposal format"
+    jobs: [J6]
+
+    emotional_state:
+      entry: "Engaged but tired of writing"
+      exit: "Relieved -- formatting handled"
+
+    integration_checkpoint: |
+      All figures referenced in text must exist.
+      Page counts within solicitation limits.
+      All compliance items covered or waived.
+
+  - id: 7
+    name: "Final Review & Submission"
+    wave: "7-8"
+    phase: c3_lifecycle
+    commands:
+      - "/proposal wave final-review"
+      - "/proposal submit prep"
+      - "/proposal submit"
+    jobs: []
+
+    emotional_state:
+      entry: "Cautious -- last chance to catch problems"
+      exit: "Confident and relieved -- submitted with archive"
+
+    integration_checkpoint: |
+      Persona simulation scorecard reviewed.
+      Final compliance report: all items covered or waived with reasons.
+      Submission confirmation captured.
+      Immutable archive created.
+
+  - id: 8
+    name: "Post-Submission & Learning"
+    wave: 9
+    phase: c3_lifecycle
+    commands:
+      - "/proposal debrief ingest <path>"
+    jobs: [J7]
+
+    emotional_state:
+      entry: "Reflective -- waiting for result"
+      exit: "Hopeful -- every proposal makes the next one better"
+
+    integration_checkpoint: |
+      Debrief feedback mapped to proposal sections.
+      Win/loss tags are append-only in corpus.
+      Lessons learned written to corpus.
+
+error_paths:
+  - id: E1
+    name: "Solicitation Parse Failure"
+    trigger: "Invalid URL, unexpected format, content behind login"
+    recovery: "Download PDF manually; provide local file path"
+    user_message: "Could not parse solicitation. Try: /proposal new --file ./solicitation.pdf"
+
+  - id: E2
+    name: "Empty Corpus"
+    trigger: "First-time use, no documents ingested"
+    recovery: "Tool proceeds without corpus matches; suggests ingestion"
+    user_message: "No corpus documents found. Add with: /proposal corpus add <directory>"
+
+  - id: E3
+    name: "TPOC Call Never Happens"
+    trigger: "Questions generated but call stays pending"
+    recovery: "User marks as no-call or leaves pending; tool continues"
+    user_message: "TPOC questions pending. Mark as no-call or ingest when ready."
+
+  - id: E4
+    name: "Compliance Item Missed by Parser"
+    trigger: "User finds requirement parser missed"
+    recovery: "Manual addition via /proposal compliance add"
+    user_message: "Add requirement: /proposal compliance add '<requirement text>'"
+
+  - id: E5
+    name: "Deadline Pressure"
+    trigger: "Critical days threshold reached"
+    recovery: "PES warnings; optional wave skipping with documented waiver"
+
+  - id: E6
+    name: "Session Crash"
+    trigger: "Claude Code session ends unexpectedly"
+    recovery: "PES session startup integrity check; state recovered"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: topic_id
+      must_match_across: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+      failure_message: "Topic ID mismatch across waves -- proposal-state.json is single source of truth"
+
+    - artifact: compliance_matrix
+      must_match_across: [2, 5, 6, 7]
+      failure_message: "Compliance matrix must be the same living document updated across waves, not copies"
+
+    - artifact: deadline
+      must_match_across: [0, 1, 2, 3, 4, 5, 6, 7]
+      failure_message: "Deadline must come from proposal-state.json; PES computes days remaining"
+
+    - artifact: discrimination_table
+      must_match_across: [4, 5, 7]
+      failure_message: "Every discriminator claim in the table must be evidenced in drafted sections"
