@@ -11,8 +11,10 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from pes.domain.proposal_service import ProposalCreationService
 from pes.domain.solicitation import SolicitationParseResult, TopicInfo
+from pes.domain.state import StateNotFoundError
+from pes.domain.status_service import StatusService
 from pes.ports.solicitation_port import SolicitationParser
-from pes.ports.state_port import StateWriter
+from pes.ports.state_port import StateReader, StateWriter
 
 # Link to feature files
 scenarios("../features/new_proposal.feature")
@@ -57,6 +59,26 @@ class InMemoryStateWriter(StateWriter):
         return len(self.saved_states) > 0
 
 
+class FileBackedStateReader(StateReader):
+    """StateReader that reads from a JSON file written by write_state fixture."""
+
+    def __init__(self, state_file_path: str) -> None:
+        import json
+        from pathlib import Path
+
+        self._path = Path(state_file_path)
+        self._json = json
+
+    def load(self) -> dict:
+        if not self._path.exists():
+            raise StateNotFoundError("No active proposal found")
+        text = self._path.read_text(encoding="utf-8")
+        return self._json.loads(text)
+
+    def exists(self) -> bool:
+        return self._path.exists()
+
+
 # ---------------------------------------------------------------------------
 # Fixtures for proposal creation
 # ---------------------------------------------------------------------------
@@ -78,6 +100,13 @@ def proposal_service(fake_parser, in_memory_state_writer):
         parser=fake_parser,
         state_writer=in_memory_state_writer,
     )
+
+
+@pytest.fixture()
+def status_service(state_file):
+    """StatusService wired with file-backed StateReader."""
+    reader = FileBackedStateReader(str(state_file))
+    return StatusService(reader)
 
 
 @pytest.fixture()
@@ -195,13 +224,15 @@ def corpus_ingested():
 
 
 @given(
-    parsers.parse("Phil has an active proposal for {topic_id}"),
+    parsers.re(r"Phil has an active proposal for (?P<topic_id>[A-Z0-9]+-\d+)$"),
+    target_fixture="active_state",
 )
 def active_proposal_for_topic(sample_state, write_state, topic_id):
-    """Set up active proposal for given topic."""
+    """Set up active proposal for given topic (without wave specification)."""
     state = sample_state.copy()
     state["topic"]["id"] = topic_id
     write_state(state)
+    return state
 
 
 @given(parsers.parse("the compliance matrix has {count:d} items"))
@@ -295,9 +326,10 @@ def start_from_file(
 
 
 @when("Phil checks proposal status")
-def check_status():
+def check_status(status_service, creation_result):
     """Invoke status through driving port."""
-    pytest.skip("Awaiting StatusService implementation")
+    report = status_service.get_status()
+    creation_result["status_report"] = report
 
 
 # --- Then steps for US-002 ---
@@ -437,8 +469,17 @@ def verify_archived(creation_result):
 def verify_proposal_message(message, creation_result):
     """Verify user-facing message."""
     result = creation_result.get("result")
-    if result is not None:
-        # Check error, warnings, or guidance
+    report = creation_result.get("status_report")
+    if report is not None:
+        all_text = " ".join(filter(None, [
+            report.error or "",
+            report.suggestion or "",
+            report.deadline_countdown or "",
+            " ".join(report.warnings),
+            " ".join(e.description for e in report.async_events),
+        ]))
+        assert message in all_text, f"Expected '{message}' in '{all_text}'"
+    elif result is not None:
         all_text = " ".join(filter(None, [
             result.error or "",
             result.guidance or "",
@@ -488,43 +529,72 @@ def verify_manual_deadline_prompt(creation_result):
 # --- Then steps for US-001 ---
 
 
-@then(parsers.parse('Phil sees the current wave is "{wave_name}"'))
-def verify_current_wave(wave_name):
+@then(parsers.parse('Phil sees the current wave as "{wave_name}"'))
+def verify_current_wave_as(wave_name, creation_result):
     """Verify current wave displayed."""
-    pass
+    report = creation_result["status_report"]
+    assert report.current_wave == wave_name
+
+
+@then(parsers.parse('Phil sees the current wave is "{wave_name}"'))
+def verify_current_wave(wave_name, creation_result):
+    """Verify current wave displayed."""
+    report = creation_result["status_report"]
+    assert report.current_wave == wave_name
 
 
 @then(parsers.parse('Phil sees the suggested next action "{action}"'))
-def verify_next_action(action):
+def verify_next_action(action, creation_result):
     """Verify suggested action displayed."""
-    pass
+    report = creation_result["status_report"]
+    assert report.next_action == action
 
 
 @then(parsers.parse('Wave 0 shows as completed with "{detail}"'))
-def verify_wave_0_completed(detail):
+def verify_wave_0_completed(detail, creation_result):
     """Verify Wave 0 completion detail."""
-    pass
+    report = creation_result["status_report"]
+    wave_0 = next(w for w in report.waves if w.wave_number == 0)
+    assert wave_0.status == "completed"
+    assert detail in (wave_0.detail or "")
 
 
 @then("Wave 1 shows as active with detail for each sub-task")
-def verify_wave_1_detail():
+def verify_wave_1_detail(creation_result):
     """Verify Wave 1 active detail."""
-    pass
+    report = creation_result["status_report"]
+    wave_1 = next(w for w in report.waves if w.wave_number == 1)
+    assert wave_1.status == "active"
 
 
 @then('subsequent waves show as "not started"')
-def verify_subsequent_waves():
+def verify_subsequent_waves(creation_result):
     """Verify later waves show not started."""
-    pass
+    report = creation_result["status_report"]
+    for wave in report.waves:
+        if wave.wave_number > 1:
+            assert wave.status == "not_started"
 
 
 @then(parsers.parse('Phil sees a deadline warning "{warning}"'))
-def verify_deadline_warning_message(warning):
+def verify_deadline_warning_message(warning, creation_result):
     """Verify specific deadline warning text."""
-    pass
+    report = creation_result["status_report"]
+    assert any(warning in w for w in report.warnings)
 
 
 @then("Phil sees suggestions to prioritize the highest-impact incomplete work")
-def verify_priority_suggestions():
+def verify_priority_suggestions(creation_result):
     """Verify prioritization suggestions shown."""
-    pass
+    report = creation_result["status_report"]
+    assert report.next_action is not None
+    action = report.next_action.lower()
+    assert "prioritize" in action or "highest-impact" in action
+
+
+@then('Phil sees the suggestion to start with "/proposal new"')
+def verify_start_suggestion(creation_result):
+    """Verify suggestion to start with /proposal new."""
+    report = creation_result["status_report"]
+    assert report.suggestion is not None
+    assert "/proposal new" in report.suggestion
