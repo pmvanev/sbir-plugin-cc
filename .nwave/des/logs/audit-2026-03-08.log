@@ -7,3 +7,30 @@
 {"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"c1d0eadd-cd54-4813-855c-e046a5d85ea8","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-08T17:03:57.027752+00:00"}
 {"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"c1d0eadd-cd54-4813-855c-e046a5d85ea8","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-08T17:03:57.046640+00:00"}
 {"decision":"allow","duration_ms":20.2956,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"c1d0eadd-cd54-4813-855c-e046a5d85ea8","timestamp":"2026-03-08T17:03:57.047305+00:00"}
+{"event":"HOOK_INVOKED","handler":"pre_tool_use","hook_id":"e92d4b7b-8539-452e-a075-28ab470a326f","input_summary":{"subagent_type":"nw:nw-product-discoverer"},"timestamp":"2026-03-08T17:14:51.220421+00:00"}
+{"context":"non_des_task","event":"HOOK_PRE_TOOL_USE_ALLOWED","hook_id":"e92d4b7b-8539-452e-a075-28ab470a326f","timestamp":"2026-03-08T17:14:51.238010+00:00"}
+{"decision":"allow","duration_ms":34.8757,"event":"HOOK_COMPLETED","exit_code":0,"handler":"pre_tool_use","hook_id":"e92d4b7b-8539-452e-a075-28ab470a326f","timestamp":"2026-03-08T17:14:51.239035+00:00"}
+{"event":"HOOK_INVOKED","handler":"subagent_stop","hook_id":"0b807207-d2fa-4fd8-8d95-85b4fc388491","input_summary":{"agent_id":"aae29dd93041704a4","agent_type":"nw:nw-product-discoverer","has_transcript":true},"timestamp":"2026-03-08T17:15:20.862019+00:00"}
+{"error":"'charmap' codec can't decode byte 0x81 in position 897: character maps to <undefined>","error_type":"UnicodeDecodeError","event":"HOOK_ERROR","handler":"subagent_stop","stderr_capture":"","timestamp":"2026-03-08T17:15:20.863124+00:00"}
+{"decision":"error","duration_ms":2.3468,"event":"HOOK_COMPLETED","exit_code":1,"handler":"subagent_stop","hook_id":"0b807207-d2fa-4fd8-8d95-85b4fc388491","timestamp":"2026-03-08T17:15:20.863833+00:00"}
+{"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"c98c3670-f548-4da6-96ec-327a9aa2f670","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-08T17:15:21.164232+00:00"}
+{"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"c98c3670-f548-4da6-96ec-327a9aa2f670","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-08T17:15:21.178547+00:00"}
+{"decision":"allow","duration_ms":15.6032,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"c98c3670-f548-4da6-96ec-327a9aa2f670","timestamp":"2026-03-08T17:15:21.179189+00:00"}
+{"event":"HOOK_INVOKED","handler":"pre_tool_use","hook_id":"25dc69f8-166a-416f-98c5-44b1719b5be9","input_summary":{"subagent_type":"nw:nw-product-discoverer"},"timestamp":"2026-03-08T17:22:33.081848+00:00"}
+{"context":"non_des_task","event":"HOOK_PRE_TOOL_USE_ALLOWED","hook_id":"25dc69f8-166a-416f-98c5-44b1719b5be9","timestamp":"2026-03-08T17:22:33.083182+00:00"}
+{"decision":"allow","duration_ms":2.5592,"event":"HOOK_COMPLETED","exit_code":0,"handler":"pre_tool_use","hook_id":"25dc69f8-166a-416f-98c5-44b1719b5be9","timestamp":"2026-03-08T17:22:33.083838+00:00"}
+{"event":"HOOK_INVOKED","handler":"subagent_stop","hook_id":"72d6637d-1de7-4268-8bb1-4520d5ef476c","input_summary":{"agent_id":"aae29dd93041704a4","agent_type":"nw:nw-product-discoverer","has_transcript":true},"timestamp":"2026-03-08T17:23:41.799799+00:00"}
+{"error":"'charmap' codec can't decode byte 0x81 in position 897: character maps to <undefined>","error_type":"UnicodeDecodeError","event":"HOOK_ERROR","handler":"subagent_stop","stderr_capture":"","timestamp":"2026-03-08T17:23:41.800883+00:00"}
+{"decision":"error","duration_ms":2.4422,"event":"HOOK_COMPLETED","exit_code":1,"handler":"subagent_stop","hook_id":"72d6637d-1de7-4268-8bb1-4520d5ef476c","timestamp":"2026-03-08T17:23:41.801665+00:00"}
+{"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"f365da0a-8394-4f53-96c7-7b216591a4e1","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-08T17:23:42.109898+00:00"}
+{"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"f365da0a-8394-4f53-96c7-7b216591a4e1","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-08T17:23:42.127852+00:00"}
+{"decision":"allow","duration_ms":19.3002,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"f365da0a-8394-4f53-96c7-7b216591a4e1","timestamp":"2026-03-08T17:23:42.128580+00:00"}
+{"event":"HOOK_INVOKED","handler":"pre_tool_use","hook_id":"6e1bb5f9-4d16-44a1-b5b3-d4b83006ac55","input_summary":{"subagent_type":"nw:nw-product-discoverer"},"timestamp":"2026-03-08T17:28:48.116294+00:00"}
+{"context":"non_des_task","event":"HOOK_PRE_TOOL_USE_ALLOWED","hook_id":"6e1bb5f9-4d16-44a1-b5b3-d4b83006ac55","timestamp":"2026-03-08T17:28:48.131354+00:00"}
+{"decision":"allow","duration_ms":27.0111,"event":"HOOK_COMPLETED","exit_code":0,"handler":"pre_tool_use","hook_id":"6e1bb5f9-4d16-44a1-b5b3-d4b83006ac55","timestamp":"2026-03-08T17:28:48.132198+00:00"}
+{"event":"HOOK_INVOKED","handler":"subagent_stop","hook_id":"afe62b4c-8741-4c62-b6ec-919038d473d3","input_summary":{"agent_id":"aae29dd93041704a4","agent_type":"nw:nw-product-discoverer","has_transcript":true},"timestamp":"2026-03-08T17:33:46.503658+00:00"}
+{"error":"'charmap' codec can't decode byte 0x81 in position 897: character maps to <undefined>","error_type":"UnicodeDecodeError","event":"HOOK_ERROR","handler":"subagent_stop","stderr_capture":"","timestamp":"2026-03-08T17:33:46.504714+00:00"}
+{"decision":"error","duration_ms":2.5085,"event":"HOOK_COMPLETED","exit_code":1,"handler":"subagent_stop","hook_id":"afe62b4c-8741-4c62-b6ec-919038d473d3","timestamp":"2026-03-08T17:33:46.505601+00:00"}
+{"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"76bed30f-216c-4c38-bbac-57fa16e544fa","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-08T17:33:46.817655+00:00"}
+{"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"76bed30f-216c-4c38-bbac-57fa16e544fa","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-08T17:33:46.833066+00:00"}
+{"decision":"allow","duration_ms":16.6815,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"76bed30f-216c-4c38-bbac-57fa16e544fa","timestamp":"2026-03-08T17:33:46.833788+00:00"}
