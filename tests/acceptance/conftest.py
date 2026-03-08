@@ -18,7 +18,6 @@ from typing import Any
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Proposal State Fixtures
 # ---------------------------------------------------------------------------
@@ -146,6 +145,42 @@ def pes_config(proposal_dir: Path) -> Path:
     config_path = proposal_dir / ".sbir" / "pes-config.json"
     config_path.write_text(json.dumps(config, indent=2))
     return config_path
+
+
+# ---------------------------------------------------------------------------
+# PES Enforcement Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def in_memory_audit_log():
+    """In-memory audit logger that captures entries for assertion."""
+    from pes.ports.audit_port import AuditLogger
+
+    class InMemoryAuditLogger(AuditLogger):
+        def __init__(self) -> None:
+            self.entries: list[dict[str, Any]] = []
+
+        def log(self, entry: dict[str, Any]) -> None:
+            self.entries.append(entry)
+
+    return InMemoryAuditLogger()
+
+
+@pytest.fixture()
+def rule_loader_from_config(pes_config: Path):
+    """RuleLoader that loads from the test PES config file."""
+    from pes.adapters.json_rule_adapter import JsonRuleAdapter
+
+    return JsonRuleAdapter(str(pes_config))
+
+
+@pytest.fixture()
+def enforcement_engine(rule_loader_from_config, in_memory_audit_log):
+    """EnforcementEngine wired with test adapters."""
+    from pes.domain.engine import EnforcementEngine
+
+    return EnforcementEngine(rule_loader_from_config, in_memory_audit_log)
 
 
 # ---------------------------------------------------------------------------

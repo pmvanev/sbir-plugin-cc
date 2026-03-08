@@ -7,7 +7,10 @@ Does NOT import internal Rule classes or SessionChecker directly.
 from __future__ import annotations
 
 import pytest
-from pytest_bdd import scenarios, given, when, then, parsers
+from pytest_bdd import given, parsers, scenarios, then, when
+
+from pes.domain.rules import Decision
+from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 
 # Link to feature file
 scenarios("../features/pes_enforcement.feature")
@@ -101,25 +104,34 @@ def new_enforcement_rule():
 # --- When steps ---
 
 
-@when("Phil starts a new session")
-def start_session():
-    """Invoke session startup through PES hook adapter."""
-    # TODO: Invoke through ClaudeCodeHookAdapter session_start
-    pytest.skip("Awaiting ClaudeCodeHookAdapter implementation")
+@when("Phil starts a new session", target_fixture="enforcement_result")
+def start_session(enforcement_engine, state_file):
+    """Invoke session startup through EnforcementEngine integrity check."""
+    from pes.adapters.json_state_adapter import JsonStateAdapter
+
+    state_reader = JsonStateAdapter(str(state_file.parent))
+    state = state_reader.load()
+    return enforcement_engine.check_session_start(state)
 
 
-@when("Phil attempts to start Wave 1 strategy work")
-def attempt_wave_1():
+@when("Phil attempts to start Wave 1 strategy work", target_fixture="enforcement_result")
+def attempt_wave_1(enforcement_engine, state_file):
     """Invoke wave strategy command through PES enforcement."""
-    # TODO: Invoke through EnforcementEngine with PreToolUse event
-    pytest.skip("Awaiting EnforcementEngine implementation")
+    from pes.adapters.json_state_adapter import JsonStateAdapter
+
+    state_reader = JsonStateAdapter(str(state_file.parent))
+    state = state_reader.load()
+    return enforcement_engine.evaluate(state, tool_name="wave_1_strategy")
 
 
-@when("Phil starts Wave 1 strategy work")
-def start_wave_1():
+@when("Phil starts Wave 1 strategy work", target_fixture="enforcement_result")
+def start_wave_1(enforcement_engine, state_file):
     """Invoke wave strategy after Go decision."""
-    # TODO: Invoke through EnforcementEngine
-    pytest.skip("Awaiting EnforcementEngine implementation")
+    from pes.adapters.json_state_adapter import JsonStateAdapter
+
+    state_reader = JsonStateAdapter(str(state_file.parent))
+    state = state_reader.load()
+    return enforcement_engine.evaluate(state, tool_name="wave_1_strategy")
 
 
 @when("Phil attempts to start Wave 2 work")
@@ -168,10 +180,10 @@ def verify_orphan_detected():
 
 
 @then(parsers.parse('Phil sees "{message}"'))
-def verify_message(message):
+def verify_message(enforcement_result, message):
     """Verify user-facing message content."""
-    # TODO: Assert message from enforcement/service result
-    pass
+    all_messages = " ".join(enforcement_result.messages)
+    assert message in all_messages, f"Expected '{message}' in {enforcement_result.messages}"
 
 
 @then("Phil sees guidance to run the compliance check")
@@ -181,15 +193,16 @@ def verify_compliance_guidance():
 
 
 @then("the enforcement system runs silently")
-def verify_silent_run():
+def verify_silent_run(enforcement_result):
     """Verify no output from enforcement on clean state."""
-    pass
+    assert enforcement_result.decision == Decision.ALLOW
+    assert enforcement_result.messages == []
 
 
 @then("no warnings are displayed")
-def verify_no_warnings():
+def verify_no_warnings(enforcement_result):
     """Verify zero warning messages."""
-    pass
+    assert len(enforcement_result.messages) == 0
 
 
 @then("Phil sees a critical deadline warning")
@@ -205,10 +218,9 @@ def verify_priority_suggestions():
 
 
 @then("the enforcement system blocks the action")
-def verify_action_blocked():
+def verify_action_blocked(enforcement_result):
     """Verify enforcement returns block decision (exit code 1)."""
-    # TODO: Assert Decision.block from EnforcementEngine
-    pass
+    assert enforcement_result.decision == Decision.BLOCK
 
 
 @then("Phil sees guidance to complete the Go/No-Go step first")
@@ -218,10 +230,9 @@ def verify_go_guidance():
 
 
 @then("the action proceeds normally")
-def verify_action_allowed():
+def verify_action_allowed(enforcement_result):
     """Verify enforcement returns allow decision (exit code 0)."""
-    # TODO: Assert Decision.allow from EnforcementEngine
-    pass
+    assert enforcement_result.decision == Decision.ALLOW
 
 
 @then("Phil sees guidance to add a compliance item")
@@ -231,10 +242,12 @@ def verify_add_compliance_guidance():
 
 
 @then("the block decision is recorded in the audit log with a timestamp")
-def verify_audit_log():
+def verify_audit_log(in_memory_audit_log):
     """Verify audit log entry for enforcement decision."""
-    # TODO: Read audit log file and verify entry
-    pass
+    assert len(in_memory_audit_log.entries) > 0
+    entry = in_memory_audit_log.entries[-1]
+    assert "timestamp" in entry
+    assert entry["decision"] == "BLOCK"
 
 
 @then("the new rule is evaluated alongside existing rules")

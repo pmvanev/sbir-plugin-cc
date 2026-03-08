@@ -1,0 +1,38 @@
+{
+  "rules": [
+    {
+      "rule_id": "wave-1-requires-go",
+      "description": "Wave 1 strategy work requires Go decision in Wave 0",
+      "rule_type": "wave_ordering",
+      "condition": {
+        "requires_go_no_go": "go",
+        "target_wave": 1
+      },
+      "message": "Wave 1 requires Go decision in Wave 0"
+    },
+    {
+      "rule_id": "wave-2-requires-strategy",
+      "description": "Wave 2 writing requires strategy brief approval in Wave 1",
+      "rule_type": "wave_ordering",
+      "condition": {
+        "requires_strategy_approval": true,
+        "target_wave": 2
+      },
+      "message": "Wave 2 requires strategy brief approval in Wave 1"
+    }
+  ],
+  "enforcement": {
+    "session_startup_check": true,
+    "wave_ordering": "strict",
+    "compliance_gate": true
+  },
+  "deadlines": {
+    "warning_days": 7,
+    "critical_days": 3
+  },
+  "audit_log": {
+    "enabled": true,
+    "path": "./.sbir/audit/",
+    "retention_days": 365
+  }
+}
