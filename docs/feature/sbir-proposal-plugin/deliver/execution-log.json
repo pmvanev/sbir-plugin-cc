@@ -1,6 +1,6 @@
 {
   "schema_version": "3.0",
-  "feature_id": "sbir-proposal-plugin",
+  "project_id": "sbir-proposal-plugin",
   "events": [
     {
       "sid": "01-01",
@@ -29,6 +29,13 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-03-08T21:55:03Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-08T21:57:54Z"
     }
   ]
 }
