@@ -1,0 +1,6 @@
+{
+  "name": "sbir",
+  "description": "SBIR/STTR Proposal Writing Plugin for Claude Code",
+  "author": "pmvanev",
+  "version": "0.1.0"
+}

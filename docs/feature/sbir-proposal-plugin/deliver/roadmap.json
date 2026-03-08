@@ -1,0 +1,184 @@
+{
+  "roadmap": {
+    "project_id": "sbir-proposal-plugin",
+    "created_at": "2026-03-08T21:33:30Z",
+    "total_steps": 12,
+    "phases": 4
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Foundation -- Plugin Skeleton, State Schema, PES Engine",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Plugin skeleton and proposal state schema",
+          "criteria": [
+            "Plugin installs via claude plugin install and registers",
+            "proposal-state.json created with versioned schema on /proposal new",
+            "State writes complete atomically without partial corruption",
+            "Missing state file returns helpful message, not crash",
+            "Corrupted state detected with recovery from .bak"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "PES enforcement engine and hook integration",
+          "criteria": [
+            "SessionStart hook runs integrity check silently",
+            "Clean state produces no PES output to user",
+            "Enforcement rules loaded from pes-config.json without code changes",
+            "Audit log records each enforcement action with timestamp",
+            "Exit code 0 allows action; exit code 1 blocks with message"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Corpus and Solicitation -- Ingestion, Parsing, Go/No-Go",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Directory-based corpus ingestion",
+          "criteria": [
+            "Ingests PDF, docx, txt, md files from given directory",
+            "Reports count and type of ingested documents",
+            "Skips unsupported file types with count reported",
+            "Re-ingesting same directory adds only new files (dedup by hash)",
+            "Empty directory produces helpful message with supported formats"
+          ]
+        },
+        {
+          "id": "02-02",
+          "name": "Solicitation parsing and new proposal creation",
+          "criteria": [
+            "Parses solicitation for topic ID, agency, phase, deadline",
+            "Searches corpus for related past work with relevance indication",
+            "Go/No-Go is a human checkpoint with go, no-go, defer options",
+            "Go decision records in state and unlocks Wave 1",
+            "Unparseable solicitation produces actionable error message"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Wave 1 Capabilities -- Status, Compliance, TPOC, Strategy",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Proposal status and reorientation",
+          "criteria": [
+            "Displays current wave, progress, and deadline countdown",
+            "Shows pending async events (TPOC call) with their state",
+            "Suggests concrete next action based on current state",
+            "Shows PES deadline warning at critical threshold",
+            "Handles gracefully when no proposal exists"
+          ]
+        },
+        {
+          "id": "03-02",
+          "name": "Compliance matrix generation and manual editing",
+          "criteria": [
+            "Extracts shall-statements, format requirements, and implicit requirements",
+            "Maps each item to proposal section; flags ambiguities",
+            "Low extraction count produces warning, not silent acceptance",
+            "User adds missed items via /proposal compliance add",
+            "Matrix is human-editable markdown written to artifacts directory"
+          ]
+        },
+        {
+          "id": "03-03",
+          "name": "TPOC question generation",
+          "criteria": [
+            "Questions generated from ambiguities and strategic probes",
+            "Questions categorized by type and ordered by priority",
+            "Written to editable file user modifies before call",
+            "Call-never-happened is valid state that does not block progress"
+          ]
+        },
+        {
+          "id": "03-04",
+          "name": "TPOC answer ingestion and delta analysis",
+          "criteria": [
+            "Accepts file path for call notes (text, markdown, or Word)",
+            "Matches answers to original questions; marks unanswered",
+            "Generates delta analysis comparing TPOC answers to solicitation",
+            "Updates compliance matrix with TPOC clarifications"
+          ]
+        },
+        {
+          "id": "03-05",
+          "name": "Strategy brief generation and Wave 1 checkpoint",
+          "criteria": [
+            "Brief covers TRL, teaming, Phase III, budget, and risks",
+            "Generated even without TPOC answers (notes their absence)",
+            "Strategy alignment is human checkpoint with approve/revise/skip",
+            "Approval records in state and unlocks Wave 2 (PES-enforced)",
+            "User feedback incorporated into revised brief for re-review"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Enforcement and Compliance Check -- PES Rules, /proposal:check",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "PES wave ordering enforcement",
+          "criteria": [
+            "Wave 1 commands blocked when go_no_go is not 'go'",
+            "Wave 1 commands allowed when go_no_go equals 'go'",
+            "Block message explains what prerequisite is required",
+            "Enforcement rules configurable in pes-config.json"
+          ]
+        },
+        {
+          "id": "04-02",
+          "name": "PES session startup integrity check",
+          "criteria": [
+            "Orphaned files detected and warned on startup",
+            "Clean state produces no warnings on session startup",
+            "Deadline proximity warning surfaces at configured threshold",
+            "Corrupted state triggers recovery attempt from backup"
+          ]
+        },
+        {
+          "id": "04-03",
+          "name": "Simplified compliance check command",
+          "criteria": [
+            "Reports coverage by status: covered, partial, missing, waived",
+            "Waived items shown distinct from missing with count",
+            "Missing matrix handled gracefully with guidance to generate one"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/",
+      "agents/",
+      "commands/",
+      "skills/",
+      "hooks/",
+      "templates/",
+      ".claude-plugin/"
+    ],
+    "test_directories": [
+      "tests/unit/",
+      "tests/acceptance/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "solution-architect-reviewer",
+    "approved_at": "2026-03-08T21:45:00Z"
+  }
+}
