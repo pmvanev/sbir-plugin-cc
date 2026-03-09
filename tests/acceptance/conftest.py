@@ -29,8 +29,15 @@ def proposal_dir(tmp_path: Path) -> Path:
     sbir_dir = tmp_path / ".sbir"
     sbir_dir.mkdir()
     (sbir_dir / "audit").mkdir()
-    artifacts_dir = tmp_path / "artifacts" / "wave-1-strategy"
-    artifacts_dir.mkdir(parents=True)
+    # Wave 1 artifacts
+    (tmp_path / "artifacts" / "wave-1-strategy").mkdir(parents=True)
+    # Wave 2 artifacts (C2)
+    (tmp_path / "artifacts" / "wave-2-research").mkdir(parents=True)
+    # Wave 3 artifacts (C2)
+    (tmp_path / "artifacts" / "wave-3-outline").mkdir(parents=True)
+    # Wave 4 artifacts (C2)
+    (tmp_path / "artifacts" / "wave-4-drafting" / "sections").mkdir(parents=True)
+    (tmp_path / "artifacts" / "wave-4-drafting" / "reviews").mkdir(parents=True)
     return tmp_path
 
 

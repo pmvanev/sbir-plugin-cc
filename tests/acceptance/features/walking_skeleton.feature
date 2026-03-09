@@ -44,3 +44,39 @@ Feature: SBIR Proposal Walking Skeleton
     Then the enforcement system blocks the action
     And Phil sees "Wave 1 requires Go decision in Wave 0"
     And Phil sees guidance to complete the Go/No-Go step first
+
+  # ===================================================================
+  # C2 Walking Skeletons: Waves 2-4
+  # ===================================================================
+
+  # Walking Skeleton 4: Research through discrimination and outline
+  # Validates: research generation -> research checkpoint -> discrimination table -> outline -> Wave 4 unlock
+  @walking_skeleton
+  @skip
+  Scenario: Engineer completes research and builds proposal structure
+    Given Phil has an active proposal with an approved strategy brief
+    And a compliance matrix exists with 47 items
+    When Phil generates research findings from the strategy brief
+    Then Phil sees research covering technical landscape, market analysis, and prior awards
+    When Phil approves the research review
+    Then Wave 3 is unlocked
+    When Phil generates the discrimination table
+    Then Phil sees discriminators for company, technical approach, and team
+    When Phil generates the proposal outline
+    Then Phil sees every compliance item mapped to a section with page budgets
+    When Phil approves the proposal outline
+    Then Wave 4 is unlocked
+
+  # Walking Skeleton 5: Section drafting through review iteration
+  # Validates: draft generation -> review scorecard -> iteration -> compliance verification
+  @walking_skeleton
+  @skip
+  Scenario: Engineer drafts a section and iterates through review
+    Given Phil has an active proposal with an approved proposal outline
+    And the outline includes a technical approach section with 8-page budget
+    When Phil requests a draft of the technical approach section
+    Then Phil sees a draft addressing compliance items with word count
+    When the section is submitted for review
+    Then Phil sees a scorecard with actionable findings
+    When Phil requests iteration on the technical approach section
+    Then the revised section preserves approved content and addresses findings
