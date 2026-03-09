@@ -9,7 +9,6 @@ Feature: Wave 3 Discrimination Table and Proposal Outline
 
   # --- Discrimination Table: Happy Path ---
 
-  @skip
   Scenario: Discrimination table generated from strategy and research context
     Given a strategy brief exists with key discriminators
     And research findings include competitor landscape and prior art
@@ -19,14 +18,12 @@ Feature: Wave 3 Discrimination Table and Proposal Outline
     And Phil sees discriminators covering team qualifications and past performance
     And each discriminator cites supporting evidence
 
-  @skip
   Scenario: Discrimination table incorporates TPOC insights
     Given TPOC answers revealed the agency's failed prior approach
     When the discrimination table is generated
     Then the technical discriminators explicitly contrast with the failed prior approach
     And the TPOC insight is cited as evidence
 
-  @skip
   Scenario: Discrimination table iteration with feedback
     Given a discrimination table has been generated for AF243-001
     When Phil provides discrimination feedback "Add facility clearance as a company discriminator"
@@ -68,7 +65,6 @@ Feature: Wave 3 Discrimination Table and Proposal Outline
 
   # --- Error Paths ---
 
-  @skip
   Scenario: Discrimination table cannot start without research approval
     Given the research review has not been approved
     When Phil attempts to generate the discrimination table

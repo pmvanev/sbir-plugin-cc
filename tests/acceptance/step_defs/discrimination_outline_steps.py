@@ -1,8 +1,7 @@
 """Step definitions for Wave 3 discrimination table and proposal outline.
 
-Invokes through: DiscriminationService, OutlineService (driving ports -- to be
-created in C2). Does NOT import internal discriminator builders or outline
-generators directly.
+Invokes through: DiscriminationService (driving port).
+Does NOT import internal discriminator builders or outline generators directly.
 """
 
 from __future__ import annotations
@@ -12,10 +11,84 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from pes.domain.discrimination import DiscriminationTable, DiscriminatorItem
+from pes.domain.discrimination_service import (
+    DiscriminationService,
+    ResearchApprovalRequiredError,
+)
+from pes.domain.research import (
+    ResearchCategory,
+    ResearchFinding,
+    ResearchSummary,
+)
+from pes.domain.strategy import StrategyBrief, StrategySection
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 
 # Link to feature file
 scenarios("../features/discrimination_outline.feature")
+
+
+# ---------------------------------------------------------------------------
+# Fake driven port (DiscriminationGenerator) at port boundary
+# ---------------------------------------------------------------------------
+
+
+class FakeDiscriminationGenerator:
+    """Fake driven port that produces deterministic discrimination tables."""
+
+    def __init__(self) -> None:
+        self.last_tpoc_insights: str | None = None
+        self.last_feedback: str | None = None
+
+    def generate(
+        self,
+        strategy_brief: StrategyBrief,
+        compliance_matrix: dict[str, Any],
+        research_summary: ResearchSummary,
+        *,
+        tpoc_insights: str | None = None,
+        feedback: str | None = None,
+    ) -> DiscriminationTable:
+        self.last_tpoc_insights = tpoc_insights
+        self.last_feedback = feedback
+
+        items = [
+            DiscriminatorItem(
+                category="company_strengths",
+                claim="Superior manufacturing capacity versus competitor X",
+                evidence_citation="Company profile: 50k sq ft facility",
+            ),
+            DiscriminatorItem(
+                category="technical_approach",
+                claim="Novel beam-steering approach versus prior art",
+                evidence_citation="Research finding: patent landscape analysis",
+            ),
+            DiscriminatorItem(
+                category="team_qualifications",
+                claim="PI has 15 years directed energy experience",
+                evidence_citation="Company profile: team roster",
+            ),
+        ]
+
+        if tpoc_insights:
+            items.append(
+                DiscriminatorItem(
+                    category="technical_approach",
+                    claim="Our approach avoids the failed thermal management design",
+                    evidence_citation=f"TPOC insight: {tpoc_insights}",
+                )
+            )
+
+        if feedback:
+            items.append(
+                DiscriminatorItem(
+                    category="company_strengths",
+                    claim=f"Added per feedback: {feedback}",
+                    evidence_citation="User feedback incorporation",
+                )
+            )
+
+        return DiscriminationTable(items=items)
 
 
 # ---------------------------------------------------------------------------
@@ -29,31 +102,119 @@ def discrim_context() -> dict[str, Any]:
     return {}
 
 
+@pytest.fixture()
+def fake_generator() -> FakeDiscriminationGenerator:
+    return FakeDiscriminationGenerator()
+
+
+@pytest.fixture()
+def discrimination_service(fake_generator) -> DiscriminationService:
+    return DiscriminationService(discrimination_generator=fake_generator)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+SAMPLE_BRIEF = StrategyBrief(
+    sections=[
+        StrategySection(key="technical_approach", title="Technical Approach", content="approach"),
+        StrategySection(key="trl", title="TRL", content="trl assessment"),
+        StrategySection(key="teaming", title="Teaming", content="teaming plan"),
+        StrategySection(key="phase_iii", title="Phase III", content="commercialization"),
+        StrategySection(key="budget", title="Budget", content="budget plan"),
+        StrategySection(key="risks", title="Risks", content="risk assessment"),
+    ],
+    tpoc_available=True,
+)
+
+
+def _make_research_summary() -> ResearchSummary:
+    return ResearchSummary(
+        findings=[
+            ResearchFinding(
+                category=cat,
+                content=f"Finding for {cat.value}",
+                evidence_source=f"Source for {cat.value}",
+            )
+            for cat in ResearchCategory
+        ],
+    )
+
+
+SAMPLE_COMPLIANCE_MATRIX = {"item_count": 47, "items": []}
+
+
+# --- Given steps (Background) ---
+
+
+@given(
+    "Phil has an active proposal with approved research review",
+    target_fixture="active_state",
+)
+def proposal_with_research_approved(sample_state, write_state):
+    """Set up proposal with research approved, ready for Wave 3."""
+    state = sample_state.copy()
+    state["go_no_go"] = "go"
+    state["current_wave"] = 3
+    state["waves"] = {
+        "0": {"status": "completed", "completed_at": "2026-03-02T10:00:00Z"},
+        "1": {"status": "completed", "completed_at": "2026-03-05T10:00:00Z"},
+        "2": {"status": "completed", "completed_at": "2026-03-08T10:00:00Z"},
+        "3": {"status": "active", "completed_at": None},
+    }
+    state["strategy_brief"] = {
+        "path": "./artifacts/wave-1-strategy/strategy-brief.md",
+        "status": "approved",
+        "approved_at": "2026-03-05T10:00:00Z",
+    }
+    state["research_summary"] = {
+        "status": "approved",
+        "approved_at": "2026-03-08T10:00:00Z",
+    }
+    write_state(state)
+    return state
+
+
 # --- Given steps ---
 
 
 @given("a strategy brief exists with key discriminators")
 def strategy_with_discriminators(discrim_context):
     """Strategy brief contains discriminator candidates."""
-    discrim_context["strategy_available"] = True
+    discrim_context["strategy_brief"] = SAMPLE_BRIEF
 
 
 @given("research findings include competitor landscape and prior art")
 def research_with_competitors(discrim_context):
     """Research findings have competitor and prior art data."""
-    discrim_context["research_available"] = True
+    discrim_context["research_summary"] = _make_research_summary()
+    discrim_context["research_approved"] = True
 
 
 @given("TPOC answers revealed the agency's failed prior approach")
 def tpoc_revealed_failure(discrim_context):
     """TPOC data includes insight about agency's prior failed approach."""
-    discrim_context["tpoc_failure_insight"] = True
+    discrim_context["tpoc_insights"] = "Agency's prior thermal management approach failed due to overheating"
+    discrim_context["strategy_brief"] = SAMPLE_BRIEF
+    discrim_context["research_summary"] = _make_research_summary()
+    discrim_context["research_approved"] = True
 
 
 @given("a discrimination table has been generated for AF243-001")
-def discrimination_generated(discrim_context):
+def discrimination_generated(discrim_context, discrimination_service):
     """Discrimination table has been generated."""
-    discrim_context["discrimination_generated"] = True
+    discrim_context["strategy_brief"] = SAMPLE_BRIEF
+    discrim_context["research_summary"] = _make_research_summary()
+    discrim_context["research_approved"] = True
+    table = discrimination_service.generate_table(
+        strategy_brief=SAMPLE_BRIEF,
+        compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
+        research_summary=_make_research_summary(),
+        research_approved=True,
+    )
+    discrim_context["discrimination_table"] = table
 
 
 @given("a compliance matrix exists with 47 items")
@@ -123,13 +284,28 @@ def any_valid_page_limit(discrim_context):
     discrim_context["page_limit"] = 25
 
 
+@given("the research review has not been approved")
+def research_not_approved(discrim_context):
+    """Research review not approved."""
+    discrim_context["research_approved"] = False
+    discrim_context["strategy_brief"] = SAMPLE_BRIEF
+    discrim_context["research_summary"] = _make_research_summary()
+
+
 # --- When steps ---
 
 
 @when("the discrimination table is generated")
-def generate_discrimination(discrim_context):
+def generate_discrimination(discrim_context, discrimination_service):
     """Invoke discrimination table generation through driving port."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrimination_service.generate_table(
+        strategy_brief=discrim_context.get("strategy_brief", SAMPLE_BRIEF),
+        compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
+        research_summary=discrim_context.get("research_summary", _make_research_summary()),
+        research_approved=discrim_context.get("research_approved", True),
+        tpoc_insights=discrim_context.get("tpoc_insights"),
+    )
+    discrim_context["discrimination_table"] = table
 
 
 @when(
@@ -137,10 +313,18 @@ def generate_discrimination(discrim_context):
         'Phil provides discrimination feedback "{feedback}"'
     )
 )
-def revise_discrimination(discrim_context, feedback):
+def revise_discrimination(discrim_context, feedback, discrimination_service):
     """Submit discrimination revision feedback."""
     discrim_context["revision_feedback"] = feedback
-    pytest.skip("Awaiting DiscriminationService implementation")
+    revised = discrimination_service.revise_table(
+        existing_table=discrim_context["discrimination_table"],
+        strategy_brief=discrim_context.get("strategy_brief", SAMPLE_BRIEF),
+        compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
+        research_summary=discrim_context.get("research_summary", _make_research_summary()),
+        research_approved=True,
+        feedback=feedback,
+    )
+    discrim_context["discrimination_table"] = revised
 
 
 @when("the proposal outline is generated")
@@ -165,9 +349,17 @@ def revise_outline(discrim_context, feedback):
 
 
 @when("Phil attempts to generate the discrimination table")
-def attempt_generate_discrimination(discrim_context):
+def attempt_generate_discrimination(discrim_context, discrimination_service):
     """Attempt discrimination without prerequisites."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    try:
+        discrimination_service.generate_table(
+            strategy_brief=discrim_context.get("strategy_brief", SAMPLE_BRIEF),
+            compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
+            research_summary=discrim_context.get("research_summary"),
+            research_approved=discrim_context.get("research_approved", False),
+        )
+    except ResearchApprovalRequiredError as e:
+        discrim_context["error"] = str(e)
 
 
 @when("Phil attempts to generate the proposal outline")
@@ -200,7 +392,9 @@ def validate_outline_mapping(discrim_context):
 @then("Phil sees discriminators covering company strengths versus competitors")
 def verify_company_discriminators(discrim_context):
     """Verify company discriminators present."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrim_context["discrimination_table"]
+    company_items = [i for i in table.items if i.category == "company_strengths"]
+    assert len(company_items) > 0, "Expected at least one company_strengths discriminator"
 
 
 @then(
@@ -208,7 +402,9 @@ def verify_company_discriminators(discrim_context):
 )
 def verify_technical_discriminators(discrim_context):
     """Verify technical discriminators present."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrim_context["discrimination_table"]
+    tech_items = [i for i in table.items if i.category == "technical_approach"]
+    assert len(tech_items) > 0, "Expected at least one technical_approach discriminator"
 
 
 @then(
@@ -216,13 +412,19 @@ def verify_technical_discriminators(discrim_context):
 )
 def verify_team_discriminators(discrim_context):
     """Verify team discriminators present."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrim_context["discrimination_table"]
+    team_items = [i for i in table.items if i.category == "team_qualifications"]
+    assert len(team_items) > 0, "Expected at least one team_qualifications discriminator"
 
 
 @then("each discriminator cites supporting evidence")
 def verify_evidence_citations(discrim_context):
     """Verify evidence cited for each discriminator."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrim_context["discrimination_table"]
+    for item in table.items:
+        assert item.evidence_citation, (
+            f"Discriminator '{item.claim}' missing evidence citation"
+        )
 
 
 @then(
@@ -230,25 +432,38 @@ def verify_evidence_citations(discrim_context):
 )
 def verify_tpoc_contrast(discrim_context):
     """Verify TPOC failure insight used in discrimination."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrim_context["discrimination_table"]
+    tech_items = [i for i in table.items if i.category == "technical_approach"]
+    contrast_found = any("failed" in i.claim.lower() or "avoids" in i.claim.lower() for i in tech_items)
+    assert contrast_found, "Expected technical discriminator contrasting with failed prior approach"
 
 
 @then("the TPOC insight is cited as evidence")
 def verify_tpoc_evidence_cited(discrim_context):
     """Verify TPOC insight cited."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrim_context["discrimination_table"]
+    tpoc_cited = any("tpoc" in i.evidence_citation.lower() for i in table.items)
+    assert tpoc_cited, "Expected TPOC insight cited as evidence"
 
 
 @then("the discrimination table is revised incorporating the feedback")
 def verify_discrimination_revised(discrim_context):
     """Verify discrimination table revised."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrim_context["discrimination_table"]
+    feedback = discrim_context["revision_feedback"]
+    # Revised table should incorporate feedback content
+    all_claims = " ".join(i.claim for i in table.items)
+    assert feedback.lower() in all_claims.lower() or len(table.items) > 3, (
+        "Revised table should incorporate feedback"
+    )
 
 
 @then("Phil reviews the revised discrimination table")
 def verify_revised_discrimination(discrim_context):
     """Verify revised table presented."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    table = discrim_context["discrimination_table"]
+    assert table is not None
+    assert len(table.items) > 0
 
 
 @then("every compliance item is mapped to a proposal section")
@@ -321,7 +536,10 @@ def verify_discrim_message(discrim_context, message):
 @then("Phil sees guidance to complete Wave 2 research review first")
 def verify_research_guidance(discrim_context):
     """Verify guidance points to research review."""
-    pytest.skip("Awaiting DiscriminationService implementation")
+    error = discrim_context.get("error", "")
+    assert "wave 2" in error.lower() or "research" in error.lower(), (
+        f"Expected guidance mentioning research review, got: '{error}'"
+    )
 
 
 @then("Phil sees guidance to complete the discrimination review first")
