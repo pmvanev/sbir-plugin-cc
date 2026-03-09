@@ -76,6 +76,39 @@ def check_status(state_file):
 # --- Then steps ---
 
 
+@given(
+    "Phil has an active proposal with current wave set to 99",
+    target_fixture="active_state",
+)
+def proposal_with_unknown_wave(sample_state, write_state):
+    """Set up proposal state with an undefined wave number."""
+    state = sample_state.copy()
+    state["current_wave"] = 99
+    state["go_no_go"] = "go"
+    state["waves"] = {
+        "99": {"status": "active", "completed_at": None},
+    }
+    write_state(state)
+    return state
+
+
+@given(
+    "Phil has an active proposal with no wave entries in the state",
+    target_fixture="active_state",
+)
+def proposal_with_no_wave_entries(sample_state, write_state):
+    """Set up proposal state with empty waves dict."""
+    state = sample_state.copy()
+    state["current_wave"] = 0
+    state["go_no_go"] = "go"
+    state["waves"] = {}
+    write_state(state)
+    return state
+
+
+# --- Then steps ---
+
+
 @then(parsers.parse('Phil sees "{wave_name}"'))
 def verify_wave_name_in_status(status_report, wave_name):
     """Verify that the wave name appears in the status report."""
@@ -85,4 +118,29 @@ def verify_wave_name_in_status(status_report, wave_name):
     assert wave_name in all_text, (
         f"Expected '{wave_name}' in wave names. "
         f"Found waves: {all_wave_names}, current: {current}"
+    )
+
+
+@then(parsers.parse('Phil sees "{wave_label}" as the current wave name'))
+def verify_current_wave_name(status_report, wave_label):
+    """Verify the current wave name in the status report."""
+    assert wave_label in status_report.current_wave, (
+        f"Expected '{wave_label}' in current wave. "
+        f"Got: {status_report.current_wave}"
+    )
+
+
+@then("no error is raised")
+def verify_no_error(status_report):
+    """Verify no error in the status report."""
+    assert status_report.error is None, (
+        f"Expected no error, got: {status_report.error}"
+    )
+
+
+@then("Phil sees progress with zero waves completed")
+def verify_zero_waves_completed(status_report):
+    """Verify progress shows zero completed waves."""
+    assert "0/" in status_report.progress, (
+        f"Expected '0/' in progress. Got: {status_report.progress}"
     )

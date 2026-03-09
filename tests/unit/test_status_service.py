@@ -1,6 +1,6 @@
 """Unit tests for proposal status through StatusService (driving port).
 
-Test Budget: 5 behaviors x 2 = 10 unit tests max.
+Test Budget: 8 behaviors x 2 = 16 unit tests max.
 Tests enter through driving port (StatusService).
 StateReader driven port replaced with in-memory fake.
 Domain objects (StatusReport, WaveDetail, AsyncEvent) are real collaborators.
@@ -22,11 +22,16 @@ from pes.ports.state_port import StateReader
 # ---------------------------------------------------------------------------
 
 WAVE_NAMES = {
-    0: "Wave 0: Qualify & Decide",
+    0: "Wave 0: Intelligence & Fit",
     1: "Wave 1: Requirements & Strategy",
-    2: "Wave 2: Technical Volume",
-    3: "Wave 3: Cost & Management Volumes",
-    4: "Wave 4: Compliance & Submission",
+    2: "Wave 2: Research",
+    3: "Wave 3: Discrimination & Outline",
+    4: "Wave 4: Drafting",
+    5: "Wave 5: Visual Assets",
+    6: "Wave 6: Formatting & Assembly",
+    7: "Wave 7: Final Review",
+    8: "Wave 8: Submission",
+    9: "Wave 9: Debrief & Learning",
 }
 
 
@@ -223,3 +228,65 @@ class TestNoProposal:
         assert "No active proposal" in report.error
         assert report.suggestion is not None
         assert "/proposal new" in report.suggestion
+
+
+# ---------------------------------------------------------------------------
+# Behavior 6: All 10 wave names displayed correctly
+# ---------------------------------------------------------------------------
+
+
+class TestAllWaveNames:
+    @pytest.mark.parametrize("wave_num,expected_name", [
+        (0, "Wave 0: Intelligence & Fit"),
+        (1, "Wave 1: Requirements & Strategy"),
+        (2, "Wave 2: Research"),
+        (3, "Wave 3: Discrimination & Outline"),
+        (4, "Wave 4: Drafting"),
+        (5, "Wave 5: Visual Assets"),
+        (6, "Wave 6: Formatting & Assembly"),
+        (7, "Wave 7: Final Review"),
+        (8, "Wave 8: Submission"),
+        (9, "Wave 9: Debrief & Learning"),
+    ])
+    def test_wave_name_matches_spec(self, wave_num, expected_name):
+        state = _make_state(wave=wave_num)
+        service = _make_service(state)
+
+        report = service.get_status()
+
+        assert report.current_wave == expected_name
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: Unknown wave number produces default label
+# ---------------------------------------------------------------------------
+
+
+class TestUnknownWaveNumber:
+    def test_unknown_wave_shows_default_label_without_error(self):
+        state = _make_state(wave=0)
+        state["current_wave"] = 99
+        state["waves"] = {"99": {"status": "active", "completed_at": None}}
+        service = _make_service(state)
+
+        report = service.get_status()
+
+        assert "Wave 99" in report.current_wave
+        assert report.error is None
+
+
+# ---------------------------------------------------------------------------
+# Behavior 8: Missing wave entries produce zero-completed progress
+# ---------------------------------------------------------------------------
+
+
+class TestMissingWaveEntries:
+    def test_empty_waves_shows_zero_completed(self):
+        state = _make_state(wave=0)
+        state["waves"] = {}
+        service = _make_service(state)
+
+        report = service.get_status()
+
+        assert "0/" in report.progress
+        assert report.error is None

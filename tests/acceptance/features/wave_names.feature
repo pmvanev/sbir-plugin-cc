@@ -52,14 +52,12 @@ Feature: Wave Names and Cross-Cutting State Expansion (C2 Foundation)
 
   # --- Error Paths ---
 
-  @skip
   Scenario: Status handles unknown wave number gracefully
     Given Phil has an active proposal with current wave set to 99
     When Phil checks proposal status
     Then Phil sees "Wave 99" as the current wave name
     And no error is raised
 
-  @skip
   Scenario: Status handles missing wave entries in state
     Given Phil has an active proposal with no wave entries in the state
     When Phil checks proposal status
