@@ -1,15 +1,21 @@
-"""Unit tests for OutlineService (driving port) -- proposal outline generation.
+"""Unit tests for OutlineService (driving port) -- outline generation and checkpoint.
 
-Test Budget: 4 behaviors x 2 = 8 unit tests max.
+Test Budget: 8 behaviors x 2 = 16 unit tests max.
 Tests enter through driving port (OutlineService).
 Driven port (OutlineGenerator) mocked at port boundary.
 Domain objects (ProposalOutline, OutlineSection) are real collaborators.
 
-Behaviors:
+Behaviors (generation -- step 03-03):
 1. Generate outline mapping all compliance items to sections
 2. Section page budgets total to solicitation page limit or fewer
 3. Unmapped compliance items flagged with item IDs listed
 4. Generation without approved discrimination table raises error
+
+Behaviors (checkpoint -- step 03-04):
+5. Approval records timestamp and unlocks Wave 4
+6. Revision regenerates outline incorporating feedback text
+7. Approve without generated outline raises descriptive error
+8. Skip marks outline as deferred and unlocks Wave 4
 """
 
 from __future__ import annotations
@@ -21,6 +27,7 @@ import pytest
 from pes.domain.outline import OutlineSection, ProposalOutline
 from pes.domain.outline_service import (
     DiscriminationApprovalRequiredError,
+    OutlineNotFoundError,
     OutlineService,
 )
 
@@ -49,11 +56,13 @@ class FakeOutlineGenerator:
         compliance_matrix: dict[str, Any],
         *,
         page_limit: float,
+        feedback: str | None = None,
     ) -> ProposalOutline:
         self.generate_called_with = {
             "discrimination_table": discrimination_table,
             "compliance_matrix": compliance_matrix,
             "page_limit": page_limit,
+            "feedback": feedback,
         }
 
         # Derive compliance item IDs from matrix
@@ -250,3 +259,123 @@ class TestGenerateWithoutDiscriminationApproval:
                 compliance_matrix=_make_compliance_matrix(6),
                 page_limit=25.0,
             )
+
+
+# ---------------------------------------------------------------------------
+# Helper: generate an outline for checkpoint tests
+# ---------------------------------------------------------------------------
+
+
+def _generate_sample_outline(
+    service: OutlineService,
+) -> ProposalOutline:
+    """Generate a sample outline through the driving port."""
+    result = service.generate_outline(
+        discrimination_table=SAMPLE_DISCRIMINATION_TABLE,
+        compliance_matrix=_make_compliance_matrix(6),
+        page_limit=25.0,
+    )
+    return result.outline
+
+
+# ---------------------------------------------------------------------------
+# Behavior 5: Approval records timestamp and unlocks Wave 4
+# ---------------------------------------------------------------------------
+
+
+class TestApproveOutline:
+    def test_approval_records_timestamp_and_unlocks_wave_4(self):
+        service, _ = _make_service()
+        outline = _generate_sample_outline(service)
+
+        result = service.approve_outline(outline=outline)
+
+        assert result["outline_status"] == "approved"
+        assert result["approved_at"] is not None
+        assert result["wave_4_unlocked"] is True
+
+    def test_approval_timestamp_is_iso_format(self):
+        service, _ = _make_service()
+        outline = _generate_sample_outline(service)
+
+        result = service.approve_outline(outline=outline)
+
+        # Verify ISO format by parsing
+        from datetime import datetime
+
+        datetime.fromisoformat(result["approved_at"])
+
+
+# ---------------------------------------------------------------------------
+# Behavior 6: Revision regenerates outline incorporating feedback text
+# ---------------------------------------------------------------------------
+
+
+class TestReviseOutline:
+    def test_revision_passes_feedback_to_generator(self):
+        service, gen = _make_service()
+        outline = _generate_sample_outline(service)
+
+        service.revise_outline(
+            outline=outline,
+            discrimination_table=SAMPLE_DISCRIMINATION_TABLE,
+            compliance_matrix=_make_compliance_matrix(6),
+            page_limit=25.0,
+            feedback="Move risk table from appendix to main body",
+        )
+
+        assert gen.generate_called_with is not None
+        assert gen.generate_called_with["feedback"] == "Move risk table from appendix to main body"
+
+    def test_revision_returns_new_outline(self):
+        service, _ = _make_service()
+        outline = _generate_sample_outline(service)
+
+        revised = service.revise_outline(
+            outline=outline,
+            discrimination_table=SAMPLE_DISCRIMINATION_TABLE,
+            compliance_matrix=_make_compliance_matrix(6),
+            page_limit=25.0,
+            feedback="Add executive summary section",
+        )
+
+        assert isinstance(revised, ProposalOutline)
+        assert len(revised.sections) > 0
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: Approve without generated outline raises descriptive error
+# ---------------------------------------------------------------------------
+
+
+class TestApproveWithoutOutline:
+    def test_raises_outline_not_found_error(self):
+        service, _ = _make_service()
+
+        with pytest.raises(OutlineNotFoundError) as exc_info:
+            service.approve_outline(outline=None)
+
+        assert "no proposal outline to approve" in str(exc_info.value).lower()
+
+    def test_error_includes_generate_guidance(self):
+        service, _ = _make_service()
+
+        with pytest.raises(OutlineNotFoundError) as exc_info:
+            service.approve_outline(outline=None)
+
+        assert "generate" in str(exc_info.value).lower()
+
+
+# ---------------------------------------------------------------------------
+# Behavior 8: Skip marks outline as deferred and unlocks Wave 4
+# ---------------------------------------------------------------------------
+
+
+class TestSkipOutline:
+    def test_skip_marks_deferred_and_unlocks_wave_4(self):
+        service, _ = _make_service()
+
+        result = service.skip_outline()
+
+        assert result["outline_status"] == "deferred"
+        assert result["wave_4_unlocked"] is True

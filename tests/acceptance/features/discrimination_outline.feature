@@ -49,14 +49,12 @@ Feature: Wave 3 Discrimination Table and Proposal Outline
     When the proposal outline is generated
     Then the section page budgets total to 25 pages or fewer
 
-  @skip
   Scenario: Outline approval unlocks Wave 4
     Given a proposal outline has been generated for AF243-001
     When Phil approves the proposal outline
     Then the approval is recorded in the proposal state
     And Wave 4 is unlocked
 
-  @skip
   Scenario: Outline iteration with feedback
     Given a proposal outline has been generated for AF243-001
     When Phil provides outline feedback "Move risk table from appendix to main body"
@@ -78,7 +76,6 @@ Feature: Wave 3 Discrimination Table and Proposal Outline
     Then Phil sees "Approved discrimination table required before outline"
     And Phil sees guidance to complete the discrimination review first
 
-  @skip
   Scenario: Cannot approve outline that does not exist
     Given no proposal outline has been generated
     When Phil attempts to approve the proposal outline

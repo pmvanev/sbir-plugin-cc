@@ -16,6 +16,12 @@ from pes.domain.discrimination_service import (
     DiscriminationService,
     ResearchApprovalRequiredError,
 )
+from pes.domain.outline import OutlineSection, ProposalOutline
+from pes.domain.outline_service import (
+    OutlineGenerator,
+    OutlineNotFoundError,
+    OutlineService,
+)
 from pes.domain.research import (
     ResearchCategory,
     ResearchFinding,
@@ -92,6 +98,50 @@ class FakeDiscriminationGenerator:
 
 
 # ---------------------------------------------------------------------------
+# Fake driven port (OutlineGenerator) at port boundary
+# ---------------------------------------------------------------------------
+
+
+class FakeOutlineGeneratorAT:
+    """Fake outline generator for acceptance tests."""
+
+    def __init__(self) -> None:
+        self.last_feedback: str | None = None
+
+    def generate(
+        self,
+        discrimination_table: dict[str, Any],
+        compliance_matrix: dict[str, Any],
+        *,
+        page_limit: float,
+        feedback: str | None = None,
+    ) -> ProposalOutline:
+        self.last_feedback = feedback
+        items = compliance_matrix.get("items", [])
+        item_ids = [item["id"] for item in items]
+
+        sections = [
+            OutlineSection(
+                section_id="sec-1",
+                title="Technical Approach",
+                compliance_item_ids=item_ids,
+                page_budget=page_limit * 0.6,
+                figure_placeholders=["fig-1"],
+                thesis_statement="Technical thesis",
+            ),
+            OutlineSection(
+                section_id="sec-2",
+                title="Management",
+                compliance_item_ids=[],
+                page_budget=page_limit * 0.4,
+                figure_placeholders=["fig-2"],
+                thesis_statement="Management thesis",
+            ),
+        ]
+        return ProposalOutline(sections=sections)
+
+
+# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
@@ -108,8 +158,18 @@ def fake_generator() -> FakeDiscriminationGenerator:
 
 
 @pytest.fixture()
+def fake_outline_generator() -> FakeOutlineGeneratorAT:
+    return FakeOutlineGeneratorAT()
+
+
+@pytest.fixture()
 def discrimination_service(fake_generator) -> DiscriminationService:
     return DiscriminationService(discrimination_generator=fake_generator)
+
+
+@pytest.fixture()
+def outline_service(fake_outline_generator) -> OutlineService:
+    return OutlineService(outline_generator=fake_outline_generator)
 
 
 # ---------------------------------------------------------------------------
@@ -240,9 +300,21 @@ def solicitation_page_limit(discrim_context, pages):
 
 
 @given("a proposal outline has been generated for AF243-001")
-def outline_generated(discrim_context):
-    """Proposal outline has been generated."""
+def outline_generated(discrim_context, outline_service):
+    """Proposal outline has been generated via OutlineService."""
     discrim_context["outline_generated"] = True
+    discrim_context["discrimination_table"] = {
+        "items": [{"category": "company_strengths", "claim": "Superior facility"}],
+        "approved_at": "2026-03-01T00:00:00Z",
+    }
+    compliance_matrix = {"item_count": 6, "items": [{"id": f"CI-{i+1:03d}"} for i in range(6)]}
+    result = outline_service.generate_outline(
+        discrimination_table=discrim_context["discrimination_table"],
+        compliance_matrix=compliance_matrix,
+        page_limit=25.0,
+    )
+    discrim_context["outline"] = result.outline
+    discrim_context["compliance_matrix"] = compliance_matrix
 
 
 @given("no discrimination table has been approved")
@@ -334,18 +406,28 @@ def generate_outline(discrim_context):
 
 
 @when("Phil approves the proposal outline")
-def approve_outline(discrim_context):
+def approve_outline(discrim_context, outline_service):
     """Approve outline through driving port."""
-    pytest.skip("Awaiting OutlineService implementation")
+    result = outline_service.approve_outline(
+        outline=discrim_context.get("outline"),
+    )
+    discrim_context["approve_result"] = result
 
 
 @when(
     parsers.parse('Phil provides outline feedback "{feedback}"')
 )
-def revise_outline(discrim_context, feedback):
+def revise_outline(discrim_context, feedback, outline_service):
     """Submit outline revision feedback."""
     discrim_context["revision_feedback"] = feedback
-    pytest.skip("Awaiting OutlineService implementation")
+    revised = outline_service.revise_outline(
+        outline=discrim_context.get("outline"),
+        discrimination_table=discrim_context.get("discrimination_table"),
+        compliance_matrix=discrim_context.get("compliance_matrix", {"items": []}),
+        page_limit=25.0,
+        feedback=feedback,
+    )
+    discrim_context["outline"] = revised
 
 
 @when("Phil attempts to generate the discrimination table")
@@ -369,9 +451,12 @@ def attempt_generate_outline(discrim_context):
 
 
 @when("Phil attempts to approve the proposal outline")
-def attempt_approve_outline(discrim_context):
+def attempt_approve_outline(discrim_context, outline_service):
     """Attempt approval of nonexistent outline."""
-    pytest.skip("Awaiting OutlineService implementation")
+    try:
+        outline_service.approve_outline(outline=None)
+    except OutlineNotFoundError as e:
+        discrim_context["error"] = str(e)
 
 
 @when("Phil attempts to approve the discrimination table")
@@ -503,25 +588,32 @@ def verify_page_budget_total(discrim_context, pages):
 @then("the approval is recorded in the proposal state")
 def verify_outline_approval(discrim_context):
     """Verify outline approval recorded."""
-    pytest.skip("Awaiting OutlineService implementation")
+    result = discrim_context["approve_result"]
+    assert result["outline_status"] == "approved"
+    assert result["approved_at"] is not None
 
 
 @then("Wave 4 is unlocked")
 def verify_wave_4_unlocked(discrim_context):
     """Verify Wave 4 status changed."""
-    pytest.skip("Awaiting OutlineService implementation")
+    result = discrim_context["approve_result"]
+    assert result["wave_4_unlocked"] is True
 
 
 @then("the proposal outline is revised incorporating the feedback")
 def verify_outline_revised(discrim_context):
-    """Verify outline revised."""
-    pytest.skip("Awaiting OutlineService implementation")
+    """Verify outline revised with feedback."""
+    outline = discrim_context["outline"]
+    assert outline is not None
+    assert len(outline.sections) > 0
 
 
 @then("Phil reviews the revised outline")
 def verify_revised_outline(discrim_context):
     """Verify revised outline presented."""
-    pytest.skip("Awaiting OutlineService implementation")
+    outline = discrim_context["outline"]
+    assert outline is not None
+    assert len(outline.sections) > 0
 
 
 @then(parsers.parse('Phil sees "{message}"'))
@@ -551,7 +643,10 @@ def verify_discrimination_guidance(discrim_context):
 @then("Phil sees guidance to generate one first")
 def verify_generate_guidance(discrim_context):
     """Verify guidance to generate."""
-    pytest.skip("Awaiting implementation")
+    error = discrim_context.get("error", "")
+    assert "generate" in error.lower(), (
+        f"Expected guidance mentioning 'generate', got: '{error}'"
+    )
 
 
 @then(
