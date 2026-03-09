@@ -40,7 +40,6 @@ Feature: Wave 4 Drafting, Review, and Iteration
 
   # --- Review: Happy Path ---
 
-  @skip
   Scenario: Section review produces actionable scorecard
     Given a draft exists for the technical approach section
     When the section is submitted for review
@@ -55,7 +54,6 @@ Feature: Wave 4 Drafting, Review, and Iteration
     When the section is submitted for review
     Then the review flags any matching weakness patterns from debrief history
 
-  @skip
   Scenario: Full draft review checkpoint verifies compliance coverage
     Given all proposal sections have been drafted
     When the full draft review is requested
@@ -73,14 +71,12 @@ Feature: Wave 4 Drafting, Review, and Iteration
     And unchanged content is preserved
     And the revised section is submitted for re-review
 
-  @skip
   Scenario: Re-review tracks which findings were addressed
     Given the technical approach was revised after first review
     When the revised section is re-reviewed
     Then each prior finding shows whether it was addressed or remains open
     And updated ratings reflect the improvements
 
-  @skip
   Scenario: Maximum two review cycles then escalate
     Given the technical approach has completed 2 review cycles
     And unresolved findings remain
@@ -102,7 +98,6 @@ Feature: Wave 4 Drafting, Review, and Iteration
     Then Phil sees "Section 'executive summary' is not in the approved outline"
     And Phil sees guidance to update the outline first
 
-  @skip
   Scenario: Cannot review section that has no draft
     Given no draft exists for the past performance section
     When Phil requests review of the past performance section

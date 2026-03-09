@@ -20,6 +20,14 @@ from pes.domain.draft_service import (
     SectionNotInOutlineError,
 )
 from pes.domain.outline import OutlineSection, ProposalOutline
+from pes.domain.review import ReviewFinding, ReviewScorecard
+from pes.domain.review_service import (
+    EscalationResult,
+    FullReviewResult,
+    NoDraftExistsError,
+    ReviewResult,
+    ReviewService,
+)
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 
 # Link to feature file
@@ -51,6 +59,67 @@ class FakeSectionDrafter:
             content=content,
             compliance_item_ids=section.compliance_item_ids,
             iteration=iteration,
+        )
+
+
+class FakeDraftReviewer:
+    """Fake driven port producing deterministic review scorecards."""
+
+    def __init__(
+        self,
+        *,
+        findings: list[ReviewFinding] | None = None,
+        strengths: list[str] | None = None,
+        weaknesses: list[str] | None = None,
+    ) -> None:
+        self._findings = findings or [
+            ReviewFinding(
+                location="section-1.para-2",
+                severity="major",
+                suggestion="Strengthen TRL advancement methodology",
+            ),
+            ReviewFinding(
+                location="section-1.para-5",
+                severity="minor",
+                suggestion="Add quantitative metrics",
+            ),
+        ]
+        self._strengths = strengths or ["Clear technical narrative"]
+        self._weaknesses = weaknesses or ["Weak risk mitigation"]
+
+    def review(
+        self,
+        draft: SectionDraft,
+        *,
+        prior_findings: list[ReviewFinding] | None = None,
+    ) -> ReviewScorecard:
+        if prior_findings:
+            # On re-review, resolve the first finding, keep rest
+            return ReviewScorecard(
+                findings=self._findings[1:],
+                strengths=[*self._strengths, "Addressed prior findings"],
+                weaknesses=[],
+            )
+        return ReviewScorecard(
+            findings=list(self._findings),
+            strengths=list(self._strengths),
+            weaknesses=list(self._weaknesses),
+        )
+
+
+class FakeFullDraftReviewer:
+    """Fake reviewer for full draft review -- all compliance covered."""
+
+    def review(
+        self,
+        draft: SectionDraft,
+        *,
+        prior_findings: list[ReviewFinding] | None = None,
+    ) -> ReviewScorecard:
+        return ReviewScorecard(
+            findings=[],
+            strengths=["All compliance items addressed"],
+            weaknesses=[],
         )
 
 
@@ -197,7 +266,13 @@ def tech_approach_has_findings(drafting_context):
 
 @given("the technical approach was revised after first review")
 def tech_approach_revised(drafting_context):
-    """Technical approach has been revised once."""
+    """Technical approach has been revised once -- produce a draft for re-review."""
+    outline = _make_approved_outline()
+    drafter = FakeSectionDrafter(word_count=500)
+    service = DraftService(section_drafter=drafter)
+    result = service.draft_section(outline=outline, section_id="technical-approach")
+    drafting_context["outline"] = outline
+    drafting_context["draft_result"] = result
     drafting_context["revision_count"] = 1
 
 
@@ -318,13 +393,37 @@ def draft_all_sections(drafting_context):
 @when("the section is submitted for review")
 def submit_for_review(drafting_context):
     """Invoke section review through ReviewService driving port."""
-    pytest.skip("Awaiting ReviewService implementation")
+    draft_result: DraftResult = drafting_context["draft_result"]
+    reviewer = FakeDraftReviewer()
+    service = ReviewService(draft_reviewer=reviewer)
+    review_result = service.review_section(
+        draft=draft_result.draft,
+        review_round=1,
+    )
+    drafting_context["review_result"] = review_result
 
 
 @when("the full draft review is requested")
 def request_full_review(drafting_context):
-    """Invoke full draft review through driving port."""
-    pytest.skip("Awaiting ReviewService implementation")
+    """Invoke full draft review through ReviewService driving port."""
+    outline = _make_approved_outline()
+    reviewer = FakeFullDraftReviewer()
+    drafter = FakeSectionDrafter(word_count=500)
+    draft_service = DraftService(section_drafter=drafter)
+    # Draft all sections
+    drafts = []
+    for section in outline.sections:
+        result = draft_service.draft_section(
+            outline=outline, section_id=section.section_id
+        )
+        drafts.append(result.draft)
+
+    review_service = ReviewService(draft_reviewer=reviewer)
+    full_result = review_service.full_draft_review(
+        drafts=drafts,
+        outline=outline,
+    )
+    drafting_context["full_review_result"] = full_result
 
 
 @when("Phil requests iteration on the technical approach section")
@@ -335,14 +434,59 @@ def iterate_tech_approach(drafting_context):
 
 @when("the revised section is re-reviewed")
 def re_review_section(drafting_context):
-    """Invoke re-review through driving port."""
-    pytest.skip("Awaiting ReviewService implementation")
+    """Invoke re-review through ReviewService driving port."""
+    draft_result: DraftResult = drafting_context["draft_result"]
+    prior_findings = [
+        ReviewFinding(
+            location="section-1.para-2",
+            severity="major",
+            suggestion="Strengthen TRL advancement methodology",
+        ),
+        ReviewFinding(
+            location="section-1.para-5",
+            severity="minor",
+            suggestion="Add quantitative metrics",
+        ),
+    ]
+    reviewer = FakeDraftReviewer()
+    service = ReviewService(draft_reviewer=reviewer)
+    review_result = service.review_section(
+        draft=draft_result.draft,
+        review_round=2,
+        prior_findings=prior_findings,
+    )
+    drafting_context["review_result"] = review_result
 
 
 @when("a third review cycle is requested")
 def request_third_review(drafting_context):
-    """Invoke third review cycle."""
-    pytest.skip("Awaiting ReviewService implementation")
+    """Invoke third review cycle -- expects escalation."""
+    outline = _make_approved_outline()
+    drafter = FakeSectionDrafter(word_count=500)
+    draft_service = DraftService(section_drafter=drafter)
+    draft_result = draft_service.draft_section(
+        outline=outline, section_id="technical-approach"
+    )
+    unresolved = [
+        ReviewFinding(
+            location="section-1.para-2",
+            severity="major",
+            suggestion="Strengthen TRL advancement methodology",
+        ),
+        ReviewFinding(
+            location="section-1.para-5",
+            severity="minor",
+            suggestion="Add quantitative metrics",
+        ),
+    ]
+    reviewer = FakeDraftReviewer()
+    service = ReviewService(draft_reviewer=reviewer)
+    result = service.review_section(
+        draft=draft_result.draft,
+        review_round=3,
+        prior_findings=unresolved,
+    )
+    drafting_context["review_result"] = result
 
 
 @when("Phil attempts to draft a section")
@@ -379,8 +523,17 @@ def attempt_draft_missing_section(drafting_context, section_name):
 
 @when("Phil requests review of the past performance section")
 def request_review_no_draft(drafting_context):
-    """Attempt review of un-drafted section."""
-    pytest.skip("Awaiting ReviewService implementation")
+    """Attempt review of un-drafted section -- expects NoDraftExistsError."""
+    reviewer = FakeDraftReviewer()
+    service = ReviewService(draft_reviewer=reviewer)
+    try:
+        service.review_section(
+            draft=None, review_round=1, section_id="past performance",
+        )
+    except NoDraftExistsError as exc:
+        drafting_context["error"] = str(exc)
+        return
+    pytest.fail("Expected NoDraftExistsError was not raised")
 
 
 @when("Phil's draft reaches approximately 5200 words")
@@ -476,7 +629,11 @@ def verify_section_draft(drafting_context, section_name):
 @then("Phil sees a scorecard with strengths and weaknesses")
 def verify_scorecard(drafting_context):
     """Verify scorecard produced."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result: ReviewResult = drafting_context["review_result"]
+    assert len(result.scorecard.strengths) > 0, "Expected strengths in scorecard"
+    assert len(result.scorecard.weaknesses) > 0 or len(result.scorecard.findings) > 0, (
+        "Expected weaknesses or findings in scorecard"
+    )
 
 
 @then(
@@ -484,13 +641,19 @@ def verify_scorecard(drafting_context):
 )
 def verify_finding_structure(drafting_context):
     """Verify findings are actionable."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result: ReviewResult = drafting_context["review_result"]
+    assert len(result.scorecard.findings) > 0, "Expected findings"
+    for finding in result.scorecard.findings:
+        assert finding.location, f"Finding missing location: {finding}"
+        assert finding.severity, f"Finding missing severity: {finding}"
+        assert finding.suggestion, f"Finding missing suggestion: {finding}"
 
 
 @then("the scorecard is written to the review artifacts")
 def verify_scorecard_written(drafting_context):
-    """Verify scorecard persisted."""
-    pytest.skip("Awaiting ReviewService implementation")
+    """Verify scorecard present in result (persistence is adapter concern)."""
+    result: ReviewResult = drafting_context["review_result"]
+    assert result.scorecard is not None, "Scorecard must be present in review result"
 
 
 @then(
@@ -504,19 +667,24 @@ def verify_debrief_pattern_match(drafting_context):
 @then("the compliance matrix shows all items addressed")
 def verify_full_compliance(drafting_context):
     """Verify full compliance coverage."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result: FullReviewResult = drafting_context["full_review_result"]
+    assert result.all_compliance_addressed, (
+        f"Expected all compliance addressed, unaddressed: {result.unaddressed_item_ids}"
+    )
 
 
 @then("a full scorecard is produced across all sections")
 def verify_full_scorecard(drafting_context):
     """Verify full proposal scorecard."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result: FullReviewResult = drafting_context["full_review_result"]
+    assert len(result.section_scorecards) > 0, "Expected section scorecards"
 
 
 @then("Phil can approve the draft to proceed to formatting")
 def verify_approve_option(drafting_context):
     """Verify approval option at checkpoint."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result: FullReviewResult = drafting_context["full_review_result"]
+    assert result.can_approve, "Expected approval option when all compliance addressed"
 
 
 @then("the writer addresses the review findings")
@@ -542,25 +710,38 @@ def verify_resubmitted(drafting_context):
 )
 def verify_finding_tracking(drafting_context):
     """Verify finding resolution tracking."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result: ReviewResult = drafting_context["review_result"]
+    assert result.addressed_findings is not None, "Expected addressed findings tracking"
+    assert result.open_findings is not None, "Expected open findings tracking"
+    total = len(result.addressed_findings) + len(result.open_findings)
+    assert total > 0, "Expected at least one tracked finding"
 
 
 @then("updated ratings reflect the improvements")
 def verify_updated_ratings(drafting_context):
     """Verify ratings updated after revision."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result: ReviewResult = drafting_context["review_result"]
+    # After re-review, some findings should be addressed
+    assert len(result.addressed_findings) > 0, "Expected at least one addressed finding"
 
 
 @then("Phil sees unresolved findings escalated for human decision")
 def verify_escalation(drafting_context):
     """Verify escalation after max review cycles."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result = drafting_context["review_result"]
+    assert isinstance(result, EscalationResult), (
+        f"Expected EscalationResult, got {type(result).__name__}"
+    )
+    assert len(result.unresolved_findings) > 0, "Expected unresolved findings in escalation"
 
 
 @then("Phil can accept the section as-is or provide final revisions")
 def verify_escalation_options(drafting_context):
     """Verify human decision options at escalation."""
-    pytest.skip("Awaiting ReviewService implementation")
+    result: EscalationResult = drafting_context["review_result"]
+    assert "accept" in result.options or "revise" in result.options, (
+        f"Expected accept/revise options, got: {result.options}"
+    )
 
 
 @then(parsers.parse('Phil sees "{message}"'))
@@ -593,7 +774,10 @@ def verify_update_outline_guidance(drafting_context):
 @then("Phil sees guidance to draft the section first")
 def verify_draft_section_guidance(drafting_context):
     """Verify guidance to draft section."""
-    pytest.skip("Awaiting ReviewService implementation")
+    error = drafting_context.get("error", "")
+    assert "draft" in error.lower(), (
+        f"Expected draft guidance in: '{error}'"
+    )
 
 
 @then("Phil sees a warning that the section exceeds its page budget")
