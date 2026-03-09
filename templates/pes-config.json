@@ -19,6 +19,26 @@
         "target_wave": 2
       },
       "message": "Wave 2 requires strategy brief approval in Wave 1"
+    },
+    {
+      "rule_id": "wave-3-requires-research",
+      "description": "Wave 3 outline requires research review approval in Wave 2",
+      "rule_type": "wave_ordering",
+      "condition": {
+        "requires_research_approval": true,
+        "target_wave": 3
+      },
+      "message": "Wave 3 requires research review approval in Wave 2"
+    },
+    {
+      "rule_id": "wave-4-requires-outline",
+      "description": "Wave 4 drafting requires outline approval in Wave 3",
+      "rule_type": "wave_ordering",
+      "condition": {
+        "requires_outline_approval": true,
+        "target_wave": 4
+      },
+      "message": "Wave 4 requires outline approval in Wave 3"
     }
   ],
   "enforcement": {

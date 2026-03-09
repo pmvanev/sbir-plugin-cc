@@ -22,6 +22,25 @@ scenarios("../features/wave_ordering_c2.feature")
 
 
 @given(
+    parsers.parse("Phil has an active proposal in Wave {wave:d}"),
+    target_fixture="active_state",
+)
+def proposal_in_wave(sample_state, write_state, wave):
+    """Set up an active proposal at a specific wave with Go decision."""
+    state = sample_state.copy()
+    state["go_no_go"] = "go"
+    state["current_wave"] = wave
+    for w in range(wave):
+        state["waves"][str(w)] = {
+            "status": "completed",
+            "completed_at": "2026-03-01T10:00:00Z",
+        }
+    state["waves"][str(wave)] = {"status": "active", "completed_at": None}
+    write_state(state)
+    return state
+
+
+@given(
     "Phil has an active proposal with an approved strategy brief",
     target_fixture="active_state",
 )
@@ -107,6 +126,15 @@ def proposal_with_outline_approved(sample_state, write_state):
     }
     write_state(state)
     return state
+
+
+@given("the strategy brief has not been approved")
+def strategy_not_approved(active_state, write_state):
+    """Ensure strategy brief status is not approved."""
+    active_state.setdefault("strategy_brief", {})["status"] = "not_started"
+    if "approved_at" in active_state.get("strategy_brief", {}):
+        active_state["strategy_brief"]["approved_at"] = None
+    write_state(active_state)
 
 
 @given("the research review has not been approved")

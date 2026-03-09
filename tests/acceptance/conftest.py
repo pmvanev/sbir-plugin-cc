@@ -133,6 +133,36 @@ def write_state(state_file: Path):
 def pes_config(proposal_dir: Path) -> Path:
     """Default PES configuration file."""
     config = {
+        "rules": [
+            {
+                "rule_id": "wave-1-requires-go",
+                "description": "Wave 1 strategy work requires Go decision in Wave 0",
+                "rule_type": "wave_ordering",
+                "condition": {"requires_go_no_go": "go", "target_wave": 1},
+                "message": "Wave 1 requires Go decision in Wave 0",
+            },
+            {
+                "rule_id": "wave-2-requires-strategy",
+                "description": "Wave 2 writing requires strategy brief approval in Wave 1",
+                "rule_type": "wave_ordering",
+                "condition": {"requires_strategy_approval": True, "target_wave": 2},
+                "message": "Wave 2 requires strategy brief approval in Wave 1",
+            },
+            {
+                "rule_id": "wave-3-requires-research",
+                "description": "Wave 3 outline requires research review approval in Wave 2",
+                "rule_type": "wave_ordering",
+                "condition": {"requires_research_approval": True, "target_wave": 3},
+                "message": "Wave 3 requires research review approval in Wave 2",
+            },
+            {
+                "rule_id": "wave-4-requires-outline",
+                "description": "Wave 4 drafting requires outline approval in Wave 3",
+                "rule_type": "wave_ordering",
+                "condition": {"requires_outline_approval": True, "target_wave": 4},
+                "message": "Wave 4 requires outline approval in Wave 3",
+            },
+        ],
         "enforcement": {
             "session_startup_check": True,
             "wave_ordering": "strict",
