@@ -27,14 +27,12 @@ Feature: Wave 2 Research Orchestration
     Then Phil sees the six research artifacts listed for review
     And Phil can approve, revise, or skip the research review
 
-  @skip
   Scenario: Research approval unlocks Wave 3
     Given research findings have been generated for AF243-001
     When Phil approves the research review
     Then the approval is recorded in the proposal state
     And Wave 3 is unlocked
 
-  @skip
   Scenario: Research revision incorporates feedback
     Given research findings have been generated for AF243-001
     When Phil provides research revision feedback "Deepen prior award analysis for Navy directed energy programs"
@@ -50,14 +48,12 @@ Feature: Wave 2 Research Orchestration
     Then Phil sees "Strategy brief required before Wave 2 research"
     And Phil sees guidance to complete Wave 1 strategy alignment first
 
-  @skip
   Scenario: Research cannot be approved before generation
     Given no research findings have been generated
     When Phil attempts to approve the research review
     Then Phil sees "No research findings to approve"
     And Phil sees guidance to generate research first
 
-  @skip
   Scenario: Research revision without existing findings fails
     Given no research findings have been generated
     When Phil attempts to revise research findings

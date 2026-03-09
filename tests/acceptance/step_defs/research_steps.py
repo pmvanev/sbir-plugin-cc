@@ -1,6 +1,6 @@
 """Step definitions for Wave 2 research orchestration.
 
-Invokes through: ResearchService (driving port -- to be created in C2).
+Invokes through: ResearchService (driving port).
 Does NOT import internal research generators, patent scanners, or market
 analysis components directly.
 """
@@ -12,10 +12,77 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from pes.domain.research import (
+    ResearchCategory,
+    ResearchFinding,
+    ResearchSummary,
+)
+from pes.domain.research_service import (
+    ResearchFindingsNotFoundError,
+    ResearchService,
+)
+from pes.domain.strategy import StrategyBrief, StrategySection
+
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 
 # Link to feature file
 scenarios("../features/research.feature")
+
+
+# ---------------------------------------------------------------------------
+# Fake driven port for acceptance tests
+# ---------------------------------------------------------------------------
+
+
+class FakeResearchGenerator:
+    """Fake ResearchGenerator driven port producing deterministic findings."""
+
+    def __init__(self) -> None:
+        self.last_feedback: str | None = None
+
+    def generate(
+        self,
+        strategy_brief: StrategyBrief,
+        *,
+        tpoc_available: bool,
+        feedback: str | None = None,
+    ) -> ResearchSummary:
+        self.last_feedback = feedback
+        findings = [
+            ResearchFinding(
+                category=cat,
+                content=f"Finding for {cat.value}",
+                evidence_source=f"Source for {cat.value}",
+            )
+            for cat in ResearchCategory
+        ]
+        caveats: list[str] = []
+        if not tpoc_available:
+            caveats.append("TPOC data not available; findings based on solicitation only.")
+        if feedback:
+            # Incorporate feedback into content
+            findings = [
+                ResearchFinding(
+                    category=cat,
+                    content=f"Finding for {cat.value} (revised: {feedback})",
+                    evidence_source=f"Source for {cat.value}",
+                )
+                for cat in ResearchCategory
+            ]
+        return ResearchSummary(findings=findings, caveats=caveats)
+
+
+SAMPLE_BRIEF = StrategyBrief(
+    sections=[
+        StrategySection(key="technical_approach", title="Technical Approach", content="approach"),
+        StrategySection(key="trl", title="TRL", content="trl assessment"),
+        StrategySection(key="teaming", title="Teaming", content="teaming plan"),
+        StrategySection(key="phase_iii", title="Phase III", content="commercialization"),
+        StrategySection(key="budget", title="Budget", content="budget plan"),
+        StrategySection(key="risks", title="Risks", content="risk assessment"),
+    ],
+    tpoc_available=True,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -32,18 +99,30 @@ def research_context() -> dict[str, Any]:
 # --- Given steps ---
 
 
+@given("Phil has an active proposal with an approved strategy brief")
+def proposal_with_strategy_approved(research_context):
+    """Background: proposal is active with an approved strategy brief."""
+    research_context["proposal_active"] = True
+    research_context["strategy_brief_approved"] = True
+
+
 @given("a strategy brief exists with technical approach and TRL positioning")
 def strategy_brief_with_approach(research_context):
     """Strategy brief has been generated with approach and TRL data."""
     research_context["strategy_brief_available"] = True
-    # Will wire to real StrategyBrief domain object when ResearchService exists
+    research_context["strategy_brief"] = SAMPLE_BRIEF
 
 
 @given("research findings have been generated for AF243-001")
 def research_findings_exist(research_context):
     """Research findings have been generated via ResearchService."""
+    generator = FakeResearchGenerator()
+    service = ResearchService(research_generator=generator)
+    summary = service.generate_findings(strategy_brief=SAMPLE_BRIEF, tpoc_available=True)
     research_context["findings_generated"] = True
-    # Will invoke ResearchService.generate_findings() when implemented
+    research_context["summary"] = summary
+    research_context["service"] = service
+    research_context["generator"] = generator
 
 
 @given("the strategy brief does not exist")
@@ -56,6 +135,10 @@ def no_strategy_brief(research_context):
 def no_research_findings(research_context):
     """Ensure no research findings exist."""
     research_context["findings_generated"] = False
+    generator = FakeResearchGenerator()
+    service = ResearchService(research_generator=generator)
+    research_context["service"] = service
+    research_context["summary"] = None
 
 
 @given("TPOC data is not available")
@@ -89,7 +172,10 @@ def reach_research_checkpoint(research_context):
 @when("Phil approves the research review")
 def approve_research(research_context):
     """Approve research through ResearchService driving port."""
-    pytest.skip("Awaiting ResearchService implementation")
+    service = research_context["service"]
+    summary = research_context["summary"]
+    result = service.approve_research(summary)
+    research_context["approval_result"] = result
 
 
 @when(
@@ -97,8 +183,13 @@ def approve_research(research_context):
 )
 def revise_research(research_context, feedback):
     """Submit revision feedback through driving port."""
+    service = research_context["service"]
+    summary = research_context["summary"]
     research_context["revision_feedback"] = feedback
-    pytest.skip("Awaiting ResearchService implementation")
+    revised = service.revise_research(
+        summary, SAMPLE_BRIEF, feedback,
+    )
+    research_context["revised_summary"] = revised
 
 
 @when("Phil attempts to generate research findings")
@@ -110,13 +201,21 @@ def attempt_generate_research(research_context):
 @when("Phil attempts to approve the research review")
 def attempt_approve_research(research_context):
     """Attempt approval of nonexistent research."""
-    pytest.skip("Awaiting ResearchService implementation")
+    service = research_context["service"]
+    try:
+        service.approve_research(None)
+    except ResearchFindingsNotFoundError as exc:
+        research_context["error"] = str(exc)
 
 
 @when("Phil attempts to revise research findings")
 def attempt_revise_research(research_context):
     """Attempt revision of nonexistent research."""
-    pytest.skip("Awaiting ResearchService implementation")
+    service = research_context["service"]
+    try:
+        service.revise_research(None, SAMPLE_BRIEF, "some feedback")
+    except ResearchFindingsNotFoundError as exc:
+        research_context["error"] = str(exc)
 
 
 @when("no prior SBIR awards are found for the topic")
@@ -187,25 +286,35 @@ def verify_checkpoint_options(research_context):
 @then("the approval is recorded in the proposal state")
 def verify_research_approval(research_context):
     """Verify approval recorded in state."""
-    pytest.skip("Awaiting ResearchService implementation")
+    result = research_context["approval_result"]
+    assert result["research_status"] == "approved"
+    assert result["approved_at"] is not None
 
 
 @then("Wave 3 is unlocked")
 def verify_wave_3_unlocked(research_context):
     """Verify Wave 3 status changed."""
-    pytest.skip("Awaiting ResearchService implementation")
+    result = research_context["approval_result"]
+    assert result["wave_3_unlocked"] is True
 
 
 @then("the research findings are regenerated incorporating the feedback")
 def verify_research_revision(research_context):
     """Verify research regenerated with feedback."""
-    pytest.skip("Awaiting ResearchService implementation")
+    revised = research_context["revised_summary"]
+    assert revised is not None
+    assert revised.is_complete
+    # Verify the generator received the feedback
+    generator = research_context["generator"]
+    assert generator.last_feedback is not None
 
 
 @then("Phil reviews the revised research findings")
 def verify_revised_research(research_context):
     """Verify revised research presented for review."""
-    pytest.skip("Awaiting ResearchService implementation")
+    revised = research_context["revised_summary"]
+    assert revised is not None
+    assert revised.finding_count > 0
 
 
 @then(parsers.parse('Phil sees "{message}"'))
@@ -226,7 +335,10 @@ def verify_strategy_guidance(research_context):
 @then("Phil sees guidance to generate research first")
 def verify_generate_research_guidance(research_context):
     """Verify guidance to generate research."""
-    pytest.skip("Awaiting ResearchService implementation")
+    error = research_context.get("error", "")
+    assert "generate" in error.lower() or "first" in error.lower(), (
+        f"Expected guidance to generate research in: '{error}'"
+    )
 
 
 @then('the research findings note "TPOC data not available"')
