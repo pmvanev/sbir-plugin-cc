@@ -20,9 +20,16 @@ scenarios("../features/pes_enforcement.feature")
 
 
 @given("Phil's last session ended unexpectedly")
-def last_session_crashed():
-    """Simulate unexpected session termination -- state may be inconsistent."""
-    pass
+def last_session_crashed(sample_state, write_state):
+    """Simulate unexpected session termination -- write state with orphan condition."""
+    state = sample_state.copy()
+    state["go_no_go"] = "go"
+    state["current_wave"] = 1
+    state["waves"] = {
+        "0": {"status": "completed", "completed_at": "2026-03-02T10:00:00Z"},
+        "1": {"status": "active", "completed_at": None},
+    }
+    write_state(state)
 
 
 @given("a draft file exists for section 3.2 without a compliance matrix entry")
@@ -105,13 +112,13 @@ def new_enforcement_rule():
 
 
 @when("Phil starts a new session", target_fixture="enforcement_result")
-def start_session(enforcement_engine, state_file):
+def start_session(enforcement_engine, state_file, proposal_dir):
     """Invoke session startup through EnforcementEngine integrity check."""
     from pes.adapters.json_state_adapter import JsonStateAdapter
 
     state_reader = JsonStateAdapter(str(state_file.parent))
     state = state_reader.load()
-    return enforcement_engine.check_session_start(state)
+    return enforcement_engine.check_session_start(state, proposal_dir=str(proposal_dir))
 
 
 @when("Phil attempts to start Wave 1 strategy work", target_fixture="enforcement_result")
@@ -162,21 +169,30 @@ def attempt_load_rules():
     pytest.skip("Awaiting RuleRegistry implementation")
 
 
-@when("the enforcement system runs its integrity check")
-def run_integrity_check():
-    """Invoke session checker."""
-    # TODO: Invoke through SessionChecker via hook adapter
-    pytest.skip("Awaiting SessionChecker implementation")
+@when("the enforcement system runs its integrity check", target_fixture="enforcement_result")
+def run_integrity_check(enforcement_engine, state_file):
+    """Invoke session checker -- state is corrupted so adapter raises StateCorruptedError."""
+    from pes.adapters.json_state_adapter import JsonStateAdapter
+    from pes.domain.state import StateCorruptedError
+
+    state_reader = JsonStateAdapter(str(state_file.parent))
+    try:
+        state = state_reader.load()
+    except StateCorruptedError as err:
+        # Engine should handle corrupted state with recovery
+        return enforcement_engine.check_session_start(
+            {"_corrupted": True, "_recovered_state": err.recovered_state}
+        )
+    return enforcement_engine.check_session_start(state)
 
 
 # --- Then steps ---
 
 
 @then("the enforcement system detects the orphaned draft")
-def verify_orphan_detected():
+def verify_orphan_detected(enforcement_result):
     """Verify PES detects draft without matrix entry."""
-    # TODO: Assert through enforcement result
-    pass
+    assert len(enforcement_result.messages) > 0, "Expected orphan warning messages"
 
 
 @then(parsers.parse('Phil sees "{message}"'))
@@ -187,9 +203,12 @@ def verify_message(enforcement_result, message):
 
 
 @then("Phil sees guidance to run the compliance check")
-def verify_compliance_guidance():
+def verify_compliance_guidance(enforcement_result):
     """Verify guidance suggests compliance check."""
-    pass
+    all_messages = " ".join(enforcement_result.messages).lower()
+    assert "compliance" in all_messages, (
+        f"Expected compliance guidance in {enforcement_result.messages}"
+    )
 
 
 @then("the enforcement system runs silently")
@@ -206,15 +225,22 @@ def verify_no_warnings(enforcement_result):
 
 
 @then("Phil sees a critical deadline warning")
-def verify_deadline_warning():
+def verify_deadline_warning(enforcement_result):
     """Verify deadline warning at critical threshold."""
-    pass
+    assert len(enforcement_result.messages) > 0, "Expected deadline warning messages"
+    all_messages = " ".join(enforcement_result.messages).lower()
+    assert "deadline" in all_messages, (
+        f"Expected deadline mention in {enforcement_result.messages}"
+    )
 
 
 @then("Phil sees suggestions for prioritizing remaining work")
-def verify_priority_suggestions():
+def verify_priority_suggestions(enforcement_result):
     """Verify actionable suggestions for deadline pressure."""
-    pass
+    all_messages = " ".join(enforcement_result.messages).lower()
+    assert "priorit" in all_messages, (
+        f"Expected prioritization suggestion in {enforcement_result.messages}"
+    )
 
 
 @then("the enforcement system blocks the action")
@@ -275,6 +301,9 @@ def verify_config_warning():
 
 
 @then("Phil sees guidance for recovery")
-def verify_recovery_guidance():
+def verify_recovery_guidance(enforcement_result):
     """Verify recovery guidance provided."""
-    pass
+    all_messages = " ".join(enforcement_result.messages).lower()
+    assert "recover" in all_messages, (
+        f"Expected recovery guidance in {enforcement_result.messages}"
+    )

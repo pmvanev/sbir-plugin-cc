@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pes.domain.rules import Decision, EnforcementResult, EnforcementRule
+from pes.domain.session_checker import SessionChecker
 from pes.domain.wave_rules import WaveOrderingEvaluator
 from pes.ports.audit_port import AuditLogger
 from pes.ports.rule_port import RuleLoader
@@ -18,18 +19,26 @@ class EnforcementEngine:
         self._rule_loader = rule_loader
         self._audit_logger = audit_logger
         self._wave_evaluator = WaveOrderingEvaluator()
+        self._session_checker = SessionChecker()
 
-    def check_session_start(self, state: dict[str, Any]) -> EnforcementResult:
+    def check_session_start(
+        self,
+        state: dict[str, Any],
+        proposal_dir: str | None = None,
+    ) -> EnforcementResult:
         """Run integrity check at session startup.
 
+        Returns ALLOW with warning messages for issues found.
         Returns ALLOW with no messages for clean state.
         """
-        result = EnforcementResult(decision=Decision.ALLOW)
+        messages = self._session_checker.check(state, proposal_dir=proposal_dir)
+        result = EnforcementResult(decision=Decision.ALLOW, messages=messages)
         self._audit_logger.log({
             "timestamp": datetime.now(UTC).isoformat(),
             "event": "session_start",
             "decision": result.decision.value,
             "proposal_id": state.get("proposal_id", "unknown"),
+            "messages": messages,
         })
         return result
 
