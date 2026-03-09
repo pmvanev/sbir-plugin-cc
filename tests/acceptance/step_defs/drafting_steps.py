@@ -1,7 +1,7 @@
 """Step definitions for Wave 4 drafting, review, and iteration.
 
-Invokes through: DraftService, ReviewService (driving ports -- to be created
-in C2). Does NOT import internal section writers, jargon auditors, or
+Invokes through: DraftService (driving port).
+Does NOT import internal section writers, jargon auditors, or
 cross-reference checkers directly.
 """
 
@@ -12,10 +12,100 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from pes.domain.draft import SectionDraft
+from pes.domain.draft_service import (
+    ApprovedOutlineRequiredError,
+    DraftResult,
+    DraftService,
+    SectionNotInOutlineError,
+)
+from pes.domain.outline import OutlineSection, ProposalOutline
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 
 # Link to feature file
 scenarios("../features/drafting.feature")
+
+
+# ---------------------------------------------------------------------------
+# Fake driven port (SectionDrafter) for acceptance tests
+# ---------------------------------------------------------------------------
+
+
+class FakeSectionDrafter:
+    """Fake driven port producing deterministic section drafts."""
+
+    def __init__(self, *, word_count: int = 500) -> None:
+        self._word_count = word_count
+
+    def draft(
+        self,
+        section: OutlineSection,
+        *,
+        iteration: int = 1,
+    ) -> SectionDraft:
+        # Build content with requested word count
+        words = ["word"] * self._word_count
+        content = " ".join(words)
+        return SectionDraft(
+            section_id=section.section_id,
+            content=content,
+            compliance_item_ids=section.compliance_item_ids,
+            iteration=iteration,
+        )
+
+
+class PartialComplianceDrafter:
+    """Fake drafter that omits some compliance items from the draft."""
+
+    def __init__(self, *, omit_ids: list[str]) -> None:
+        self._omit_ids = omit_ids
+
+    def draft(
+        self,
+        section: OutlineSection,
+        *,
+        iteration: int = 1,
+    ) -> SectionDraft:
+        addressed = [cid for cid in section.compliance_item_ids if cid not in self._omit_ids]
+        content = "This section addresses compliance items " + ", ".join(addressed)
+        return SectionDraft(
+            section_id=section.section_id,
+            content=content,
+            compliance_item_ids=addressed,
+            iteration=iteration,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_approved_outline(
+    *,
+    sections: list[OutlineSection] | None = None,
+) -> ProposalOutline:
+    """Build an approved outline with default sections."""
+    if sections is None:
+        sections = [
+            OutlineSection(
+                section_id="technical-approach",
+                title="Technical Approach",
+                compliance_item_ids=["CI-001", "CI-002", "CI-003"],
+                page_budget=8.0,
+                figure_placeholders=["fig-1"],
+                thesis_statement="Novel approach to beam-steering",
+            ),
+            OutlineSection(
+                section_id="statement-of-work",
+                title="Statement of Work",
+                compliance_item_ids=["CI-004", "CI-005"],
+                page_budget=4.0,
+                figure_placeholders=[],
+                thesis_statement="Milestone-based deliverables",
+            ),
+        ]
+    return ProposalOutline(sections=sections)
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +119,16 @@ def drafting_context() -> dict[str, Any]:
     return {}
 
 
+# --- Given steps (Background) ---
+
+
+@given("Phil has an active proposal with an approved proposal outline")
+def proposal_with_approved_outline(drafting_context):
+    """Background: proposal has an approved outline ready for Wave 4."""
+    drafting_context["proposal_active"] = True
+    drafting_context["outline_approved"] = True
+
+
 # --- Given steps ---
 
 
@@ -37,6 +137,7 @@ def drafting_context() -> dict[str, Any]:
 )
 def outline_with_tech_approach(drafting_context):
     """Approved outline includes technical approach section."""
+    drafting_context["outline"] = _make_approved_outline()
     drafting_context["outline_available"] = True
     drafting_context["tech_approach_pages"] = 8
 
@@ -44,6 +145,7 @@ def outline_with_tech_approach(drafting_context):
 @given("an approved outline with a statement of work section")
 def outline_with_sow(drafting_context):
     """Approved outline includes SOW section."""
+    drafting_context["outline"] = _make_approved_outline()
     drafting_context["outline_available"] = True
     drafting_context["sow_available"] = True
 
@@ -58,6 +160,15 @@ def outline_with_all_sections(drafting_context):
 @given("a draft exists for the technical approach section")
 def tech_approach_drafted(drafting_context):
     """Technical approach section has been drafted."""
+    outline = _make_approved_outline()
+    drafter = FakeSectionDrafter(word_count=500)
+    service = DraftService(section_drafter=drafter)
+    result = service.draft_section(
+        outline=outline,
+        section_id="technical-approach",
+    )
+    drafting_context["outline"] = outline
+    drafting_context["draft_result"] = result
     drafting_context["tech_approach_drafted"] = True
 
 
@@ -106,6 +217,7 @@ def unresolved_findings(drafting_context):
 def no_outline_approved(drafting_context):
     """Ensure no outline approval."""
     drafting_context["outline_available"] = False
+    drafting_context["outline"] = None
 
 
 @given(
@@ -113,6 +225,7 @@ def no_outline_approved(drafting_context):
 )
 def outline_without_exec_summary(drafting_context):
     """Outline does not have executive summary."""
+    drafting_context["outline"] = _make_approved_outline()
     drafting_context["outline_available"] = True
     drafting_context["missing_section"] = "executive summary"
 
@@ -126,6 +239,8 @@ def no_past_performance_draft(drafting_context):
 @given("the technical approach has an 8-page budget")
 def tech_approach_budget(drafting_context):
     """Technical approach page budget is 8."""
+    outline = _make_approved_outline()
+    drafting_context["outline"] = outline
     drafting_context["tech_approach_pages"] = 8
 
 
@@ -136,6 +251,7 @@ def tech_approach_budget(drafting_context):
 def unaddressed_compliance_items(drafting_context):
     """Draft misses 2 compliance items."""
     drafting_context["unaddressed_items"] = 2
+    drafting_context["omit_ids"] = ["CI-002", "CI-003"]
 
 
 @given("no debrief history exists in the corpus")
@@ -231,8 +347,15 @@ def request_third_review(drafting_context):
 
 @when("Phil attempts to draft a section")
 def attempt_draft_without_outline(drafting_context):
-    """Attempt drafting without outline."""
-    pytest.skip("Awaiting DraftService implementation")
+    """Attempt drafting without outline -- expects ApprovedOutlineRequiredError."""
+    drafter = FakeSectionDrafter()
+    service = DraftService(section_drafter=drafter)
+    try:
+        service.draft_section(outline=None, section_id="technical-approach")
+    except ApprovedOutlineRequiredError as exc:
+        drafting_context["error"] = str(exc)
+        return
+    pytest.fail("Expected ApprovedOutlineRequiredError was not raised")
 
 
 @when(
@@ -243,7 +366,15 @@ def attempt_draft_without_outline(drafting_context):
 def attempt_draft_missing_section(drafting_context, section_name):
     """Attempt drafting a section not in outline."""
     drafting_context["attempted_section"] = section_name
-    pytest.skip("Awaiting DraftService implementation")
+    drafter = FakeSectionDrafter()
+    service = DraftService(section_drafter=drafter)
+    outline = drafting_context.get("outline")
+    try:
+        service.draft_section(outline=outline, section_id=section_name)
+    except SectionNotInOutlineError as exc:
+        drafting_context["error"] = str(exc)
+        return
+    pytest.fail("Expected SectionNotInOutlineError was not raised")
 
 
 @when("Phil requests review of the past performance section")
@@ -254,15 +385,35 @@ def request_review_no_draft(drafting_context):
 
 @when("Phil's draft reaches approximately 5200 words")
 def draft_over_budget(drafting_context):
-    """Draft exceeds page budget."""
-    drafting_context["word_count"] = 5200
-    pytest.skip("Awaiting DraftService implementation")
+    """Draft exceeds page budget -- 5200 words exceeds 8-page budget (2000 words)."""
+    outline = drafting_context.get("outline", _make_approved_outline())
+    drafter = FakeSectionDrafter(word_count=5200)
+    service = DraftService(section_drafter=drafter)
+    result = service.draft_section(
+        outline=outline,
+        section_id="technical-approach",
+    )
+    drafting_context["draft_result"] = result
 
 
 @when("the compliance check runs against the section")
 def check_section_compliance(drafting_context):
-    """Run compliance check against drafted section."""
-    pytest.skip("Awaiting DraftService implementation")
+    """Run compliance check against drafted section via DraftService."""
+    outline = drafting_context.get("outline", _make_approved_outline())
+    omit_ids = drafting_context.get("omit_ids", [])
+    drafter = PartialComplianceDrafter(omit_ids=omit_ids)
+    service = DraftService(section_drafter=drafter)
+    result = service.draft_section(
+        outline=outline,
+        section_id="technical-approach",
+    )
+    drafting_context["draft_result"] = result
+    # Generate user-facing message for compliance gaps
+    if result.unaddressed_item_ids:
+        count = len(result.unaddressed_item_ids)
+        drafting_context["error"] = (
+            f"{count} compliance items not addressed in technical approach"
+        )
 
 
 @when("the technical approach section is submitted for review")
@@ -424,13 +575,19 @@ def verify_drafting_message(drafting_context, message):
 @then("Phil sees guidance to complete Wave 3 outline approval first")
 def verify_outline_guidance(drafting_context):
     """Verify guidance points to outline approval."""
-    pytest.skip("Awaiting DraftService implementation")
+    error = drafting_context.get("error", "")
+    assert "wave 3" in error.lower() or "outline approval" in error.lower(), (
+        f"Expected Wave 3 outline guidance in: '{error}'"
+    )
 
 
 @then("Phil sees guidance to update the outline first")
 def verify_update_outline_guidance(drafting_context):
     """Verify guidance to update outline."""
-    pytest.skip("Awaiting DraftService implementation")
+    error = drafting_context.get("error", "")
+    assert "update" in error.lower() or "outline" in error.lower(), (
+        f"Expected outline update guidance in: '{error}'"
+    )
 
 
 @then("Phil sees guidance to draft the section first")
@@ -442,13 +599,17 @@ def verify_draft_section_guidance(drafting_context):
 @then("Phil sees a warning that the section exceeds its page budget")
 def verify_budget_warning(drafting_context):
     """Verify page budget warning."""
-    pytest.skip("Awaiting DraftService implementation")
+    result: DraftResult = drafting_context["draft_result"]
+    assert result.budget_warning is not None, "Expected budget warning but got None"
+    assert "exceeds" in result.budget_warning.lower()
 
 
 @then("Phil sees suggestions to cut content or reallocate pages")
 def verify_budget_suggestions(drafting_context):
     """Verify budget reduction suggestions."""
-    pytest.skip("Awaiting DraftService implementation")
+    result: DraftResult = drafting_context["draft_result"]
+    assert result.budget_warning is not None
+    assert "cut" in result.budget_warning.lower() or "reallocate" in result.budget_warning.lower()
 
 
 @then(
@@ -458,13 +619,19 @@ def verify_budget_suggestions(drafting_context):
 )
 def verify_unaddressed_items(drafting_context, count):
     """Verify unaddressed compliance items flagged."""
-    pytest.skip("Awaiting DraftService implementation")
+    result: DraftResult = drafting_context["draft_result"]
+    assert len(result.unaddressed_item_ids) == count, (
+        f"Expected {count} unaddressed items, got {len(result.unaddressed_item_ids)}"
+    )
 
 
 @then("the unaddressed items are listed by ID")
 def verify_items_listed(drafting_context):
     """Verify unaddressed items enumerated."""
-    pytest.skip("Awaiting DraftService implementation")
+    result: DraftResult = drafting_context["draft_result"]
+    assert len(result.unaddressed_item_ids) > 0
+    for item_id in result.unaddressed_item_ids:
+        assert item_id.startswith("CI-"), f"Expected compliance item ID format, got: {item_id}"
 
 
 @then(

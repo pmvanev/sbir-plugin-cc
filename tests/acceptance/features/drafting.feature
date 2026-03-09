@@ -90,14 +90,12 @@ Feature: Wave 4 Drafting, Review, and Iteration
 
   # --- Error Paths ---
 
-  @skip
   Scenario: Cannot draft section without approved outline
     Given no proposal outline has been approved
     When Phil attempts to draft a section
     Then Phil sees "Approved outline required before drafting"
     And Phil sees guidance to complete Wave 3 outline approval first
 
-  @skip
   Scenario: Cannot draft section not in the outline
     Given an approved outline that does not include an "executive summary" section
     When Phil attempts to draft an "executive summary" section
@@ -111,14 +109,12 @@ Feature: Wave 4 Drafting, Review, and Iteration
     Then Phil sees "No draft exists for past performance"
     And Phil sees guidance to draft the section first
 
-  @skip
   Scenario: Section draft exceeding page budget is flagged
     Given the technical approach has an 8-page budget
     When Phil's draft reaches approximately 5200 words
     Then Phil sees a warning that the section exceeds its page budget
     And Phil sees suggestions to cut content or reallocate pages
 
-  @skip
   Scenario: Compliance matrix gap detected during drafting
     Given a draft exists for the technical approach section
     And 2 compliance items mapped to technical approach are not addressed in the draft
