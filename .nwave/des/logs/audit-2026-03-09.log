@@ -65,3 +65,12 @@
 {"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"0a0918be-9c6c-4c4e-bf77-7cf3128a2228","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-09T01:53:27.614874+00:00"}
 {"context_type":"continuation","event":"HOOK_POST_TOOL_USE_INJECTED","hook_id":"0a0918be-9c6c-4c4e-bf77-7cf3128a2228","is_des_task":true,"timestamp":"2026-03-09T01:53:27.634070+00:00"}
 {"decision":"allow","duration_ms":20.4696,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"0a0918be-9c6c-4c4e-bf77-7cf3128a2228","timestamp":"2026-03-09T01:53:27.634771+00:00"}
+{"event":"HOOK_INVOKED","handler":"pre_tool_use","hook_id":"b3baf72b-96e3-4856-b3b4-d808f5375842","input_summary":{"subagent_type":"nw:nw-agent-builder"},"timestamp":"2026-03-09T02:28:06.655306+00:00"}
+{"context":"non_des_task","event":"HOOK_PRE_TOOL_USE_ALLOWED","hook_id":"b3baf72b-96e3-4856-b3b4-d808f5375842","timestamp":"2026-03-09T02:28:06.671357+00:00"}
+{"decision":"allow","duration_ms":32.134,"event":"HOOK_COMPLETED","exit_code":0,"handler":"pre_tool_use","hook_id":"b3baf72b-96e3-4856-b3b4-d808f5375842","timestamp":"2026-03-09T02:28:06.672239+00:00"}
+{"event":"HOOK_INVOKED","handler":"subagent_stop","hook_id":"140a71a9-a2d2-4c56-8cc6-8b167d8f9528","input_summary":{"agent_id":"a921e4be5aa57d876","agent_type":"nw:nw-agent-builder","has_transcript":true},"timestamp":"2026-03-09T02:30:56.256602+00:00"}
+{"error":"'charmap' codec can't decode byte 0x81 in position 7739: character maps to <undefined>","error_type":"UnicodeDecodeError","event":"HOOK_ERROR","handler":"subagent_stop","stderr_capture":"","timestamp":"2026-03-09T02:30:56.259048+00:00"}
+{"decision":"error","duration_ms":23.1595,"event":"HOOK_COMPLETED","exit_code":1,"handler":"subagent_stop","hook_id":"140a71a9-a2d2-4c56-8cc6-8b167d8f9528","timestamp":"2026-03-09T02:30:56.260313+00:00"}
+{"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"445cf545-3d02-497d-b18f-f819808ecead","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-09T02:30:57.524229+00:00"}
+{"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"445cf545-3d02-497d-b18f-f819808ecead","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-09T02:30:57.558499+00:00"}
+{"decision":"allow","duration_ms":39.1901,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"445cf545-3d02-497d-b18f-f819808ecead","timestamp":"2026-03-09T02:30:57.560734+00:00"}
