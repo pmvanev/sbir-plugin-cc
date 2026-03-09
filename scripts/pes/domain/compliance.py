@@ -21,6 +21,7 @@ class CoverageStatus(Enum):
     NOT_STARTED = "not_started"
     PARTIAL = "partial"
     COVERED = "covered"
+    WAIVED = "waived"
 
 
 @dataclass
