@@ -1,14 +1,24 @@
 {
-  "hooks": [
-    {
-      "event": "SessionStart",
-      "script": "python3 scripts/pes/adapters/hook_adapter.py",
-      "description": "PES integrity check at session startup"
-    },
-    {
-      "event": "PreToolUse",
-      "script": "python3 scripts/pes/adapters/hook_adapter.py",
-      "description": "PES enforcement rules for tool invocations"
-    }
-  ]
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PYTHONPATH=${CLAUDE_PLUGIN_ROOT}/scripts python3 -m pes.adapters.hook_adapter session-start"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PYTHONPATH=${CLAUDE_PLUGIN_ROOT}/scripts python3 -m pes.adapters.hook_adapter pre-tool-use"
+          }
+        ]
+      }
+    ]
+  }
 }
