@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pes.domain.rules import Decision, EnforcementResult, EnforcementRule
+from pes.domain.wave_rules import WaveOrderingEvaluator
 from pes.ports.audit_port import AuditLogger
 from pes.ports.rule_port import RuleLoader
 
@@ -16,6 +17,7 @@ class EnforcementEngine:
     def __init__(self, rule_loader: RuleLoader, audit_logger: AuditLogger) -> None:
         self._rule_loader = rule_loader
         self._audit_logger = audit_logger
+        self._wave_evaluator = WaveOrderingEvaluator()
 
     def check_session_start(self, state: dict[str, Any]) -> EnforcementResult:
         """Run integrity check at session startup.
@@ -63,23 +65,5 @@ class EnforcementEngine:
     ) -> bool:
         """Check if a single rule triggers given current state and tool."""
         if rule.rule_type == "wave_ordering":
-            return self._check_wave_ordering(rule, state, tool_name)
+            return self._wave_evaluator.triggers(rule, state, tool_name)
         return False
-
-    def _check_wave_ordering(
-        self, rule: EnforcementRule, state: dict[str, Any], tool_name: str
-    ) -> bool:
-        """Check wave ordering prerequisite rules."""
-        condition = rule.condition
-        target_wave = condition.get("target_wave")
-        requires_go = condition.get("requires_go_no_go")
-
-        if target_wave is None:
-            return False
-
-        # Only applies to tools targeting the specified wave
-        if f"wave_{target_wave}" not in tool_name:
-            return False
-
-        # Check if prerequisite is met
-        return bool(requires_go and state.get("go_no_go") != requires_go)
