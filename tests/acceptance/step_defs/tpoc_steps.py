@@ -7,9 +7,11 @@ Does NOT import question generators or answer matchers directly.
 from __future__ import annotations
 
 import pytest
-from pytest_bdd import scenarios, given, when, then, parsers
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from pes.domain.compliance import ComplianceItem, ComplianceMatrix, RequirementType
+from pes.domain.tpoc import QuestionCategory, TpocQuestion, TpocQuestionSet
+from pes.domain.tpoc_ingestion_service import NotesFileNotFoundError, TpocIngestionService
 from pes.domain.tpoc_service import ComplianceMatrixRequiredError, TpocService
 
 # Link to feature file
@@ -66,20 +68,52 @@ def matrix_with_ambiguities(count, compliance_matrix_path, state_with_go, write_
     return matrix
 
 
-@given("TPOC questions were generated for AF243-001")
+@given(
+    "TPOC questions were generated for AF243-001",
+    target_fixture="generated_questions_and_matrix",
+)
 def tpoc_questions_exist(state_with_go, write_state, proposal_dir):
-    """Set up state with generated TPOC questions."""
+    """Set up state with generated TPOC questions and compliance matrix."""
     state_with_go["tpoc"]["status"] = "questions_generated"
     state_with_go["tpoc"]["questions_generated_at"] = "2026-03-03T10:00:00Z"
     state_with_go["tpoc"]["questions_path"] = (
         "./artifacts/wave-1-strategy/tpoc-questions.md"
     )
+    state_with_go["compliance_matrix"]["item_count"] = 2
+    state_with_go["compliance_matrix"]["generated_at"] = "2026-03-02T10:00:00Z"
     write_state(state_with_go)
     questions_file = proposal_dir / "artifacts" / "wave-1-strategy" / "tpoc-questions.md"
     questions_file.write_text("# TPOC Questions\n\n1. Question one?\n2. Question two?\n")
+    questions = TpocQuestionSet(questions=[
+        TpocQuestion(
+            question_id=1,
+            text="Question one?",
+            category=QuestionCategory.AMBIGUITY,
+            source_item_id=1,
+        ),
+        TpocQuestion(
+            question_id=2,
+            text="Question two?",
+            category=QuestionCategory.STRATEGIC_PROBE,
+        ),
+    ])
+    matrix = ComplianceMatrix(items=[
+        ComplianceItem(
+            item_id=1,
+            text="System shall be compact and lightweight",
+            requirement_type=RequirementType.SHALL,
+            ambiguity="Unclear definition of compact",
+        ),
+        ComplianceItem(
+            item_id=2,
+            text="Deliver Phase I report within 6 months",
+            requirement_type=RequirementType.SHALL,
+        ),
+    ])
+    return {"questions": questions, "matrix": matrix}
 
 
-@given("Phil has a notes file from the TPOC call")
+@given("Phil has a notes file from the TPOC call", target_fixture="tpoc_notes_file")
 def tpoc_notes_file(tmp_path):
     """Create TPOC call notes file."""
     notes_path = tmp_path / "notes" / "tpoc-call-2026-03-15.txt"
@@ -109,19 +143,33 @@ def no_answers():
     pass
 
 
-@given(parsers.parse("{count:d} TPOC questions were generated"))
+@given(
+    parsers.parse("{count:d} TPOC questions were generated"),
+    target_fixture="generated_question_set",
+)
 def tpoc_question_count(count, state_with_go, write_state, proposal_dir):
-    """Generate specific number of TPOC questions."""
+    """Generate specific number of TPOC questions and return TpocQuestionSet."""
     state_with_go["tpoc"]["status"] = "questions_generated"
     write_state(state_with_go)
     lines = ["# TPOC Questions\n\n"]
+    questions = []
     for i in range(count):
         lines.append(f"{i + 1}. Question {i + 1}?\n")
+        questions.append(TpocQuestion(
+            question_id=i + 1,
+            text=f"Question {i + 1}?",
+            category=QuestionCategory.AMBIGUITY,
+            source_item_id=i + 1,
+        ))
     questions_file = proposal_dir / "artifacts" / "wave-1-strategy" / "tpoc-questions.md"
     questions_file.write_text("".join(lines))
+    return TpocQuestionSet(questions=questions)
 
 
-@given(parsers.parse("Phil's notes cover only {count:d} questions"))
+@given(
+    parsers.parse("Phil's notes cover only {count:d} questions"),
+    target_fixture="partial_notes",
+)
 def partial_notes(count, tmp_path):
     """Create notes covering only some questions."""
     notes_path = tmp_path / "notes" / "partial-notes.txt"
@@ -157,29 +205,50 @@ def generate_tpoc_questions(matrix_with_ambiguities):
     return service.generate_questions(matrix_with_ambiguities)
 
 
-@when("Phil ingests the TPOC call notes")
-def ingest_tpoc_notes():
+@when("Phil ingests the TPOC call notes", target_fixture="ingestion_result")
+def ingest_tpoc_notes(tpoc_notes_file, generated_questions_and_matrix):
     """Invoke TPOC answer ingestion through driving port."""
-    # TODO: Invoke through TpocService
-    pytest.skip("Awaiting TpocService implementation")
+    from pathlib import Path
+
+    service = TpocIngestionService()
+    return service.ingest_notes(
+        notes_path=Path(tpoc_notes_file),
+        questions=generated_questions_and_matrix["questions"],
+        matrix=generated_questions_and_matrix["matrix"],
+    )
 
 
 @when("Phil checks proposal status", target_fixture="status_report")
 def check_tpoc_status(state_with_go, write_state, state_file):
     """Check status to verify TPOC pending state through StatusService."""
-    from pes.domain.status_service import StatusService
     from pes.adapters.json_state_adapter import JsonStateAdapter
+    from pes.domain.status_service import StatusService
 
     reader = JsonStateAdapter(str(state_file.parent))
     service = StatusService(reader)
     return service.get_status()
 
 
-@when("Phil ingests the partial notes")
-def ingest_partial_notes():
-    """Invoke partial TPOC ingestion."""
-    # TODO: Invoke through TpocService
-    pytest.skip("Awaiting TpocService implementation")
+@when("Phil ingests the partial notes", target_fixture="ingestion_result")
+def ingest_partial_notes(partial_notes, generated_question_set):
+    """Invoke partial TPOC ingestion through driving port."""
+    from pathlib import Path
+
+    service = TpocIngestionService()
+    items = [
+        ComplianceItem(
+            item_id=i + 1,
+            text=f"Requirement {i + 1}",
+            requirement_type=RequirementType.SHALL,
+        )
+        for i in range(generated_question_set.count)
+    ]
+    matrix = ComplianceMatrix(items=items)
+    return service.ingest_notes(
+        notes_path=Path(partial_notes),
+        questions=generated_question_set,
+        matrix=matrix,
+    )
 
 
 @when("Phil attempts to generate TPOC questions", target_fixture="tpoc_error")
@@ -193,11 +262,28 @@ def attempt_generate_questions():
         return str(e)
 
 
-@when("Phil attempts to ingest notes from a non-existent file path")
+@when(
+    "Phil attempts to ingest notes from a non-existent file path",
+    target_fixture="tpoc_error",
+)
 def attempt_ingest_bad_path():
     """Attempt ingestion with invalid file path."""
-    # TODO: Invoke through TpocService
-    pytest.skip("Awaiting TpocService implementation")
+    from pathlib import Path
+
+    service = TpocIngestionService()
+    fake_questions = TpocQuestionSet(questions=[
+        TpocQuestion(question_id=1, text="Q?", category=QuestionCategory.AMBIGUITY),
+    ])
+    fake_matrix = ComplianceMatrix(items=[])
+    try:
+        service.ingest_notes(
+            notes_path=Path("/nonexistent/path/notes.txt"),
+            questions=fake_questions,
+            matrix=fake_matrix,
+        )
+        return None
+    except NotesFileNotFoundError as e:
+        return str(e)
 
 
 # --- Then steps ---
@@ -235,32 +321,47 @@ def verify_tpoc_generated_status():
 
 
 @then("answers are matched to original questions")
-def verify_answers_matched():
+def verify_answers_matched(ingestion_result):
     """Verify answer matching."""
-    pass
+    from pes.domain.tpoc_ingestion import AnswerStatus
+
+    assert len(ingestion_result.answers) > 0
+    answered = [a for a in ingestion_result.answers if a.status == AnswerStatus.ANSWERED]
+    assert len(answered) > 0
+    # Each answered question should have answer text
+    for answer in answered:
+        assert answer.answer_text is not None
+        assert len(answer.answer_text) > 0
 
 
 @then("unanswered questions are marked")
-def verify_unanswered_marked():
+def verify_unanswered_marked(ingestion_result):
     """Verify unanswered marking."""
-    pass
+    from pes.domain.tpoc_ingestion import AnswerStatus
+
+    # With 2 questions and notes covering Q1 and Q2, all should be answered
+    # But the scenario structure allows for unanswered questions
+    # At minimum, every question has a status
+    for answer in ingestion_result.answers:
+        assert isinstance(answer.status, AnswerStatus)
 
 
 @then("a solicitation delta analysis is generated")
-def verify_delta_analysis():
+def verify_delta_analysis(ingestion_result):
     """Verify delta analysis created."""
-    pass
+    assert ingestion_result.delta_analysis is not None
+    assert ingestion_result.delta_analysis.count > 0
 
 
 @then("the compliance matrix is updated with TPOC clarifications")
-def verify_matrix_updated():
+def verify_matrix_updated(ingestion_result):
     """Verify matrix updates from TPOC."""
-    pass
+    assert len(ingestion_result.compliance_updates) > 0
 
 
 @then('the TPOC status changes to "answers ingested"')
 def verify_tpoc_ingested_status():
-    """Verify TPOC status update to ingested."""
+    """Verify TPOC status update to ingested -- state update tested at integration level."""
     pass
 
 
@@ -268,12 +369,22 @@ def verify_tpoc_ingested_status():
 def verify_tpoc_message(message, request):
     """Verify user-facing TPOC message."""
     # Check error fixture from failed generation attempts
-    tpoc_error = request.getfixturevalue("tpoc_error") if "tpoc_error" in request.fixturenames else None
+    tpoc_error = (
+        request.getfixturevalue("tpoc_error")
+        if "tpoc_error" in request.fixturenames
+        else None
+    )
     if tpoc_error is not None:
-        assert message.lower() in tpoc_error.lower(), f"Expected '{message}' in '{tpoc_error}'"
+        assert message.lower() in tpoc_error.lower(), (
+            f"Expected '{message}' in '{tpoc_error}'"
+        )
         return
     # Check status report fixture from status checks
-    status_report = request.getfixturevalue("status_report") if "status_report" in request.fixturenames else None
+    status_report = (
+        request.getfixturevalue("status_report")
+        if "status_report" in request.fixturenames
+        else None
+    )
     if status_report is not None:
         all_text = " ".join([
             status_report.current_wave,
@@ -294,30 +405,31 @@ def verify_no_block(status_report):
 
 
 @then(parsers.parse("{count:d} answers are matched"))
-def verify_match_count(count):
+def verify_match_count(count, ingestion_result):
     """Verify matched answer count."""
-    pass
+    assert ingestion_result.answered_count == count
 
 
 @then(parsers.parse("{count:d} questions are marked as unanswered"))
-def verify_unanswered_count(count):
+def verify_unanswered_count(count, ingestion_result):
     """Verify unanswered question count."""
-    pass
+    assert ingestion_result.unanswered_count == count
 
 
 @then(parsers.parse("delta analysis is generated from the {count:d} answered questions"))
-def verify_partial_delta(count):
+def verify_partial_delta(count, ingestion_result):
     """Verify delta from partial answers."""
-    pass
+    assert ingestion_result.delta_analysis.count == count
 
 
 @then("Phil sees guidance to run the strategy wave command first")
 def verify_wave_guidance(tpoc_error):
     """Verify strategy wave guidance."""
-    assert "strategy" in tpoc_error.lower() or "compliance" in tpoc_error.lower() or "wave" in tpoc_error.lower()
+    msg = tpoc_error.lower()
+    assert "strategy" in msg or "compliance" in msg or "wave" in msg
 
 
 @then("Phil sees guidance to verify the file path")
-def verify_path_guidance_tpoc():
+def verify_path_guidance_tpoc(tpoc_error):
     """Verify file path guidance."""
-    pass
+    assert "file" in tpoc_error.lower() or "path" in tpoc_error.lower()
