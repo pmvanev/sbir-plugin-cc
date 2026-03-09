@@ -24,6 +24,7 @@ C4Context
     System_Ext(sbir_gov, "SBIR.gov / Agency Portals", "Solicitation sources. Phil downloads solicitation PDF/URL.")
     System_Ext(filesystem, "Local File System", "Past proposals, debriefs, solicitation files, TPOC notes. User's existing documents.")
     System_Ext(tpoc, "TPOC (Human)", "Technical Point of Contact at sponsoring agency. Async external event -- call happens days after question generation.")
+    System_Ext(gemini, "Google Gemini API", "Nano Banana image generation. Concept figures, technical illustrations, infographics. Requires GEMINI_API_KEY.")
 
     Rel(phil, plugin, "Uses via slash commands", "/proposal new, /proposal status, etc.")
     Rel(plugin, claude_code, "Runs within", "Plugin protocol: agents, commands, hooks")
@@ -31,6 +32,7 @@ C4Context
     Rel(phil, filesystem, "Stores past proposals and notes in")
     Rel(plugin, filesystem, "Reads solicitations, corpus documents, TPOC notes from; writes state and artifacts to")
     Rel(phil, tpoc, "Has phone call with; captures notes")
+    Rel(plugin, gemini, "Generates concept figures via", "REST API, GEMINI_API_KEY")
 ```
 
 ---
@@ -45,7 +47,7 @@ C4Container
 
     System_Boundary(plugin, "SBIR Proposal Plugin") {
         Container(commands, "Slash Commands", "Markdown files", "Entry points: /proposal new, /proposal status, /proposal wave, /proposal corpus add, /proposal tpoc, /proposal compliance, /proposal:check")
-        Container(agents, "Agent Definitions", "Markdown files", "Orchestrator, corpus-librarian, compliance-sheriff, tpoc-analyst, topic-scout, fit-scorer, strategist (C1 roster)")
+        Container(agents, "Agent Definitions", "Markdown files", "12 agents: orchestrator, corpus-librarian, compliance-sheriff, tpoc-analyst, topic-scout, strategist, researcher, writer, reviewer, formatter, submission-agent, debrief-analyst")
         Container(skills, "Agent Skills", "Markdown files", "Domain knowledge: compliance-matrix-builder, tpoc-question-generator, corpus-retrieval, strategy-synthesis")
         Container(pes, "PES Enforcement System", "Python 3.12+", "Hook-based enforcement: session startup integrity, wave ordering, compliance gate. Extensible rule engine.")
         Container(hooks, "Hook Configuration", "hooks.json", "Maps Claude Code events (PreToolUse, SessionStart) to PES Python commands")
@@ -134,6 +136,7 @@ sbir-plugin-cc/                          # Plugin root = git repository
 │   └── hooks.json                       # Event-to-command mappings for PES
 ├── scripts/
 │   ├── pes-hook                         # Executable entry point (shell wrapper)
+│   ├── nano-banana-generate.sh          # Gemini Nano Banana image generation wrapper
 │   └── pes/
 │       ├── __init__.py
 │       ├── adapters/
@@ -221,6 +224,7 @@ User CLI Input
 | **Artifact format** | Markdown files | N/A | Human-editable in any text editor; git-friendly |
 | **Corpus storage** | Raw files on disk (PDF, .docx, .txt, .md) | N/A | Claude Code reads directly; no vector DB |
 | **Corpus search** | Claude Code built-in file reading | Proprietary (Anthropic) | LLM reads files, reasons about relevance. No separate indexing. |
+| **Image generation** | Google Gemini Nano Banana API | Google API ToS | Concept figures, technical illustrations, infographics. Optional -- degrades to external briefs if GEMINI_API_KEY not set. |
 | **Schema validation** | Python `jsonschema` library | MIT | Validate proposal-state.json structure |
 | **Hook protocol** | JSON on stdin/stdout + exit codes | N/A | Claude Code hook convention |
 
@@ -232,6 +236,7 @@ User CLI Input
 - **ADR-004:** JSON files for state persistence (no database)
 - **ADR-005:** One agent per domain role from day one (no agent collapsing)
 - **ADR-006:** Per-project state with global plugin installation
+- **ADR-007:** Google Gemini Nano Banana for proposal figure generation
 
 ---
 
@@ -345,7 +350,7 @@ Every error path in every command produces a message with these three elements. 
 
 ### Security (Addressed by Architecture)
 
-- **Local-only execution:** No network services, no listening ports, no cloud endpoints. All data stays on the user's machine.
+- **Primarily local execution:** No network services, no listening ports. One optional outbound API call: Nano Banana image generation sends figure prompts (descriptive text only, not proposal content) to Google Gemini API. All proposal data stays on the user's machine.
 - **No sensitive data in plugin code:** Plugin code (agents, commands, skills) contains no secrets. Proposal data is in the user's project directory.
 - **Corpus data sovereignty:** Past proposals and debriefs never leave the local filesystem. No embeddings sent to external services.
 - **PES audit trail:** All enforcement decisions and waivers are logged locally with timestamps. Provides accountability without external exposure.
@@ -729,5 +734,6 @@ Step ratio: 12 / 32 = 0.38 (well under 2.5 threshold).
 | ADR-004 | JSON files for state persistence | Accepted |
 | ADR-005 | One agent per domain role from day one | Accepted |
 | ADR-006 | Per-project state with global plugin installation | Accepted |
+| ADR-007 | Google Gemini Nano Banana for proposal figure generation | Accepted |
 
 See `docs/adrs/` for full ADR documents.

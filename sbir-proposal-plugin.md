@@ -326,8 +326,9 @@ The orchestrator maintains a structured project file throughout the lifecycle:
    - Select generation method:
      - SVG generation (local, precise diagrams and schematics)
      - Mermaid / Graphviz (flow and architecture diagrams)
-     - External tool integration (e.g., Napkin.ai, similar) for polished concept figures
-     - Chart generation from research data
+     - Google Gemini Nano Banana API for concept figures, technical illustrations, and infographics (requires `GEMINI_API_KEY`)
+     - Chart generation from research data (matplotlib/seaborn or SVG)
+     - External tool brief (manual fallback when no API/tools available)
    - Generate draft
    - **Iteration loop:** Human review → revise
 3. Ensure all figures have captions and are cross-referenced in text
@@ -485,7 +486,7 @@ The orchestrator maintains a structured project file throughout the lifecycle:
 | `win-loss-analyzer` | Analyzes outcome-tagged proposals and debrief feedback for patterns | `corpus-librarian`, `debrief-analyst` |
 | `trl-assessor` | Assesses current and target TRL with justification narrative | `researcher`, `strategist` |
 | `market-researcher` | TAM/SAM/SOM sizing, competitor landscape, commercialization pathway | `researcher` |
-| `visual-asset-generator` | Generates diagrams, figures, and concept images via SVG, Mermaid, or external tools | `formatter` |
+| `visual-asset-generator` | Generates diagrams and figures via SVG, Mermaid, Graphviz; concept figures and illustrations via Google Gemini Nano Banana API; falls back to external briefs | `formatter` |
 | `budget-scaffolder` | Rough cost modeling by labor category, indirect rates, materials, and phase | `strategist` |
 | `reviewer-persona-simulator` | Simulates government technical evaluator scoring against stated criteria; surfaces weak spots | `reviewer` |
 
