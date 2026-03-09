@@ -206,7 +206,10 @@ class ProposalCreationService:
             "go_no_go": "pending",
             "waves": {
                 "0": {"status": "active", "completed_at": None},
-                "1": {"status": "not_started", "completed_at": None},
+                **{
+                    str(i): {"status": "not_started", "completed_at": None}
+                    for i in range(1, 10)
+                },
             },
             "corpus": {
                 "directories_ingested": [],
@@ -236,6 +239,29 @@ class ProposalCreationService:
                 "certifications": None,
                 "recommendation": None,
             },
+            "research_summary": {"findings": []},
+            "discrimination_table": {"items": []},
+            "volumes": {
+                "technical": {
+                    "status": "not_started",
+                    "current_draft": None,
+                    "review_comments": [],
+                    "iterations": 0,
+                },
+                "management": {
+                    "status": "not_started",
+                    "current_draft": None,
+                    "review_comments": [],
+                    "iterations": 0,
+                },
+                "cost": {
+                    "status": "not_started",
+                    "current_draft": None,
+                    "review_comments": [],
+                    "iterations": 0,
+                },
+            },
+            "open_review_items": [],
             "created_at": now,
             "updated_at": now,
         }

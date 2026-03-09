@@ -231,3 +231,59 @@ class TestMissingMetadata:
         assert result.success
         assert len(result.warnings) > 0
         assert any("deadline" in w.lower() for w in result.warnings)
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: Initial state includes expanded schema fields
+# ---------------------------------------------------------------------------
+
+
+class TestExpandedStateSchema:
+    def test_initial_state_includes_research_summary_and_discrimination_table(self):
+        service, writer = _make_service()
+
+        service.create_proposal("solicitation text")
+
+        state = writer.saved_states[0]
+        # research_summary with empty findings
+        assert state["research_summary"] == {"findings": []}
+        # discrimination_table with empty items
+        assert state["discrimination_table"] == {"items": []}
+        # open_review_items as empty list
+        assert state["open_review_items"] == []
+
+    def test_initial_state_includes_volumes_with_three_entries(self):
+        service, writer = _make_service()
+
+        service.create_proposal("solicitation text")
+
+        state = writer.saved_states[0]
+        volumes = state["volumes"]
+        for vol_key in ("technical", "management", "cost"):
+            vol = volumes[vol_key]
+            assert vol["status"] == "not_started"
+            assert vol["current_draft"] is None
+            assert vol["review_comments"] == []
+            assert vol["iterations"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Behavior 8: Waves dict includes entries for Waves 0 through 9
+# ---------------------------------------------------------------------------
+
+
+class TestExpandedWaves:
+    def test_initial_state_has_waves_0_through_9(self):
+        service, writer = _make_service()
+
+        service.create_proposal("solicitation text")
+
+        state = writer.saved_states[0]
+        waves = state["waves"]
+        for i in range(10):
+            assert str(i) in waves, f"Wave {i} missing from state"
+        # Wave 0 is active, all others not_started
+        assert waves["0"]["status"] == "active"
+        for i in range(1, 10):
+            assert waves[str(i)]["status"] == "not_started"
+            assert waves[str(i)]["completed_at"] is None
