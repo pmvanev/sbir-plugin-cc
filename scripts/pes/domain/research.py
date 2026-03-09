@@ -57,6 +57,7 @@ class ResearchSummary:
 
     findings: list[ResearchFinding] = field(default_factory=list)
     market_metrics: MarketMetrics | None = None
+    caveats: list[str] = field(default_factory=list)
 
     @property
     def finding_count(self) -> int:
