@@ -6,9 +6,6 @@ Does NOT import WaveOrderingEvaluator or internal rule classes directly.
 
 from __future__ import annotations
 
-from typing import Any
-
-import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from pes.domain.rules import Decision

@@ -21,9 +21,9 @@ from pes.domain.research_service import (
     ResearchFindingsNotFoundError,
     ResearchService,
 )
-from pes.domain.strategy import StrategyBrief, StrategySection
-
+from pes.domain.strategy import StrategyBrief
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
+from tests.fixtures.strategy_fixtures import SAMPLE_BRIEF
 
 # Link to feature file
 scenarios("../features/research.feature")
@@ -72,17 +72,6 @@ class FakeResearchGenerator:
         return ResearchSummary(findings=findings, caveats=caveats)
 
 
-SAMPLE_BRIEF = StrategyBrief(
-    sections=[
-        StrategySection(key="technical_approach", title="Technical Approach", content="approach"),
-        StrategySection(key="trl", title="TRL", content="trl assessment"),
-        StrategySection(key="teaming", title="Teaming", content="teaming plan"),
-        StrategySection(key="phase_iii", title="Phase III", content="commercialization"),
-        StrategySection(key="budget", title="Budget", content="budget plan"),
-        StrategySection(key="risks", title="Risks", content="risk assessment"),
-    ],
-    tpoc_available=True,
-)
 
 
 # ---------------------------------------------------------------------------

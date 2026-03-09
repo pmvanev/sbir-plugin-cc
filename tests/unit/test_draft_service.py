@@ -21,12 +21,10 @@ import pytest
 from pes.domain.draft import SectionDraft
 from pes.domain.draft_service import (
     ApprovedOutlineRequiredError,
-    DraftResult,
     DraftService,
     SectionNotInOutlineError,
 )
 from pes.domain.outline import OutlineSection, ProposalOutline
-
 
 # ---------------------------------------------------------------------------
 # Fake driven port (SectionDrafter) at port boundary

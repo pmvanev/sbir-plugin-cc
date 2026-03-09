@@ -73,15 +73,13 @@ class StatusService:
         )
 
     def _compute_deadline_countdown(self, state: dict[str, Any]) -> str:
-        deadline_str = state.get("topic", {}).get("deadline", "")
-        if not deadline_str:
-            return "No deadline set"
-        try:
-            deadline = date.fromisoformat(deadline_str)
-            days_remaining = (deadline - date.today()).days
-            return f"{days_remaining} days to deadline"
-        except ValueError:
+        days_remaining = self._days_to_deadline(state)
+        if days_remaining is None:
+            deadline_str = state.get("topic", {}).get("deadline", "")
+            if not deadline_str:
+                return "No deadline set"
             return "Invalid deadline"
+        return f"{days_remaining} days to deadline"
 
     def _build_wave_details(self, state: dict[str, Any]) -> list[WaveDetail]:
         waves_data = state.get("waves", {})

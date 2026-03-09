@@ -17,8 +17,6 @@ Behaviors:
 
 from __future__ import annotations
 
-from typing import Protocol
-
 import pytest
 
 from pes.domain.research import (
@@ -31,8 +29,9 @@ from pes.domain.research_service import (
     ResearchService,
     StrategyBriefRequiredError,
 )
-from pes.domain.strategy import StrategyBrief, StrategySection
-
+from pes.domain.strategy import StrategyBrief
+from tests.fixtures.research_fixtures import make_research_summary
+from tests.fixtures.strategy_fixtures import SAMPLE_BRIEF
 
 # ---------------------------------------------------------------------------
 # Fake driven port (ResearchGenerator) at port boundary
@@ -42,8 +41,7 @@ from pes.domain.strategy import StrategyBrief, StrategySection
 class FakeResearchGenerator:
     """Fake driven port that produces deterministic findings for all six categories."""
 
-    def __init__(self, *, include_tpoc_caveat: bool = False) -> None:
-        self._include_tpoc_caveat = include_tpoc_caveat
+    def __init__(self) -> None:
         self.generate_called_with: dict | None = None
         self.last_feedback: str | None = None
 
@@ -77,19 +75,6 @@ class FakeResearchGenerator:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-SAMPLE_BRIEF = StrategyBrief(
-    sections=[
-        StrategySection(key="technical_approach", title="Technical Approach", content="approach"),
-        StrategySection(key="trl", title="TRL", content="trl assessment"),
-        StrategySection(key="teaming", title="Teaming", content="teaming plan"),
-        StrategySection(key="phase_iii", title="Phase III", content="commercialization"),
-        StrategySection(key="budget", title="Budget", content="budget plan"),
-        StrategySection(key="risks", title="Risks", content="risk assessment"),
-    ],
-    tpoc_available=True,
-)
-
 
 def _make_service(generator: FakeResearchGenerator | None = None) -> ResearchService:
     gen = generator or FakeResearchGenerator()
@@ -169,18 +154,7 @@ class TestGenerateWithoutTpocData:
 # ---------------------------------------------------------------------------
 
 
-def _make_summary() -> ResearchSummary:
-    """Create a complete ResearchSummary for checkpoint tests."""
-    return ResearchSummary(
-        findings=[
-            ResearchFinding(
-                category=cat,
-                content=f"Finding for {cat.value}",
-                evidence_source=f"Source for {cat.value}",
-            )
-            for cat in ResearchCategory
-        ],
-    )
+_make_summary = make_research_summary
 
 
 # ---------------------------------------------------------------------------

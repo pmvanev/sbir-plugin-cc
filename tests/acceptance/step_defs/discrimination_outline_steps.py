@@ -18,17 +18,14 @@ from pes.domain.discrimination_service import (
 )
 from pes.domain.outline import OutlineSection, ProposalOutline
 from pes.domain.outline_service import (
-    OutlineGenerator,
     OutlineNotFoundError,
     OutlineService,
 )
-from pes.domain.research import (
-    ResearchCategory,
-    ResearchFinding,
-    ResearchSummary,
-)
-from pes.domain.strategy import StrategyBrief, StrategySection
+from pes.domain.research import ResearchSummary
+from pes.domain.strategy import StrategyBrief
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
+from tests.fixtures.research_fixtures import make_research_summary
+from tests.fixtures.strategy_fixtures import SAMPLE_BRIEF
 
 # Link to feature file
 scenarios("../features/discrimination_outline.feature")
@@ -177,30 +174,7 @@ def outline_service(fake_outline_generator) -> OutlineService:
 # ---------------------------------------------------------------------------
 
 
-SAMPLE_BRIEF = StrategyBrief(
-    sections=[
-        StrategySection(key="technical_approach", title="Technical Approach", content="approach"),
-        StrategySection(key="trl", title="TRL", content="trl assessment"),
-        StrategySection(key="teaming", title="Teaming", content="teaming plan"),
-        StrategySection(key="phase_iii", title="Phase III", content="commercialization"),
-        StrategySection(key="budget", title="Budget", content="budget plan"),
-        StrategySection(key="risks", title="Risks", content="risk assessment"),
-    ],
-    tpoc_available=True,
-)
-
-
-def _make_research_summary() -> ResearchSummary:
-    return ResearchSummary(
-        findings=[
-            ResearchFinding(
-                category=cat,
-                content=f"Finding for {cat.value}",
-                evidence_source=f"Source for {cat.value}",
-            )
-            for cat in ResearchCategory
-        ],
-    )
+_make_research_summary = make_research_summary
 
 
 SAMPLE_COMPLIANCE_MATRIX = {"item_count": 47, "items": []}

@@ -21,20 +21,6 @@ from pes.ports.state_port import StateReader
 # Fake driven port
 # ---------------------------------------------------------------------------
 
-WAVE_NAMES = {
-    0: "Wave 0: Intelligence & Fit",
-    1: "Wave 1: Requirements & Strategy",
-    2: "Wave 2: Research",
-    3: "Wave 3: Discrimination & Outline",
-    4: "Wave 4: Drafting",
-    5: "Wave 5: Visual Assets",
-    6: "Wave 6: Formatting & Assembly",
-    7: "Wave 7: Final Review",
-    8: "Wave 8: Submission",
-    9: "Wave 9: Debrief & Learning",
-}
-
-
 class InMemoryStateReader(StateReader):
     """Returns pre-configured state dict."""
 

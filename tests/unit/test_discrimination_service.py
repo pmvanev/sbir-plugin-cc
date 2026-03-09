@@ -23,13 +23,10 @@ from pes.domain.discrimination_service import (
     DiscriminationService,
     ResearchApprovalRequiredError,
 )
-from pes.domain.research import (
-    ResearchCategory,
-    ResearchFinding,
-    ResearchSummary,
-)
-from pes.domain.strategy import StrategyBrief, StrategySection
-
+from pes.domain.research import ResearchSummary
+from pes.domain.strategy import StrategyBrief
+from tests.fixtures.research_fixtures import make_research_summary
+from tests.fixtures.strategy_fixtures import SAMPLE_BRIEF
 
 # ---------------------------------------------------------------------------
 # Fake driven port (DiscriminationGenerator) at port boundary
@@ -98,30 +95,6 @@ class FakeDiscriminationGenerator:
 # ---------------------------------------------------------------------------
 
 
-SAMPLE_BRIEF = StrategyBrief(
-    sections=[
-        StrategySection(key="technical_approach", title="Technical Approach", content="approach"),
-        StrategySection(key="trl", title="TRL", content="trl assessment"),
-        StrategySection(key="teaming", title="Teaming", content="teaming plan"),
-        StrategySection(key="phase_iii", title="Phase III", content="commercialization"),
-        StrategySection(key="budget", title="Budget", content="budget plan"),
-        StrategySection(key="risks", title="Risks", content="risk assessment"),
-    ],
-    tpoc_available=True,
-)
-
-
-def _make_research_summary() -> ResearchSummary:
-    return ResearchSummary(
-        findings=[
-            ResearchFinding(
-                category=cat,
-                content=f"Finding for {cat.value}",
-                evidence_source=f"Source for {cat.value}",
-            )
-            for cat in ResearchCategory
-        ],
-    )
 
 
 SAMPLE_COMPLIANCE_MATRIX: dict[str, Any] = {"item_count": 47, "items": []}
@@ -146,7 +119,7 @@ class TestGenerateDiscriminationTable:
         result = service.generate_table(
             strategy_brief=SAMPLE_BRIEF,
             compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
-            research_summary=_make_research_summary(),
+            research_summary=make_research_summary(),
             research_approved=True,
         )
 
@@ -159,7 +132,7 @@ class TestGenerateDiscriminationTable:
         result = service.generate_table(
             strategy_brief=SAMPLE_BRIEF,
             compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
-            research_summary=_make_research_summary(),
+            research_summary=make_research_summary(),
             research_approved=True,
         )
 
@@ -173,7 +146,7 @@ class TestGenerateDiscriminationTable:
         service.generate_table(
             strategy_brief=SAMPLE_BRIEF,
             compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
-            research_summary=_make_research_summary(),
+            research_summary=make_research_summary(),
             research_approved=True,
         )
 
@@ -194,7 +167,7 @@ class TestTpocInsightsIncorporated:
         service.generate_table(
             strategy_brief=SAMPLE_BRIEF,
             compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
-            research_summary=_make_research_summary(),
+            research_summary=make_research_summary(),
             research_approved=True,
             tpoc_insights="Agency prior approach failed due to overheating",
         )
@@ -207,7 +180,7 @@ class TestTpocInsightsIncorporated:
         result = service.generate_table(
             strategy_brief=SAMPLE_BRIEF,
             compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
-            research_summary=_make_research_summary(),
+            research_summary=make_research_summary(),
             research_approved=True,
         )
 
@@ -231,7 +204,7 @@ class TestReviseDiscriminationTable:
             existing_table=existing,
             strategy_brief=SAMPLE_BRIEF,
             compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
-            research_summary=_make_research_summary(),
+            research_summary=make_research_summary(),
             research_approved=True,
             feedback="Add facility clearance as discriminator",
         )
@@ -248,7 +221,7 @@ class TestReviseDiscriminationTable:
             existing_table=existing,
             strategy_brief=SAMPLE_BRIEF,
             compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
-            research_summary=_make_research_summary(),
+            research_summary=make_research_summary(),
             research_approved=True,
             feedback="Add facility clearance",
         )
@@ -270,7 +243,7 @@ class TestGenerateWithoutResearchApproval:
             service.generate_table(
                 strategy_brief=SAMPLE_BRIEF,
                 compliance_matrix=SAMPLE_COMPLIANCE_MATRIX,
-                research_summary=_make_research_summary(),
+                research_summary=make_research_summary(),
                 research_approved=False,
             )
 
