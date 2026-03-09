@@ -20,6 +20,17 @@ Eight categories ordered by strategic value. Each question gets exactly one tag.
 | `team-validation` | Confirm team structure and partners resonate | "Is the agency looking for academic partnerships on this topic?" |
 | `incumbent-landscape` | Understand prior attempts and why they fell short | "Have previous Phase I efforts on this topic transitioned to Phase II?" |
 
+## Question Input Sources
+
+Questions draw from multiple inputs when available:
+
+- Compliance matrix (required) -- ambiguities and gaps drive priority 1 and 2 questions
+- Raw solicitation text (required) -- the baseline for all questions
+- Company capability profile (`~/.sbir/company-profile.json`) -- tailor questions to company strengths
+- Past proposals from corpus -- avoid asking questions already answered in prior cycles
+- Research summaries -- inform strategic probes with technical context
+- Prior debrief feedback -- surface recurring evaluator concerns as questions
+
 ## Question Sources
 
 Questions derive from three sources, mapped to domain model categories:
@@ -98,3 +109,14 @@ TPOC calls are async events. The call may never happen. Handle gracefully:
 - If user advances to strategy without TPOC data, mark TPOC insights as "[pending]"
 - If call happens later, re-run ingestion and propagate updates to downstream artifacts
 - Never prompt repeatedly about an unscheduled call
+
+## Propagation After Ingestion
+
+Post-ingestion, TPOC insights propagate to downstream artifacts:
+
+- **Compliance matrix**: Updated with clarifications, expansions, and contradiction flags
+- **Discrimination table**: TPOC insights on competitive landscape and approach validation feed discriminator refinement
+- **Strategy brief**: Transition pathway and budget signal answers update Phase III and cost sections
+- **Q&A log**: Write-once artifact after ingestion (PES immutability) -- indexed for corpus retrieval in future proposals
+
+Propagation is the responsibility of the tpoc-analyst (compliance matrix updates) and downstream agents (discrimination table, strategy brief) that read the delta analysis output.

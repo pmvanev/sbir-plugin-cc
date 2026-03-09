@@ -1,6 +1,6 @@
 ---
 name: compliance-domain
-description: SBIR/STTR compliance domain knowledge -- requirement types, extraction patterns, section mappings, matrix format, and coverage lifecycle
+description: SBIR/STTR compliance domain knowledge -- requirement types, extraction patterns, section mappings, matrix format, coverage lifecycle, and wave-specific behavior
 ---
 
 # Compliance Domain Knowledge
@@ -34,7 +34,7 @@ Map extracted requirements to proposal sections using keyword detection:
 | Explicit "Section N" reference | Section N |
 | No keyword match | null (flag for user assignment) |
 
-Unmapped requirements are opportunities -- they need human judgment on placement.
+Unmapped requirements need human judgment on placement.
 
 ## Coverage Statuses
 
@@ -47,7 +47,7 @@ Unmapped requirements are opportunities -- they need human judgment on placement
 
 ## Matrix File Format
 
-The compliance matrix is a markdown file at `.sbir/compliance-matrix.md` with this structure:
+The compliance matrix is a markdown file at `.sbir/compliance-matrix.md`:
 
 ```markdown
 # Compliance Matrix
@@ -94,11 +94,39 @@ The check command produces a coverage summary:
 
 When no matrix exists, guide the user to generate one first. When the matrix cannot be parsed, suggest verifying the markdown table format.
 
+## Wave-Specific Behavior
+
+### Wave 1: Initial Extraction
+Focus: thorough extraction from solicitation text. Flag all ambiguities -- these feed TPOC question generation. Accept that most items will be NOT_STARTED. Report unmapped items that need human section assignment.
+
+### Wave 6: Formatting Compliance
+Focus: FORMAT-type requirements only. Verify each against the assembled document:
+- Page limits per volume (count actual pages vs. stated limit)
+- Font family and size (check document metadata or content)
+- Margin and spacing requirements
+- Required headers/footers (proposal title, topic number, company name, page numbers)
+- Section numbering and heading style consistency
+- File naming conventions per submission portal
+- Required forms, attachments, and certifications present
+
+Report each FORMAT item with specific remediation when non-compliant.
+
+### Wave 7: Final Audit
+Focus: comprehensive pass/fail for every item in the matrix.
+- Every item must be COVERED or WAIVED (with rationale)
+- NOT_STARTED and PARTIAL items are submission risks -- surface prominently
+- Cross-reference attachments and forms mentioned in the matrix against the submission package
+- Emit a final verdict: READY or NOT READY
+- NOT READY verdict lists every unresolved item with its ID and current status
+
 ## Architecture Integration
+
+PES Python code handles the computation. The agent orchestrates by reading/writing files:
 
 - `ComplianceService.generate_matrix(text)` -- extracts requirements, builds matrix
 - `ComplianceService.add_item(matrix, text)` -- adds manual requirement
 - `ComplianceCheckService.check(matrix)` -- returns coverage breakdown
-- `TextComplianceAdapter` -- regex-based extraction from solicitation text
+- `TextComplianceAdapter` -- regex-based extraction (SHALL, FORMAT, IMPLICIT patterns)
 - `MarkdownComplianceAdapter` -- reads/writes matrix as markdown file
 - Matrix file path: `.sbir/compliance-matrix.md`
+- Domain model: `RequirementType` (SHALL, FORMAT, IMPLICIT, MANUAL) | `CoverageStatus` (NOT_STARTED, PARTIAL, COVERED, WAIVED) | `ComplianceItem` | `ComplianceMatrix`

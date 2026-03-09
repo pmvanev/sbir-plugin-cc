@@ -1,29 +1,9 @@
 ---
 name: sbir-strategy-knowledge
-description: Domain knowledge for SBIR/STTR strategy brief generation -- TRL assessment, teaming patterns, Phase III pathways, budget scaffolding, risk identification, and competitive positioning.
+description: Core domain knowledge for SBIR/STTR strategy brief generation -- teaming patterns, Phase III pathways, risk frameworks, competitive positioning, TPOC integration, and required brief sections.
 ---
 
 # SBIR Strategy Domain Knowledge
-
-## Technology Readiness Levels (TRL)
-
-| TRL | Description | SBIR Phase Fit |
-|-----|-------------|----------------|
-| 1 | Basic principles observed | Phase I start |
-| 2 | Technology concept formulated | Phase I start |
-| 3 | Proof of concept | Phase I target |
-| 4 | Lab validation | Phase I exit / Phase II start |
-| 5 | Component validation in relevant environment | Phase II mid |
-| 6 | System/subsystem prototype in relevant environment | Phase II target |
-| 7 | System prototype in operational environment | Phase II exit |
-| 8 | System complete and qualified | Phase III |
-| 9 | System proven in operational environment | Phase III |
-
-### TRL Assessment Approach
-
-Assess current TRL from: prior work, publications, prototypes, test data. Assess target TRL from: solicitation language ("demonstrate", "prototype", "validate"). Gap between current and target determines scope credibility.
-
-Red flags: claiming TRL 2->6 in Phase I (too ambitious) | claiming TRL 5->6 in Phase I (not enough novelty) | no evidence for claimed current TRL.
 
 ## Teaming Strategy Patterns
 
@@ -63,25 +43,6 @@ Phase III = commercialization. Two main pathways:
 - Reference TAM/SAM/SOM with sources
 - Show customer discovery evidence (beyond TPOC)
 - Connect to agency strategic plans or technology roadmaps
-
-## Budget Scaffolding
-
-### Phase I Typical Structure
-- Award range: $50K-$275K (varies by agency; DoD typical $250K)
-- Duration: 6-12 months
-- Labor: 60-70% of total | Overhead/fringe: 15-25% | Materials/travel: 5-15%
-
-### Phase II Typical Structure
-- Award range: $500K-$1.7M (varies by agency; DoD typical $1.7M)
-- Duration: 24 months
-- Labor: 55-65% of total | Overhead/fringe: 15-25% | Materials/equipment: 10-20% | Subcontracts: 5-15%
-
-### Budget Red Flags
-- Subcontract exceeds 33% of total (Phase I) or 50% (Phase II) without justification
-- No travel budget (reviewers expect PI engagement with end users)
-- Materials budget too low for claimed prototyping scope
-- Labor rates inconsistent with company profile
-- Consultant rates exceed agency caps
 
 ## Risk Assessment Framework
 
