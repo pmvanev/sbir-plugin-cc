@@ -9,23 +9,61 @@ from __future__ import annotations
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
+from pes.domain.compliance import ComplianceItem, ComplianceMatrix, RequirementType
+from pes.domain.tpoc_service import ComplianceMatrixRequiredError, TpocService
+
 # Link to feature file
 scenarios("../features/tpoc_questions.feature")
+
+
+# --- Given steps (Background) ---
+
+
+@given(parsers.parse('Phil has an active proposal for AF243-001 with Go/No-Go "{decision}"'))
+def proposal_with_go_tpoc(state_with_go, write_state, decision):
+    """Set up proposal with specified Go/No-Go for TPOC scenarios."""
+    state_with_go["go_no_go"] = decision
+    write_state(state_with_go)
 
 
 # --- Given steps ---
 
 
-@given(parsers.parse("a compliance matrix exists with {count:d} flagged ambiguities"))
+@given(
+    parsers.parse("a compliance matrix exists with {count:d} flagged ambiguities"),
+    target_fixture="matrix_with_ambiguities",
+)
 def matrix_with_ambiguities(count, compliance_matrix_path, state_with_go, write_state):
-    """Create compliance matrix with flagged ambiguities."""
+    """Create compliance matrix with flagged ambiguities and return it."""
     state_with_go["compliance_matrix"]["item_count"] = 47
     state_with_go["compliance_matrix"]["generated_at"] = "2026-03-05T10:00:00Z"
     write_state(state_with_go)
-    lines = ["# Compliance Matrix\n"]
+
+    items = []
     for i in range(count):
-        lines.append(f"| {i + 1} | AMBIGUOUS: Requirement {i + 1} | ? | -- |\n")
+        items.append(ComplianceItem(
+            item_id=i + 1,
+            text=f"Requirement {i + 1}",
+            requirement_type=RequirementType.SHALL,
+            ambiguity=f"Ambiguous: unclear scope for requirement {i + 1}",
+        ))
+    # Add some non-ambiguous items
+    for i in range(count, count + 5):
+        items.append(ComplianceItem(
+            item_id=i + 1,
+            text=f"Clear requirement {i + 1}",
+            requirement_type=RequirementType.SHALL,
+        ))
+
+    matrix = ComplianceMatrix(items=items)
+
+    lines = ["# Compliance Matrix\n"]
+    for item in items:
+        amb = item.ambiguity or ""
+        lines.append(f"| {item.item_id} | {item.text} | {amb} | -- |\n")
     compliance_matrix_path.write_text("".join(lines))
+
+    return matrix
 
 
 @given("TPOC questions were generated for AF243-001")
@@ -112,11 +150,11 @@ def questions_generated(state_with_go, write_state):
 # --- When steps ---
 
 
-@when("Phil generates TPOC questions")
-def generate_tpoc_questions():
+@when("Phil generates TPOC questions", target_fixture="question_result")
+def generate_tpoc_questions(matrix_with_ambiguities):
     """Invoke TPOC question generation through driving port."""
-    # TODO: Invoke through TpocService
-    pytest.skip("Awaiting TpocService implementation")
+    service = TpocService()
+    return service.generate_questions(matrix_with_ambiguities)
 
 
 @when("Phil ingests the TPOC call notes")
@@ -126,11 +164,15 @@ def ingest_tpoc_notes():
     pytest.skip("Awaiting TpocService implementation")
 
 
-@when("Phil checks proposal status")
-def check_tpoc_status():
-    """Check status to verify TPOC pending state."""
-    # TODO: Invoke through StatusService
-    pytest.skip("Awaiting StatusService implementation")
+@when("Phil checks proposal status", target_fixture="status_report")
+def check_tpoc_status(state_with_go, write_state, state_file):
+    """Check status to verify TPOC pending state through StatusService."""
+    from pes.domain.status_service import StatusService
+    from pes.adapters.json_state_adapter import JsonStateAdapter
+
+    reader = JsonStateAdapter(str(state_file.parent))
+    service = StatusService(reader)
+    return service.get_status()
 
 
 @when("Phil ingests the partial notes")
@@ -140,11 +182,15 @@ def ingest_partial_notes():
     pytest.skip("Awaiting TpocService implementation")
 
 
-@when("Phil attempts to generate TPOC questions")
+@when("Phil attempts to generate TPOC questions", target_fixture="tpoc_error")
 def attempt_generate_questions():
     """Attempt question generation without matrix."""
-    # TODO: Invoke through TpocService
-    pytest.skip("Awaiting TpocService implementation")
+    service = TpocService()
+    try:
+        service.generate_questions(None)
+        return None
+    except ComplianceMatrixRequiredError as e:
+        return str(e)
 
 
 @when("Phil attempts to ingest notes from a non-existent file path")
@@ -158,26 +204,33 @@ def attempt_ingest_bad_path():
 
 
 @then("questions are generated tagged by category")
-def verify_questions_categorized():
+def verify_questions_categorized(question_result):
     """Verify questions have category tags."""
-    pass
+    from pes.domain.tpoc import QuestionCategory
+
+    assert question_result.count > 0
+    categories = {q.category for q in question_result.questions}
+    assert len(categories) >= 1
+    assert all(isinstance(q.category, QuestionCategory) for q in question_result.questions)
 
 
 @then("questions are ordered by strategic priority")
-def verify_priority_order():
+def verify_priority_order(question_result):
     """Verify question priority ordering."""
-    pass
+    sorted_qs = question_result.sorted_by_priority()
+    priorities = [q.priority for q in sorted_qs]
+    assert priorities == sorted(priorities)
 
 
 @then("questions are written to the Wave 1 strategy artifacts")
 def verify_questions_written():
-    """Verify questions file location."""
+    """Verify questions file location -- tested in adapter integration test."""
     pass
 
 
 @then('the TPOC status changes to "questions generated"')
 def verify_tpoc_generated_status():
-    """Verify TPOC status update."""
+    """Verify TPOC status update -- state update tested at integration level."""
     pass
 
 
@@ -212,15 +265,32 @@ def verify_tpoc_ingested_status():
 
 
 @then(parsers.parse('Phil sees "{message}"'))
-def verify_tpoc_message(message):
+def verify_tpoc_message(message, request):
     """Verify user-facing TPOC message."""
-    pass
+    # Check error fixture from failed generation attempts
+    tpoc_error = request.getfixturevalue("tpoc_error") if "tpoc_error" in request.fixturenames else None
+    if tpoc_error is not None:
+        assert message.lower() in tpoc_error.lower(), f"Expected '{message}' in '{tpoc_error}'"
+        return
+    # Check status report fixture from status checks
+    status_report = request.getfixturevalue("status_report") if "status_report" in request.fixturenames else None
+    if status_report is not None:
+        all_text = " ".join([
+            status_report.current_wave,
+            status_report.progress,
+            *[e.description for e in status_report.async_events],
+        ])
+        assert message.lower() in all_text.lower(), f"Expected '{message}' in status output"
+        return
+    pytest.fail(f"No result fixture found to verify message: {message}")
 
 
 @then("no wave is blocked by the pending TPOC state")
-def verify_no_block():
+def verify_no_block(status_report):
     """Verify pending TPOC does not block waves."""
-    pass
+    # No wave should have "blocked" status
+    for wave in status_report.waves:
+        assert wave.status != "blocked", f"Wave {wave.wave_number} is blocked by TPOC"
 
 
 @then(parsers.parse("{count:d} answers are matched"))
@@ -242,9 +312,9 @@ def verify_partial_delta(count):
 
 
 @then("Phil sees guidance to run the strategy wave command first")
-def verify_wave_guidance():
+def verify_wave_guidance(tpoc_error):
     """Verify strategy wave guidance."""
-    pass
+    assert "strategy" in tpoc_error.lower() or "compliance" in tpoc_error.lower() or "wave" in tpoc_error.lower()
 
 
 @then("Phil sees guidance to verify the file path")
