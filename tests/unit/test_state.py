@@ -23,5 +23,5 @@ class TestStateErrors:
         assert error.recovered_state == recovered
         assert error.recovered_state["proposal_id"] == "recovered-uuid"
 
-    def test_schema_version_is_1_0_0(self) -> None:
-        assert SCHEMA_VERSION == "1.0.0"
+    def test_schema_version_is_2_0_0(self) -> None:
+        assert SCHEMA_VERSION == "2.0.0"

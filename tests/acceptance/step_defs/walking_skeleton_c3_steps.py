@@ -68,6 +68,14 @@ def proposal_with_red_pdc(sample_state, write_state, proposal_dir):
         },
     }
     (pdcs_dir / "section-3.2.pdc").write_text(json.dumps(pdc_data, indent=2))
+    # Include PDC status in state for engine evaluation
+    state["pdc_status"] = {
+        "3.2": {
+            "tier_1": "GREEN",
+            "tier_2": "RED",
+            "red_items": ["Phase II pathway uses generic language"],
+        },
+    }
     write_state(state)
     return state
 

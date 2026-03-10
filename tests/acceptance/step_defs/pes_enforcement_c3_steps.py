@@ -75,13 +75,23 @@ def section_has_red_pdc(active_state, write_state, proposal_dir, section_id, cou
         },
     }
     (pdcs_dir / f"section-{section_id}.pdc").write_text(json.dumps(pdc_data, indent=2))
+    # Update state with PDC status for engine evaluation
+    if "pdc_status" not in active_state:
+        active_state["pdc_status"] = {}
+    active_state["pdc_status"][section_id] = {
+        "tier_1": "GREEN",
+        "tier_2": "RED",
+        "red_items": ["Phase II pathway uses generic language"],
+    }
+    write_state(active_state)
 
 
 @given("all sections have Tier 1 and Tier 2 PDCs GREEN")
-def all_sections_green_pdcs(proposal_dir):
+def all_sections_green_pdcs(active_state, write_state, proposal_dir):
     """Create PDC state indicating all sections GREEN."""
     pdcs_dir = proposal_dir / "pdcs"
     pdcs_dir.mkdir(exist_ok=True)
+    pdc_status: dict[str, Any] = {}
     for section_id in ["3.1", "3.2", "3.3", "3.4", "4.1"]:
         pdc_data = {
             "section_id": section_id,
@@ -91,6 +101,13 @@ def all_sections_green_pdcs(proposal_dir):
         (pdcs_dir / f"section-{section_id}.pdc").write_text(
             json.dumps(pdc_data, indent=2)
         )
+        pdc_status[section_id] = {
+            "tier_1": "GREEN",
+            "tier_2": "GREEN",
+            "red_items": [],
+        }
+    active_state["pdc_status"] = pdc_status
+    write_state(active_state)
 
 
 @given(
@@ -276,6 +293,12 @@ def toggle_rule_config():
 # --- Then steps ---
 
 
+@then("the enforcement system blocks the action")
+def verify_action_blocked_c3(enforcement_result):
+    """Verify enforcement returns block decision."""
+    assert enforcement_result.decision == Decision.BLOCK
+
+
 @then("Phil sees the specific section and PDC items that remain RED")
 def verify_red_pdc_details(enforcement_result):
     """Verify message contains PDC-specific details."""
@@ -289,6 +312,15 @@ def verify_red_pdc_details(enforcement_result):
 def verify_action_allowed_c3(enforcement_result):
     """Verify enforcement returns allow decision."""
     assert enforcement_result.decision == Decision.ALLOW
+
+
+@then("Phil sees a critical deadline warning")
+def verify_critical_deadline_warning(enforcement_result):
+    """Verify critical deadline warning is present."""
+    all_messages = " ".join(enforcement_result.messages).lower()
+    assert "critical" in all_messages or "deadline" in all_messages, (
+        f"Expected critical deadline warning in {enforcement_result.messages}"
+    )
 
 
 @then("Phil sees a suggestion to submit with available work or skip non-essential waves")

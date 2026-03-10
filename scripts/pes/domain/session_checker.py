@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+DEADLINE_CRITICAL_DAYS = 3
 DEADLINE_WARNING_DAYS = 7
 DRAFT_EXTENSIONS = {".md", ".txt", ".docx"}
 
@@ -64,9 +65,15 @@ class SessionChecker:
             return []
 
         days_remaining = (deadline - date.today()).days
-        if days_remaining <= DEADLINE_WARNING_DAYS:
+        if days_remaining <= DEADLINE_CRITICAL_DAYS:
             return [
                 f"Critical deadline warning: {days_remaining} days remaining. "
+                f"Prioritize completing in-progress work. "
+                f"Consider: submit with available work or skip non-essential waves."
+            ]
+        if days_remaining <= DEADLINE_WARNING_DAYS:
+            return [
+                f"Deadline warning: {days_remaining} days remaining. "
                 f"Prioritize completing in-progress work before starting new sections."
             ]
         return []
