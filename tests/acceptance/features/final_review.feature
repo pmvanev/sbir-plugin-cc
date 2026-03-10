@@ -9,7 +9,6 @@ Feature: Final Review with Simulated Government Evaluator (US-012)
 
   # --- Happy Path ---
 
-  @skip
   Scenario: Reviewer persona simulation scores proposal
     Given the assembled proposal for AF243-001 is ready for final review
     When Phil requests the final review
@@ -17,7 +16,6 @@ Feature: Final Review with Simulated Government Evaluator (US-012)
     And each score includes a brief rationale
     And the scorecard is written to the review artifacts directory
 
-  @skip
   Scenario: Red team review identifies strongest objections
     Given the reviewer simulation has completed
     When the tool runs a red team review
@@ -25,7 +23,6 @@ Feature: Final Review with Simulated Government Evaluator (US-012)
     And each objection references a specific section and page
     And the findings are written to the review artifacts directory
 
-  @skip
   Scenario: Debrief-informed review flags known weaknesses
     Given past debrief feedback for AF241-087 exists in the corpus
     And that debrief said "transition pathway lacked specificity"
@@ -33,7 +30,6 @@ Feature: Final Review with Simulated Government Evaluator (US-012)
     Then it flags "transition pathway specificity" as a known weakness
     And reports whether the current proposal addresses it
 
-  @skip
   Scenario: Issue resolution and re-review
     Given the red team found 1 HIGH issue in Section 3.2
     When Phil fixes the issue and requests re-review
@@ -42,14 +38,12 @@ Feature: Final Review with Simulated Government Evaluator (US-012)
 
   # --- Edge Cases ---
 
-  @skip
   Scenario: No past debriefs available
     Given no debrief feedback exists in the corpus
     When the tool runs the debrief cross-check
     Then it reports "No past debrief data available"
     And notes this check improves as debriefs are ingested
 
-  @skip
   Scenario: Forced sign-off after 2 review iterations
     Given 2 review iterations have been completed
     And 1 MEDIUM issue remains unresolved
