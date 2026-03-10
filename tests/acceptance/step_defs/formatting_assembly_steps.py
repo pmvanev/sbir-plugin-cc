@@ -1,6 +1,6 @@
 """Step definitions for document formatting and volume assembly (US-011).
 
-Invokes through: FormattingService (driving port).
+Invokes through: FormattingService and AssemblyService (driving ports).
 Does NOT import internal format template loaders or document renderers directly.
 """
 
@@ -119,34 +119,82 @@ def volume_over_limit(pages, limit):
 
 @given(
     parsers.parse("the compliance matrix has {count:d} items"),
+    target_fixture="compliance_item_count",
 )
 def compliance_matrix_with_items(count):
     """Compliance matrix with given item count."""
-    pass
+    return count
 
 
 @given(
     parsers.parse("{covered:d} are covered and {waived:d} are waived with reasons"),
+    target_fixture="compliance_setup",
 )
-def compliance_covered_waived(covered, waived):
-    """Compliance items with coverage and waivers."""
-    pass
+def compliance_covered_waived(compliance_item_count, covered, waived):
+    """Build a compliance matrix with covered and waived items."""
+    from pes.domain.compliance import (
+        ComplianceItem,
+        ComplianceMatrix,
+        CoverageStatus,
+        RequirementType,
+    )
+
+    items = []
+    for i in range(1, covered + 1):
+        items.append(ComplianceItem(
+            item_id=i, text=f"Requirement {i}",
+            requirement_type=RequirementType.SHALL,
+            status=CoverageStatus.COVERED,
+        ))
+    for i in range(covered + 1, covered + waived + 1):
+        items.append(ComplianceItem(
+            item_id=i, text=f"Requirement {i}",
+            requirement_type=RequirementType.SHALL,
+            status=CoverageStatus.WAIVED,
+        ))
+    matrix = ComplianceMatrix(items=items)
+    return {"matrix": matrix, "total": compliance_item_count, "covered": covered, "waived": waived}
 
 
 @given(
     parsers.parse(
         '{count:d} item has status "missing" with no coverage and no waiver'
     ),
+    target_fixture="compliance_setup",
 )
-def compliance_missing_item(count):
-    """Compliance item with missing status."""
-    pass
+def compliance_missing_item(compliance_item_count, count):
+    """Build a compliance matrix with one missing item."""
+    from pes.domain.compliance import (
+        ComplianceItem,
+        ComplianceMatrix,
+        CoverageStatus,
+        RequirementType,
+    )
+
+    items = []
+    # All items except `count` are covered
+    covered_count = compliance_item_count - count
+    for i in range(1, covered_count + 1):
+        items.append(ComplianceItem(
+            item_id=i, text=f"Requirement {i}",
+            requirement_type=RequirementType.SHALL,
+            status=CoverageStatus.COVERED,
+        ))
+    for i in range(covered_count + 1, compliance_item_count + 1):
+        items.append(ComplianceItem(
+            item_id=i, text=f"Requirement {i}",
+            requirement_type=RequirementType.SHALL,
+            status=CoverageStatus.NOT_STARTED,
+        ))
+    matrix = ComplianceMatrix(items=items)
+    return {"matrix": matrix, "total": compliance_item_count, "missing_count": count}
 
 
-@given("formatting and compliance checks are complete")
+@given("formatting and compliance checks are complete",
+       target_fixture="assembly_ready")
 def formatting_complete():
     """Formatting and compliance checks done."""
-    pass
+    return True
 
 
 # --- When steps ---
@@ -183,16 +231,45 @@ def report_page_count():
     pytest.skip("Awaiting FormattingService implementation")
 
 
-@when("the tool runs the final compliance check")
-def run_final_compliance():
+@when(
+    "the tool runs the final compliance check",
+    target_fixture="compliance_result",
+)
+def run_final_compliance(compliance_setup):
     """Run final compliance check through AssemblyService."""
-    pytest.skip("Awaiting AssemblyService implementation")
+    from pes.domain.assembly_service import AssemblyService
+
+    service = AssemblyService()
+    return service.run_final_compliance_check(matrix=compliance_setup["matrix"])
 
 
-@when("the tool assembles volumes")
-def assemble_volumes():
+@when(
+    "the tool assembles volumes",
+    target_fixture="assembly_result",
+)
+def assemble_volumes(assembly_ready):
     """Assemble volumes through AssemblyService."""
-    pytest.skip("Awaiting AssemblyService implementation")
+    from pes.domain.assembly_service import AssemblyService
+    from pes.ports.document_assembly_port import DocumentAssembler
+
+    # Use a fake assembler for acceptance test
+    class FakeAssembler(DocumentAssembler):
+        def assemble_volumes(self, *, sections, format_template_agency):
+            from pes.ports.document_assembly_port import AssembledVolume
+            return [
+                AssembledVolume(volume_number=1, title="Technical", content="...", page_count=19),
+                AssembledVolume(volume_number=2, title="Cost", content="...", page_count=5),
+                AssembledVolume(
+                    volume_number=3, title="Company Info",
+                    content="...", page_count=3,
+                ),
+            ]
+
+    service = AssemblyService(document_assembler=FakeAssembler())
+    return service.assemble_volumes(
+        sections=["technical", "cost", "company-info"],
+        format_template_agency="dod",
+    )
 
 
 # --- Then steps ---
@@ -270,38 +347,46 @@ def verify_trimming_suggestions():
 @then(
     parsers.parse('it reports "{report}"'),
 )
-def verify_compliance_report(report):
+def verify_compliance_report(compliance_result, report):
     """Verify compliance report content."""
-    pytest.skip("Awaiting AssemblyService implementation")
+    assert compliance_result.summary == report
 
 
 @then("the final check is written to the formatting artifacts directory")
-def verify_final_check_written():
+def verify_final_check_written(compliance_result):
     """Verify final compliance check artifact."""
-    pytest.skip("Awaiting AssemblyService implementation")
+    assert compliance_result.artifact_written is True
 
 
 @then("it reports the missing item with guidance to provide content or waive")
-def verify_missing_guidance():
+def verify_missing_guidance(compliance_result):
     """Verify missing item guidance."""
-    pytest.skip("Awaiting AssemblyService implementation")
+    assert compliance_result.missing > 0
+    assert compliance_result.blocks_progression is True
+    guidance_lower = compliance_result.guidance.lower()
+    assert "waive" in guidance_lower or "content" in guidance_lower
 
 
 @then(
     "it creates Volume 1 (Technical), Volume 2 (Cost), and Volume 3 (Company Info)"
 )
-def verify_volumes_created():
+def verify_volumes_created(assembly_result):
     """Verify three volumes are created."""
-    pytest.skip("Awaiting AssemblyService implementation")
+    assert len(assembly_result.volumes) == 3
+    titles = [v.title for v in assembly_result.volumes]
+    assert "Technical" in titles
+    assert "Cost" in titles
+    assert "Company Info" in titles
 
 
 @then("the volumes are written to the assembly artifacts directory")
-def verify_volumes_written():
+def verify_volumes_written(assembly_result):
     """Verify volumes are written to correct directory."""
-    pytest.skip("Awaiting AssemblyService implementation")
+    assert assembly_result.artifact_written is True
 
 
 @then("a human checkpoint is presented for assembled package review")
-def verify_human_checkpoint():
+def verify_human_checkpoint(assembly_result):
     """Verify human checkpoint for assembly review."""
-    pytest.skip("Awaiting AssemblyService implementation")
+    assert assembly_result.checkpoint_required is True
+    assert assembly_result.checkpoint_type == "assembled_package_review"

@@ -47,7 +47,6 @@ Feature: Document Formatting and Volume Assembly (US-011)
 
   # --- Compliance Final Check ---
 
-  @skip
   Scenario: Compliance matrix final check during formatting
     Given the compliance matrix has 47 items
     And 45 are covered and 2 are waived with reasons
@@ -55,7 +54,6 @@ Feature: Document Formatting and Volume Assembly (US-011)
     Then it reports "45/47 covered | 2 waived (with reasons) | 0 missing"
     And the final check is written to the formatting artifacts directory
 
-  @skip
   Scenario: Compliance matrix check flags missing items
     Given the compliance matrix has 47 items
     And 1 item has status "missing" with no coverage and no waiver
@@ -64,7 +62,6 @@ Feature: Document Formatting and Volume Assembly (US-011)
 
   # --- Assembly ---
 
-  @skip
   Scenario: Assemble volumes and present for review
     Given formatting and compliance checks are complete
     When the tool assembles volumes
