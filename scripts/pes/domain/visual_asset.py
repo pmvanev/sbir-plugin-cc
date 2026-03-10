@@ -63,6 +63,22 @@ class CrossReferenceEntry:
     exists: bool
 
 
+@dataclass(frozen=True)
+class ExternalBrief:
+    """Brief for a figure that cannot be auto-generated.
+
+    Frozen value object -- immutable after creation.
+    Provides content description, dimensions, and resolution guidance
+    for manual figure creation.
+    """
+
+    figure_number: int
+    section_id: str
+    content_description: str
+    dimensions: str
+    resolution: str
+
+
 @dataclass
 class CrossReferenceLog:
     """Validates figure-to-text reference consistency."""

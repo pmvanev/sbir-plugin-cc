@@ -2,6 +2,7 @@
 
 Implements VisualAssetPort for JSON file persistence of
 figure inventories and cross-reference logs.
+Also implements FigurePersistence protocol for figure generation artifacts.
 """
 
 from __future__ import annotations
@@ -12,14 +13,19 @@ from pathlib import Path
 from pes.domain.visual_asset import (
     CrossReferenceEntry,
     CrossReferenceLog,
+    ExternalBrief,
     FigureInventory,
     FigurePlaceholder,
+    GeneratedFigure,
 )
 from pes.ports.visual_asset_port import VisualAssetPort
 
 
 class FileVisualAssetAdapter(VisualAssetPort):
-    """Reads and writes visual asset artifacts as JSON files."""
+    """Reads and writes visual asset artifacts as JSON files.
+
+    Also satisfies FigurePersistence protocol for VisualAssetService.
+    """
 
     def __init__(self, artifacts_dir: Path) -> None:
         self._dir = artifacts_dir
@@ -88,3 +94,36 @@ class FileVisualAssetAdapter(VisualAssetPort):
             for e in data["entries"]
         ]
         return CrossReferenceLog(entries=entries)
+
+    # --- FigurePersistence protocol methods ---
+
+    def write_figure(self, figure: GeneratedFigure, content: str) -> None:
+        """Write generated figure file to figures directory."""
+        figures_dir = self._dir / "figures"
+        figures_dir.mkdir(parents=True, exist_ok=True)
+        path = figures_dir / figure.file_path
+        path.write_text(content, encoding="utf-8")
+
+    def write_external_brief(self, brief: ExternalBrief) -> None:
+        """Write external brief as JSON to figures directory."""
+        figures_dir = self._dir / "figures"
+        figures_dir.mkdir(parents=True, exist_ok=True)
+        path = figures_dir / f"figure-{brief.figure_number}-brief.json"
+        data = {
+            "figure_number": brief.figure_number,
+            "section_id": brief.section_id,
+            "content_description": brief.content_description,
+            "dimensions": brief.dimensions,
+            "resolution": brief.resolution,
+        }
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def replace_figure(self, figure_number: int, new_path: str) -> GeneratedFigure:
+        """Replace a figure with a manual file path."""
+        fmt = new_path.split(".")[-1] if "." in new_path else "unknown"
+        return GeneratedFigure(
+            figure_number=figure_number,
+            section_id="replaced",
+            file_path=new_path,
+            format=fmt,
+        )
