@@ -38,6 +38,17 @@ def proposal_dir(tmp_path: Path) -> Path:
     # Wave 4 artifacts (C2)
     (tmp_path / "artifacts" / "wave-4-drafting" / "sections").mkdir(parents=True)
     (tmp_path / "artifacts" / "wave-4-drafting" / "reviews").mkdir(parents=True)
+    # Wave 5 artifacts (C3)
+    (tmp_path / "artifacts" / "wave-5-visuals" / "figures").mkdir(parents=True)
+    # Wave 6 artifacts (C3)
+    (tmp_path / "artifacts" / "wave-6-format" / "assembled").mkdir(parents=True)
+    # Wave 7 artifacts (C3)
+    (tmp_path / "artifacts" / "wave-7-review").mkdir(parents=True)
+    # Wave 8 artifacts (C3)
+    (tmp_path / "artifacts" / "wave-8-submission" / "package").mkdir(parents=True)
+    (tmp_path / "artifacts" / "wave-8-submission" / "archive").mkdir(parents=True)
+    # Wave 9 artifacts (C3)
+    (tmp_path / "artifacts" / "wave-9-learning").mkdir(parents=True)
     return tmp_path
 
 
@@ -162,11 +173,43 @@ def pes_config(proposal_dir: Path) -> Path:
                 "condition": {"requires_outline_approval": True, "target_wave": 4},
                 "message": "Wave 4 requires outline approval in Wave 3",
             },
+            {
+                "rule_id": "wave-5-requires-pdc-green",
+                "description": "Wave 5 visuals require all sections Tier 1+2 PDCs GREEN",
+                "rule_type": "pdc_gate",
+                "condition": {"requires_pdc_green": True, "target_wave": 5},
+                "message": "Wave 5 requires all sections to have Tier 1+2 PDCs GREEN",
+            },
+            {
+                "rule_id": "deadline-blocking",
+                "description": "Block non-essential waves at critical deadline threshold",
+                "rule_type": "deadline_blocking",
+                "condition": {"critical_days": 3, "non_essential_waves": [5]},
+                "message": "Critical deadline threshold -- non-essential work blocked",
+            },
+            {
+                "rule_id": "submission-immutability",
+                "description": "Block all writes to submitted proposal artifacts",
+                "rule_type": "submission_immutability",
+                "condition": {"requires_immutable": True},
+                "message": "Proposal is submitted. Artifacts are read-only.",
+            },
+            {
+                "rule_id": "corpus-integrity",
+                "description": "Win/loss tags are append-only",
+                "rule_type": "corpus_integrity",
+                "condition": {"append_only_tags": True},
+                "message": "Win/loss tags are append-only and cannot be modified",
+            },
         ],
         "enforcement": {
             "session_startup_check": True,
             "wave_ordering": "strict",
             "compliance_gate": True,
+            "pdc_gate": True,
+            "deadline_blocking": True,
+            "submission_immutability": True,
+            "corpus_integrity": True,
         },
         "deadlines": {"warning_days": 7, "critical_days": 3},
         "audit_log": {
