@@ -15,7 +15,6 @@ Feature: Document Formatting and Volume Assembly (US-011)
     Then the tool applies font, margins, headers, footers, and section numbering
     And the output medium is recorded in the proposal state
 
-  @skip
   Scenario: Insert figures and format references
     Given 5 approved figures exist and the document has 23 citations
     When the tool inserts figures and formats references
@@ -24,7 +23,6 @@ Feature: Document Formatting and Volume Assembly (US-011)
 
   # --- Jargon Audit ---
 
-  @skip
   Scenario: Jargon audit flags undefined acronyms
     Given the document uses 15 unique acronyms
     And 2 are not defined on first use
@@ -34,14 +32,12 @@ Feature: Document Formatting and Volume Assembly (US-011)
 
   # --- Page Count ---
 
-  @skip
   Scenario: Page count within solicitation limits
     Given the formatted technical volume is 19 pages
     And the solicitation limit is 20 pages
     When the tool reports the page count
     Then Phil sees "19/20 -- within limit (1 page margin)"
 
-  @skip
   Scenario: Page count over limit with guidance
     Given the formatted technical volume is 22 pages against a 20-page limit
     When the tool reports the page count
