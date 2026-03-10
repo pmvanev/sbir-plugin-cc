@@ -53,7 +53,6 @@ Feature: Final Review with Simulated Government Evaluator (US-012)
 
   # --- Sign-Off Gate ---
 
-  @skip
   Scenario: Human sign-off unlocks Wave 8
     Given all HIGH issues are addressed
     When Phil signs off on the final review

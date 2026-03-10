@@ -1,6 +1,6 @@
 """Tests for wave ordering enforcement rules through EnforcementEngine.
 
-Test Budget: 8 behaviors x 2 = 16 max unit tests (current: 12)
+Test Budget: 10 behaviors x 2 = 20 max unit tests (current: 16)
 
 Behaviors (C1):
 1. Wave 1 blocked when go_no_go is not 'go' (parametrized variations)
@@ -15,6 +15,10 @@ Behaviors (C2 - Waves 2-4):
 8. Wave 4 blocked when outline not approved; allowed when approved (parametrized)
 9. Skipping waves blocked with prerequisite guidance
 10. Block decisions recorded in audit log with rule ID
+
+Behaviors (C3 - Wave 8 sign-off gate):
+11. Wave 8 blocked without final review sign-off (parametrized)
+12. Wave 8 allowed when final review sign-off recorded
 
 Tests enter through driving port (EnforcementEngine.evaluate).
 Driven ports (RuleLoader, AuditLogger) use fakes at port boundaries.
@@ -346,3 +350,66 @@ class TestWaveBlockAuditLogging:
         entry = audit.entries[0]
         assert "timestamp" in entry
         assert entry["decision"] == "BLOCK"
+
+
+# --- C3: Wave 8 sign-off gate ---
+
+
+def _wave_8_signoff_rule() -> EnforcementRule:
+    """Rule: Wave 8 requires final review sign-off."""
+    return EnforcementRule(
+        rule_id="wave-8-requires-signoff",
+        description="Wave 8 submission requires final review sign-off",
+        rule_type="wave_ordering",
+        condition={"requires_final_review_signoff": True, "target_wave": 8},
+        message="Wave 8 requires final review sign-off",
+    )
+
+
+class TestWave8SignOffBlocking:
+    """Wave 8 blocked when final review sign-off not recorded."""
+
+    @pytest.mark.parametrize(
+        "final_review",
+        [
+            {"signed_off": False},
+            {},
+        ],
+        ids=["not_signed_off", "missing_signed_off"],
+    )
+    def test_blocks_wave_8_without_signoff(
+        self, final_review: dict[str, Any]
+    ) -> None:
+        engine, _ = _make_engine([_wave_8_signoff_rule()])
+        state = {"proposal_id": "p-001", "final_review": final_review}
+
+        result = engine.evaluate(state, tool_name="wave_8_submission")
+
+        assert result.decision == Decision.BLOCK
+
+    def test_blocks_wave_8_when_final_review_missing_from_state(self) -> None:
+        engine, _ = _make_engine([_wave_8_signoff_rule()])
+        state: dict[str, Any] = {"proposal_id": "p-001"}
+
+        result = engine.evaluate(state, tool_name="wave_8_submission")
+
+        assert result.decision == Decision.BLOCK
+
+
+class TestWave8SignOffAllowing:
+    """Wave 8 allowed when final review sign-off is recorded."""
+
+    def test_allows_wave_8_when_signed_off(self) -> None:
+        engine, _ = _make_engine([_wave_8_signoff_rule()])
+        state = {
+            "proposal_id": "p-001",
+            "final_review": {
+                "signed_off": True,
+                "signed_off_at": "2026-03-10T14:00:00Z",
+            },
+        }
+
+        result = engine.evaluate(state, tool_name="wave_8_submission")
+
+        assert result.decision == Decision.ALLOW
+        assert result.messages == []

@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from pes.domain.engine import EnforcementEngine
 from pes.domain.final_review import (
     CriterionScore,
     DebriefCrossCheckEntry,
@@ -17,6 +18,7 @@ from pes.domain.final_review import (
     ReviewerScorecard,
 )
 from pes.domain.final_review_service import FinalReviewService
+from pes.domain.rules import Decision, EnforcementRule
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 
 # Link to feature file
@@ -416,9 +418,59 @@ def verify_signoff_written(signoff_result):
     assert signoff_result.artifact_written is True
 
 
+class FakeRuleLoader:
+    """Fake rule loader for acceptance tests."""
+
+    def __init__(self, rules: list[EnforcementRule]) -> None:
+        self._rules = rules
+
+    def load_rules(self) -> list[EnforcementRule]:
+        return self._rules
+
+
+class FakeAuditLogger:
+    """Fake audit logger for acceptance tests."""
+
+    def __init__(self) -> None:
+        self.entries: list[dict] = []
+
+    def log(self, entry: dict) -> None:
+        self.entries.append(entry)
+
+
 @then("Wave 8 is unlocked")
-def verify_wave_8_unlocked():
-    """Verify Wave 8 is unlocked after sign-off."""
-    # Wave unlock is handled by PES state management, not the service.
-    # Acceptance test just verifies sign-off was recorded.
-    pass
+def verify_wave_8_unlocked(signoff_result):
+    """Verify PES blocks Wave 8 without sign-off, allows after sign-off."""
+    assert signoff_result.signed_off is True
+
+    wave_8_rule = EnforcementRule(
+        rule_id="wave-8-requires-signoff",
+        description="Wave 8 submission requires final review sign-off",
+        rule_type="wave_ordering",
+        condition={"requires_final_review_signoff": True, "target_wave": 8},
+        message="Wave 8 requires final review sign-off",
+    )
+
+    rule_loader = FakeRuleLoader([wave_8_rule])
+    audit = FakeAuditLogger()
+
+    # First: verify Wave 8 is BLOCKED without sign-off
+    state_without_signoff = {
+        "proposal_id": "AF243-001",
+        "final_review": {"signed_off": False},
+    }
+    engine = EnforcementEngine(rule_loader, audit)
+    blocked_result = engine.evaluate(state_without_signoff, tool_name="wave_8_submission")
+    assert blocked_result.decision == Decision.BLOCK
+
+    # Then: verify Wave 8 is ALLOWED with sign-off
+    state_with_signoff = {
+        "proposal_id": "AF243-001",
+        "final_review": {
+            "signed_off": True,
+            "signed_off_at": signoff_result.timestamp,
+        },
+    }
+    engine2 = EnforcementEngine(rule_loader, audit)
+    allowed_result = engine2.evaluate(state_with_signoff, tool_name="wave_8_submission")
+    assert allowed_result.decision == Decision.ALLOW

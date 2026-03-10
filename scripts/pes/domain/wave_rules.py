@@ -47,4 +47,10 @@ class WaveOrderingEvaluator:
                 if not isinstance(artifact, dict) or not artifact.get(approval_field):
                     return True
 
+        # Check final review sign-off condition (Wave 8)
+        if condition.get("requires_final_review_signoff"):
+            final_review = state.get("final_review", {})
+            if not isinstance(final_review, dict) or not final_review.get("signed_off"):
+                return True
+
         return False
