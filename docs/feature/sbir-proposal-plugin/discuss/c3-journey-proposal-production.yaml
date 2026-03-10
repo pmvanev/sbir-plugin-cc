@@ -1,0 +1,626 @@
+journey:
+  name: "SBIR Proposal Production & Learning"
+  goal: "Transform approved draft into a submitted, archived proposal and feed lessons back into the corpus"
+  persona: "Phil Santos -- small business engineer, 2-3 proposals/year, sole writer, CLI-native"
+  phase: c3_lifecycle
+  waves: [5, 6, 7, 8, 9]
+  jobs: [J6, J7, J9, J10, J11]
+
+  emotional_arc:
+    start: "Engaged but fatigued -- most of the intellectual work is done, but mechanical work remains"
+    middle: "Cautious and methodical -- verification mode, checking everything before the point of no return"
+    end: "Relieved and hopeful -- submitted with confidence, every proposal makes the next one better"
+
+  preconditions:
+    - "All sections drafted, reviewed, and approved (Wave 4 complete)"
+    - "All Tier 1+2 PDCs GREEN for every section"
+    - "At least one human review per section recorded"
+    - "Compliance matrix exists with tracked items"
+    - "Discrimination table approved"
+    - "proposal-state.json current_wave >= 5"
+
+steps:
+  - id: 6
+    name: "Visual Assets"
+    wave: 5
+    phase: c3_lifecycle
+    commands:
+      - "/proposal wave visuals"
+    jobs: [J9]
+
+    substeps:
+      - id: "6a"
+        name: "Figure Inventory"
+        description: "Review outline for figure placeholders; determine type and generation method for each"
+        artifacts_produced:
+          - "./artifacts/wave-5-visuals/figure-inventory.md"
+      - id: "6b"
+        name: "Figure Generation"
+        description: "Generate each figure via SVG, Mermaid, Graphviz, image API, or external brief"
+        artifacts_produced:
+          - "./artifacts/wave-5-visuals/figures/"
+      - id: "6c"
+        name: "Figure Review Loop"
+        description: "Present each figure for human review; iterate or accept manual replacement"
+      - id: "6d"
+        name: "Cross-Reference Validation"
+        description: "Verify all figures have captions and are referenced in text"
+        artifacts_produced:
+          - "./artifacts/wave-5-visuals/cross-reference-log.md"
+
+    tui_mockup: |
+      +-- /proposal wave visuals ------------------------------------------+
+      |                                                                    |
+      |  WAVE 5: VISUAL ASSETS                                             |
+      |  Topic: ${topic_id} | ${days_to_deadline} days to deadline          |
+      |                                                                    |
+      |  Figure inventory from outline:                                    |
+      |    ${figure_count} figures identified across ${section_count} sects |
+      |                                                                    |
+      |  Figure 1: System Architecture Diagram (Section 3.1)               |
+      |    Type: Block diagram | Method: Mermaid                           |
+      |    Status: [generated -- review needed]                            |
+      |                                                                    |
+      |  Figure 2: Phase I Timeline (Section 4)                            |
+      |    Type: Gantt chart | Method: Mermaid                             |
+      |    Status: [generated -- review needed]                            |
+      |                                                                    |
+      |  Figure 3: SWaP-C Comparison (Section 3.2)                         |
+      |    Type: Data table/chart | Method: SVG                            |
+      |    Status: [pending generation]                                    |
+      |                                                                    |
+      |  Figure 4: Concept Illustration (Section 3.3)                      |
+      |    Type: Technical illustration | Method: Gemini API               |
+      |    Status: [pending generation]                                    |
+      |                                                                    |
+      |  Figure 5: Test Setup Photograph (Section 3.4)                     |
+      |    Type: Photo | Method: External (manual)                         |
+      |    Status: [external brief generated]                              |
+      |                                                                    |
+      |  Actions:                                                          |
+      |    (r) review figure  (g) generate next  (s) skip to formatting    |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: figure_inventory
+        source: "./artifacts/wave-5-visuals/figure-inventory.md"
+        displayed_as: "${figure_count} figures across ${section_count} sections"
+        consumers: ["wave 5 generation", "wave 6 figure insertion", "wave 7 cross-reference check"]
+      - name: cross_reference_log
+        source: "./artifacts/wave-5-visuals/cross-reference-log.md"
+        displayed_as: "Cross-reference log"
+        consumers: ["wave 6 assembly", "wave 7 final review"]
+      - name: generated_figures
+        source: "./artifacts/wave-5-visuals/figures/"
+        displayed_as: "Generated figures directory"
+        consumers: ["wave 6 figure insertion", "wave 8 submission package"]
+
+    emotional_state:
+      entry: "Engaged but tired of writing -- ready for a different kind of work"
+      exit: "Satisfied -- figures strengthen the narrative visually"
+
+    integration_checkpoint: |
+      Wave 4 must be complete: all sections have Tier 1+2 PDCs GREEN
+      and at least one human review per section.
+      PES PDC gate enforces this.
+      All figure placeholders in outline must have a corresponding entry in figure inventory.
+      All generated figures must have captions.
+
+  - id: 7
+    name: "Formatting & Assembly"
+    wave: 6
+    phase: c3_lifecycle
+    commands:
+      - "/proposal format"
+    jobs: [J6]
+
+    substeps:
+      - id: "7a"
+        name: "Template Selection"
+        description: "Identify solicitation format requirements; select output medium (Word, LaTeX, Google Docs)"
+      - id: "7b"
+        name: "Document Formatting"
+        description: "Apply font, margins, headers, footers, section numbering per solicitation requirements"
+      - id: "7c"
+        name: "Figure Insertion"
+        description: "Insert approved figures at correct positions with captions"
+      - id: "7d"
+        name: "Reference Formatting"
+        description: "Format citations; verify hyperlinks; ensure consistent citation style"
+      - id: "7e"
+        name: "Compliance and Quality Checks"
+        description: "Final compliance matrix check; jargon audit; page count verification"
+        artifacts_produced:
+          - "./artifacts/wave-6-format/compliance-final-check.md"
+          - "./artifacts/wave-6-format/jargon-audit.md"
+      - id: "7f"
+        name: "Volume Assembly"
+        description: "Assemble all volumes into required file structure per solicitation"
+        artifacts_produced:
+          - "./artifacts/wave-6-format/assembled/"
+      - id: "7g"
+        name: "Assembly Review Checkpoint"
+        description: "Human reviews the fully assembled, formatted document package"
+
+    tui_mockup: |
+      +-- /proposal format ------------------------------------------------+
+      |                                                                    |
+      |  WAVE 6: FORMATTING & ASSEMBLY                                      |
+      |  Topic: ${topic_id} | ${days_to_deadline} days to deadline          |
+      |                                                                    |
+      |  Solicitation format requirements:                                 |
+      |    Font: Times New Roman 12pt | Margins: 1" all sides              |
+      |    Page limit: 20 pages (technical volume)                         |
+      |    Header: Topic number, company name, page number                 |
+      |                                                                    |
+      |  Output medium: ${output_medium}                                   |
+      |                                                                    |
+      |  Formatting progress:                                              |
+      |    [done] Section numbering and heading styles applied             |
+      |    [done] Headers and footers applied                              |
+      |    [done] Figures inserted (${figure_count} figures)               |
+      |    [done] References formatted (${reference_count} citations)      |
+      |    [running] Jargon audit...                                       |
+      |                                                                    |
+      |  Page count: ${current_pages}/${max_pages}                          |
+      |    ${page_count_status}                                            |
+      |                                                                    |
+      |  Compliance matrix final check:                                    |
+      |    ${compliance_covered}/${compliance_total} covered               |
+      |    ${compliance_waived} waived (with reasons)                      |
+      |    ${compliance_missing} MISSING -- action required                |
+      |                                                                    |
+      |  Volumes assembled:                                                |
+      |    Volume 1: Technical (${vol1_pages} pages)                       |
+      |    Volume 2: Cost (${vol2_pages} pages)                            |
+      |    Volume 3: Company Info (${vol3_pages} pages)                    |
+      |                                                                    |
+      |  CHECKPOINT: Review assembled package                              |
+      |    (a) approve -- proceed to final review                          |
+      |    (r) revise  -- provide feedback on formatting                   |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: output_medium
+        source: "user selection during Wave 6"
+        displayed_as: "${output_medium}"
+        consumers: ["wave 6 formatting", "wave 8 submission packaging"]
+      - name: page_count
+        source: "computed from assembled document"
+        displayed_as: "${current_pages}/${max_pages}"
+        consumers: ["wave 6 status", "wave 7 final review"]
+      - name: compliance_final
+        source: "./artifacts/wave-6-format/compliance-final-check.md"
+        displayed_as: "${compliance_covered}/${compliance_total} covered"
+        consumers: ["wave 7 final review", "wave 8 pre-submission check"]
+      - name: assembled_volumes
+        source: "./artifacts/wave-6-format/assembled/"
+        displayed_as: "Assembled volume files"
+        consumers: ["wave 7 final review input", "wave 8 submission package"]
+
+    emotional_state:
+      entry: "Engaged but dreading mechanical formatting work"
+      exit: "Relieved -- formatting handled, document looks professional"
+
+    integration_checkpoint: |
+      All figures from Wave 5 must exist and be inserted.
+      All compliance items must be covered or waived (with reasons).
+      Page count must be within solicitation limits.
+      All cross-references must resolve (no broken figure/table references).
+      Compliance matrix is the same living document from Wave 1, updated here.
+
+  - id: 8
+    name: "Final Review"
+    wave: 7
+    phase: c3_lifecycle
+    commands:
+      - "/proposal wave final-review"
+    jobs: [J11]
+
+    substeps:
+      - id: "8a"
+        name: "Reviewer Persona Simulation"
+        description: "Simulate government technical evaluator scoring against stated evaluation criteria"
+        artifacts_produced:
+          - "./artifacts/wave-7-review/reviewer-scorecard.md"
+      - id: "8b"
+        name: "Red Team Review"
+        description: "Identify the 3-5 strongest objections a skeptical reviewer would raise"
+        artifacts_produced:
+          - "./artifacts/wave-7-review/red-team-findings.md"
+      - id: "8c"
+        name: "Debrief-Informed Review"
+        description: "Check against known weaknesses from past debrief critiques in corpus"
+        artifacts_produced:
+          - "./artifacts/wave-7-review/debrief-cross-check.md"
+      - id: "8d"
+        name: "Final Compliance and Attachment Check"
+        description: "Verify formatting compliance, all attachments present, all certifications included"
+      - id: "8e"
+        name: "Issue Resolution Loop"
+        description: "Address issues surfaced in 8a-8d; re-review max 2 iterations"
+      - id: "8f"
+        name: "Human Sign-Off"
+        description: "Phil provides final approval before submission preparation begins"
+        artifacts_produced:
+          - "./artifacts/wave-7-review/sign-off-record.md"
+
+    tui_mockup: |
+      +-- /proposal wave final-review -------------------------------------+
+      |                                                                    |
+      |  WAVE 7: FINAL REVIEW                                               |
+      |  Topic: ${topic_id} | ${days_to_deadline} days to deadline          |
+      |                                                                    |
+      |  REVIEWER PERSONA SIMULATION                                        |
+      |  Evaluating against ${evaluation_criteria_count} criteria...         |
+      |                                                                    |
+      |  Simulated Scores:                                                 |
+      |    Technical Merit:       ${score_technical}/10                     |
+      |    Innovation/Novelty:    ${score_innovation}/10                    |
+      |    Phase II Potential:    ${score_phase2}/10                        |
+      |    Commercial Potential:  ${score_commercial}/10                    |
+      |    Company Capability:    ${score_capability}/10                    |
+      |                                                                    |
+      |  Overall: ${score_overall}/10                                       |
+      |                                                                    |
+      |  RED TEAM FINDINGS (${red_team_count} objections):                  |
+      |    1. [HIGH] Section 3.2: SWaP-C claim unsupported by test data    |
+      |    2. [MED]  Section 4: Timeline aggressive for TRL 3->5           |
+      |    3. [LOW]  Section 6: TAM estimate cites 2023 data               |
+      |                                                                    |
+      |  DEBRIEF CROSS-CHECK:                                               |
+      |    ! AF241-087 debrief said "transition pathway lacked specificity"|
+      |      Section 5 in current proposal: ${transition_status}           |
+      |                                                                    |
+      |  COMPLIANCE: ${compliance_status}                                   |
+      |  ATTACHMENTS: ${attachments_status}                                 |
+      |                                                                    |
+      |  Actions:                                                          |
+      |    (f) fix issues  (i) iterate review  (s) sign-off                |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: reviewer_scorecard
+        source: "./artifacts/wave-7-review/reviewer-scorecard.md"
+        displayed_as: "Simulated scores"
+        consumers: ["sign-off decision", "wave 9 win/loss comparison"]
+      - name: red_team_findings
+        source: "./artifacts/wave-7-review/red-team-findings.md"
+        displayed_as: "${red_team_count} objections"
+        consumers: ["issue resolution", "wave 9 post-mortem"]
+      - name: sign_off_record
+        source: "./artifacts/wave-7-review/sign-off-record.md"
+        displayed_as: "Sign-off status"
+        consumers: ["PES gate for Wave 8", "submission package"]
+
+    emotional_state:
+      entry: "Cautious -- last chance to catch problems before the point of no return"
+      exit: "Confident -- a simulated reviewer found issues and they were addressed"
+
+    integration_checkpoint: |
+      Assembled document from Wave 6 must exist.
+      All compliance items covered or waived.
+      Reviewer simulation must complete with scores.
+      Red team review must complete.
+      All HIGH-severity red team findings must be addressed or acknowledged.
+      Final sign-off must be recorded before Wave 8.
+      PES enforces: Wave 8 requires sign-off.
+
+  - id: 9
+    name: "Submission"
+    wave: 8
+    phase: c3_lifecycle
+    commands:
+      - "/proposal submit prep"
+      - "/proposal submit"
+    jobs: [J10]
+
+    substeps:
+      - id: "9a"
+        name: "Portal Identification"
+        description: "Determine submission portal from agency/solicitation (DSIP, Grants.gov, NSPIRES)"
+      - id: "9b"
+        name: "Portal-Specific Packaging"
+        description: "Apply portal file naming, size limits, format requirements"
+        artifacts_produced:
+          - "./artifacts/wave-8-submission/package/"
+      - id: "9c"
+        name: "Pre-Submission Verification"
+        description: "Verify all files present, correctly named, within size limits, correct formats"
+        artifacts_produced:
+          - "./artifacts/wave-8-submission/pre-submission-checklist.md"
+      - id: "9d"
+        name: "Human Confirmation"
+        description: "Phil confirms ready to submit -- point of no return"
+      - id: "9e"
+        name: "Submission"
+        description: "Submit package to portal (manual step guided by tool)"
+      - id: "9f"
+        name: "Confirmation Capture"
+        description: "Record submission confirmation number and timestamp"
+        artifacts_produced:
+          - "./artifacts/wave-8-submission/confirmation-record.md"
+      - id: "9g"
+        name: "Immutable Archive"
+        description: "Create read-only snapshot of exactly what was submitted"
+        artifacts_produced:
+          - "./artifacts/wave-8-submission/archive/"
+
+    tui_mockup: |
+      +-- /proposal submit prep -------------------------------------------+
+      |                                                                    |
+      |  WAVE 8: SUBMISSION PREPARATION                                     |
+      |  Topic: ${topic_id} | ${days_to_deadline} days to deadline          |
+      |                                                                    |
+      |  Submission portal: ${portal_name}                                  |
+      |  Portal URL: ${portal_url}                                          |
+      |                                                                    |
+      |  Package contents:                                                 |
+      |    [ok] ${vol1_filename} (${vol1_size}) -- Technical Volume         |
+      |    [ok] ${vol2_filename} (${vol2_size}) -- Cost Volume              |
+      |    [ok] ${vol3_filename} (${vol3_size}) -- Company Info             |
+      |    [ok] ${cert_filename} (${cert_size}) -- Firm Certification      |
+      |    [!!] ${budget_filename} -- MISSING                              |
+      |                                                                    |
+      |  File naming check:                                                |
+      |    Convention: ${naming_convention}                                  |
+      |    ${naming_status}                                                 |
+      |                                                                    |
+      |  Size limits:                                                      |
+      |    ${size_status}                                                   |
+      |                                                                    |
+      |  Pre-submission checklist: ${checklist_status}                       |
+      |                                                                    |
+      +--------------------------------------------------------------------+
+
+      +-- /proposal submit ------------------------------------------------+
+      |                                                                    |
+      |  SUBMISSION CONFIRMATION                                            |
+      |  Topic: ${topic_id}                                                 |
+      |                                                                    |
+      |  This is the POINT OF NO RETURN.                                    |
+      |  Once submitted, PES marks all artifacts as read-only.              |
+      |                                                                    |
+      |  Confirm submission?                                               |
+      |    (y) yes -- submit and archive                                   |
+      |    (n) no  -- return to preparation                                |
+      |  >                                                                 |
+      |                                                                    |
+      |  ---                                                               |
+      |                                                                    |
+      |  SUBMITTED at ${submission_timestamp}                               |
+      |  Confirmation: ${confirmation_number}                               |
+      |                                                                    |
+      |  Archive created: ./artifacts/wave-8-submission/archive/            |
+      |  PES: All proposal artifacts marked READ-ONLY.                      |
+      |                                                                    |
+      |  Next: Await award notification.                                   |
+      |  When result arrives: /proposal debrief ingest <path>              |
+      |                                                                    |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: portal_name
+        source: "derived from proposal-state.json#topic.agency"
+        displayed_as: "${portal_name}"
+        consumers: ["submission packaging", "file naming rules"]
+      - name: submission_package
+        source: "./artifacts/wave-8-submission/package/"
+        displayed_as: "Submission package directory"
+        consumers: ["submission", "immutable archive"]
+      - name: confirmation_record
+        source: "./artifacts/wave-8-submission/confirmation-record.md"
+        displayed_as: "${confirmation_number} at ${submission_timestamp}"
+        consumers: ["proposal-state.json update", "status display"]
+      - name: immutable_archive
+        source: "./artifacts/wave-8-submission/archive/"
+        displayed_as: "Immutable archive"
+        consumers: ["compliance audit", "corpus (read-only)"]
+
+    emotional_state:
+      entry: "Anxious -- point of no return after weeks of work"
+      exit: "Relieved -- submitted with confirmation and archive"
+
+    integration_checkpoint: |
+      Wave 7 sign-off must be recorded.
+      All required files must be present in package.
+      File naming must match portal convention.
+      File sizes must be within portal limits.
+      Human must explicitly confirm submission.
+      PES marks all artifacts read-only after submission.
+      Submission confirmation captured in proposal-state.json.
+
+  - id: 10
+    name: "Post-Submission & Learning"
+    wave: 9
+    phase: c3_lifecycle
+    commands:
+      - "/proposal debrief ingest <path>"
+    jobs: [J7]
+
+    substeps:
+      - id: "10a"
+        name: "Award Tracking"
+        description: "Track award notification timeline; record outcome when known"
+      - id: "10b"
+        name: "Outcome Recording"
+        description: "Tag proposal with outcome (awarded, not selected, withdrawn)"
+      - id: "10c_award"
+        name: "Award Path"
+        description: "Archive winning proposal; extract winning discriminators and strategies"
+        condition: "outcome == 'awarded'"
+      - id: "10c_loss"
+        name: "Loss Path -- Debrief Request"
+        description: "Draft debrief request letter"
+        condition: "outcome == 'not_selected'"
+        artifacts_produced:
+          - "./artifacts/wave-9-learning/debrief-request-draft.md"
+      - id: "10d"
+        name: "Debrief Ingestion"
+        description: "Parse debrief feedback; map critiques to proposal sections"
+        condition: "debrief received"
+        artifacts_produced:
+          - "./artifacts/wave-9-learning/debrief-structured.md"
+      - id: "10e"
+        name: "Critique-to-Section Mapping"
+        description: "Map each reviewer comment to the specific proposal section it addresses"
+        artifacts_produced:
+          - "./artifacts/wave-9-learning/critique-section-map.md"
+      - id: "10f"
+        name: "Win/Loss Pattern Update"
+        description: "Update cumulative win/loss analysis across all proposals in corpus"
+        artifacts_produced:
+          - "./artifacts/wave-9-learning/pattern-analysis.md"
+      - id: "10g"
+        name: "Corpus and Profile Update"
+        description: "Add outcome tags, update capability profile, feed lessons learned"
+      - id: "10h"
+        name: "Lessons Learned Checkpoint"
+        description: "Human reviews lessons learned summary"
+        artifacts_produced:
+          - "./artifacts/wave-9-learning/lessons-learned.md"
+
+    tui_mockup: |
+      +-- /proposal debrief ingest ----------------------------------------+
+      |                                                                    |
+      |  WAVE 9: POST-SUBMISSION LEARNING                                   |
+      |  Topic: ${topic_id} -- ${topic_title}                               |
+      |                                                                    |
+      |  Outcome: ${proposal_outcome}                                       |
+      |                                                                    |
+      |  Parsing debrief: ${debrief_source}                                 |
+      |                                                                    |
+      |  DEBRIEF SUMMARY                                                    |
+      |  ┌──────────────────────────────────────────────────────────────┐  |
+      |  │ Reviewer Scores:                                             │  |
+      |  │   Technical Merit: ${debrief_score_technical}/10             │  |
+      |  │   Innovation:      ${debrief_score_innovation}/10            │  |
+      |  │   Phase II Plan:   ${debrief_score_phase2}/10                │  |
+      |  │   Cost Realism:    ${debrief_score_cost}/10                  │  |
+      |  └──────────────────────────────────────────────────────────────┘  |
+      |                                                                    |
+      |  CRITIQUE-TO-SECTION MAPPING                                        |
+      |  ┌──────────────────────────────────────────────────────────────┐  |
+      |  │ 1. "Transition pathway lacked specificity"                   │  |
+      |  │    -> Section 5: Phase II/III Plan (page 17)                 │  |
+      |  │    -> Known weakness: YES (also flagged in AF241-087)        │  |
+      |  │                                                              │  |
+      |  │ 2. "Cost estimate for key personnel appears high"            │  |
+      |  │    -> Cost Volume: Labor Rates (page 3)                      │  |
+      |  │    -> Known weakness: NO (new finding)                       │  |
+      |  │                                                              │  |
+      |  │ 3. "Strong prior relevant work evidence"                     │  |
+      |  │    -> Section 4: Company Qualifications (page 15)            │  |
+      |  │    -> Strength: consistent with N222-038 win pattern         │  |
+      |  └──────────────────────────────────────────────────────────────┘  |
+      |                                                                    |
+      |  WIN/LOSS PATTERN UPDATE                                            |
+      |    Proposals in corpus: ${corpus_proposal_count}                    |
+      |    Win rate: ${win_rate}                                            |
+      |    Recurring weakness: "transition pathway specificity"             |
+      |                                                                    |
+      |  Lessons learned written to:                                       |
+      |    ./artifacts/wave-9-learning/lessons-learned.md                   |
+      |                                                                    |
+      |  Corpus updated. Known weakness profile updated.                   |
+      |                                                                    |
+      |  CHECKPOINT: Lessons Learned Review                                |
+      |    (a) acknowledge  (e) edit lessons  (d) done                     |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: proposal_outcome
+        source: "proposal-state.json#volumes.*.outcome"
+        displayed_as: "${proposal_outcome}"
+        consumers: ["corpus tagging", "pattern analysis", "status display"]
+      - name: debrief_structured
+        source: "./artifacts/wave-9-learning/debrief-structured.md"
+        displayed_as: "Structured debrief"
+        consumers: ["critique mapping", "pattern analysis", "corpus annotation"]
+      - name: critique_section_map
+        source: "./artifacts/wave-9-learning/critique-section-map.md"
+        displayed_as: "Critique-to-section mapping"
+        consumers: ["lessons learned", "future Wave 7 debrief cross-check"]
+      - name: pattern_analysis
+        source: "./artifacts/wave-9-learning/pattern-analysis.md"
+        displayed_as: "Win/loss patterns"
+        consumers: ["future Wave 0 fit scoring", "future Wave 7 reviewer heuristics"]
+      - name: win_loss_tags
+        source: "proposal-state.json#volumes.*.outcome"
+        displayed_as: "Win/loss outcome tags"
+        consumers: ["corpus librarian", "pattern analysis"]
+
+    emotional_state:
+      entry: "Reflective -- waiting for result, processing outcome"
+      exit: "Hopeful -- every proposal makes the next one better, institutional learning is real"
+
+    integration_checkpoint: |
+      Proposal must have been submitted (Wave 8 complete, confirmation exists).
+      Outcome must be recorded before debrief ingestion.
+      Win/loss tags are append-only (PES enforces).
+      Debrief annotations layer on corpus -- never modify source documents.
+      Lessons learned reviewed by human before corpus update completes.
+      Pattern analysis is cumulative across all proposals in corpus.
+
+error_paths:
+  - id: E7
+    name: "Figure Generation Failure"
+    trigger: "Mermaid/Graphviz/SVG generation produces malformed output; API unavailable"
+    recovery: "Tool generates external brief for manual figure creation. Phil can provide manual figure file."
+    user_message: "Figure generation failed for Figure 3. External brief created. Provide your own figure: /proposal wave visuals --replace 3 ./my-figure.svg"
+
+  - id: E8
+    name: "Page Count Exceeded"
+    trigger: "Assembled document exceeds solicitation page limit"
+    recovery: "Tool identifies sections consuming most pages. Suggests cuts or compression."
+    user_message: "Page count: 22/20. Over by 2 pages. Largest sections: Section 3 (8 pages), Section 4 (5 pages). Consider trimming Section 3 or compressing figures."
+
+  - id: E9
+    name: "Missing Attachment Detected"
+    trigger: "Pre-submission check finds a required form or attachment missing"
+    recovery: "Blocklist the submission until attachment is provided."
+    user_message: "Missing required file: Firm Certification (SF-XX). Add to package before submission."
+
+  - id: E10
+    name: "Portal Requirements Changed"
+    trigger: "File naming convention or size limit differs from what tool expected"
+    recovery: "Tool displays the expected vs. actual requirement. Phil adjusts manually."
+    user_message: "Portal file naming changed. Expected: TopicNumber_CompanyName_Vol1.pdf. Found requirement: TopicNumber-CompanyName-TechnicalVolume.pdf. Rename manually or update portal config."
+
+  - id: E11
+    name: "Debrief Not Received"
+    trigger: "No debrief feedback available (agency did not provide, or Phil never requested)"
+    recovery: "Record outcome without debrief. Tag proposal with outcome only."
+    user_message: "No debrief received for ${topic_id}. Outcome recorded as '${proposal_outcome}'. Debrief can be ingested later if received."
+
+  - id: E12
+    name: "Deadline Critical During Formatting"
+    trigger: "days_to_deadline drops below critical threshold during Wave 5 or 6"
+    recovery: "PES surfaces deadline warning. Suggests skipping visual asset refinement and proceeding to assembly with available figures."
+    user_message: "${days_to_deadline} days remaining -- critical threshold. Consider: (s) skip remaining figures and format with what you have, (c) continue at risk."
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: topic_id
+      must_match_across: [6, 7, 8, 9, 10]
+      failure_message: "Topic ID must match across all C3 waves -- single source in proposal-state.json"
+
+    - artifact: compliance_matrix
+      must_match_across: [7, 8]
+      failure_message: "Compliance matrix in Wave 6 final check must be the same living document from Wave 1"
+
+    - artifact: figure_inventory
+      must_match_across: [6, 7]
+      failure_message: "All figures in inventory must be present in assembled document"
+
+    - artifact: assembled_volumes
+      must_match_across: [7, 8, 9]
+      failure_message: "Assembled volumes must flow from Wave 6 through review and into submission unchanged (except for issue fixes)"
+
+    - artifact: submission_confirmation
+      must_match_across: [9, 10]
+      failure_message: "Submission confirmation must exist before post-submission learning can begin"
+
+    - artifact: win_loss_tags
+      must_match_across: [10]
+      failure_message: "Win/loss tags are append-only -- PES corpus integrity enforces"
