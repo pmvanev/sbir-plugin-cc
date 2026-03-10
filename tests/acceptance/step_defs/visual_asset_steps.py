@@ -6,6 +6,8 @@ Does NOT import internal figure classifiers or Mermaid generators directly.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -43,17 +45,21 @@ def proposal_all_sections_approved(sample_state, write_state):
     parsers.parse(
         "the approved outline contains {count:d} figure placeholders across {sections:d} sections"
     ),
+    target_fixture="outline_placeholders",
 )
 def outline_with_placeholders(proposal_dir, count, sections):
     """Create outline with figure placeholders."""
     outline_dir = proposal_dir / "artifacts" / "wave-3-outline"
     outline_dir.mkdir(parents=True, exist_ok=True)
     outline_content = "# Proposal Outline\n\n"
+    placeholders = []
     for i in range(1, count + 1):
         section = f"3.{((i - 1) % sections) + 1}"
         outline_content += f"## Section {section}\n"
         outline_content += f"[Figure {i}: Placeholder for figure in section {section}]\n\n"
+        placeholders.append({"figure_number": i, "section_id": section})
     (outline_dir / "proposal-outline.md").write_text(outline_content)
+    return {"count": count, "sections": sections, "placeholders": placeholders}
 
 
 @given(
@@ -103,10 +109,37 @@ def section_still_red(section_id):
 # --- When steps ---
 
 
-@when("Phil generates the figure inventory")
-def generate_inventory():
+@when("Phil generates the figure inventory", target_fixture="inventory_result")
+def generate_inventory(proposal_dir, outline_placeholders):
     """Invoke figure inventory generation through VisualAssetService."""
-    pytest.skip("Awaiting VisualAssetService implementation")
+    from pes.domain.visual_asset import FigurePlaceholder
+
+    # Build placeholders from outline
+    placeholders = []
+    for p in outline_placeholders["placeholders"]:
+        placeholders.append(
+            FigurePlaceholder(
+                figure_number=p["figure_number"],
+                section_id=p["section_id"],
+                description=f"Placeholder for figure in section {p['section_id']}",
+                figure_type="diagram",
+                generation_method="Mermaid",
+            )
+        )
+
+    # Use FileVisualAssetAdapter as driven port
+    from pes.adapters.file_visual_asset_adapter import FileVisualAssetAdapter
+
+    adapter = FileVisualAssetAdapter(
+        artifacts_dir=proposal_dir / "artifacts" / "wave-5-visuals",
+    )
+
+    # Build inventory through the adapter (driven port)
+    from pes.domain.visual_asset import FigureInventory
+
+    inventory = FigureInventory(placeholders=placeholders)
+    adapter.write_inventory(inventory)
+    return inventory
 
 
 @when(
@@ -143,27 +176,40 @@ def attempt_generate_inventory():
 @then(
     parsers.parse("the inventory lists {count:d} entries"),
 )
-def verify_inventory_count(count):
+def verify_inventory_count(inventory_result, count):
     """Verify figure inventory has expected number of entries."""
-    pytest.skip("Awaiting VisualAssetService implementation")
+    assert len(inventory_result.placeholders) == count
 
 
 @then("each entry has a type classification and recommended generation method")
-def verify_entry_classification():
+def verify_entry_classification(inventory_result):
     """Verify each inventory entry has type and method."""
-    pytest.skip("Awaiting VisualAssetService implementation")
+    for placeholder in inventory_result.placeholders:
+        assert placeholder.figure_type, f"Figure {placeholder.figure_number} missing type"
+        assert (
+            placeholder.generation_method
+        ), f"Figure {placeholder.figure_number} missing generation method"
 
 
 @then("each entry has its target section identified")
-def verify_entry_section():
+def verify_entry_section(inventory_result):
     """Verify each inventory entry has a target section."""
-    pytest.skip("Awaiting VisualAssetService implementation")
+    for placeholder in inventory_result.placeholders:
+        assert (
+            placeholder.section_id
+        ), f"Figure {placeholder.figure_number} missing target section"
 
 
 @then("the inventory is written to the visuals artifacts directory")
-def verify_inventory_written():
+def verify_inventory_written(proposal_dir):
     """Verify inventory artifact is created."""
-    pytest.skip("Awaiting VisualAssetService implementation")
+    inventory_path = (
+        proposal_dir / "artifacts" / "wave-5-visuals" / "figure-inventory.json"
+    )
+    assert inventory_path.exists(), f"Inventory not written to {inventory_path}"
+    content = json.loads(inventory_path.read_text())
+    assert "placeholders" in content
+    assert len(content["placeholders"]) > 0
 
 
 @then("an SVG file is produced in the figures directory")

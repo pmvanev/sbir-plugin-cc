@@ -9,7 +9,6 @@ Feature: Visual Asset Generation from Outline Placeholders (US-010)
 
   # --- Happy Path ---
 
-  @skip
   Scenario: Generate figure inventory from approved outline
     Given the approved outline contains 5 figure placeholders across 4 sections
     When Phil generates the figure inventory
