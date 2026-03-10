@@ -1,0 +1,14 @@
+{
+    "agency": "doe",
+    "solicitation_type": "phase-i",
+    "font_family": "Times New Roman",
+    "font_size_pt": 12,
+    "margin_top_inches": 1.0,
+    "margin_bottom_inches": 1.0,
+    "margin_left_inches": 1.0,
+    "margin_right_inches": 1.0,
+    "header": "DOE SBIR Phase I",
+    "footer": "Page {page_number}",
+    "page_limit": 20,
+    "line_spacing": 1.0
+}

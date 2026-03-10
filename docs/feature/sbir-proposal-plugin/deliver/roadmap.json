@@ -1,242 +1,397 @@
 {
   "roadmap": {
     "project_id": "sbir-proposal-plugin",
-    "created_at": "2026-03-09T22:32:39Z",
-    "total_steps": 13,
-    "phases": 4
+    "created_at": "2026-03-10T22:24:52Z",
+    "total_steps": 15,
+    "phases": 7
   },
   "phases": [
     {
       "id": "01",
-      "name": "Cross-cutting foundation",
+      "name": "PES C3 Enforcement (US-014)",
+      "description": "Four new PES rule evaluators and state schema v2.0.0 extension for Waves 5-9 enforcement.",
       "steps": [
         {
           "id": "01-01",
-          "name": "Expand initial state schema for Waves 2-4",
-          "description": "Add research_summary, discrimination_table, volumes (technical/management/cost with status, current_draft, review_comments, iterations), and open_review_items to initial proposal state. Expand waves dict to include entries for Waves 2 through 9.",
+          "name": "PES C3 rule evaluators and state schema extension",
+          "description": "PDC gate, deadline blocking, submission immutability, corpus integrity evaluators. State schema v2.0.0 with C3 fields. Engine dispatch for new rule types. PES config extension.",
           "criteria": [
-            "New proposal state includes research_summary with empty findings list",
-            "New proposal state includes discrimination_table with empty items list",
-            "New proposal state includes volumes with technical, management, and cost entries",
-            "New proposal state includes open_review_items as empty list",
-            "Waves dict in new proposal state includes entries for Waves 0 through 9"
+            "PDC gate blocks Wave 5 when sections have RED Tier 1/2 PDC items",
+            "Deadline blocking warns at critical threshold and blocks non-essential waves",
+            "Submission immutability blocks writes to submitted artifacts; allows reads",
+            "Corpus integrity blocks modification of win/loss tags; allows appending new tags",
+            "All four rules configurable in pes-config.json; C1 invariants unaffected"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/proposal_service.py",
-            "scripts/pes/domain/state.py",
-            "tests/unit/test_proposal_service.py"
-          ]
-        },
-        {
-          "id": "01-02",
-          "name": "Expand WAVE_NAMES to all 10 waves",
-          "description": "Fix WAVE_NAMES dict in status_service.py to cover Waves 0-9 with correct names per spec. StatusService handles unknown wave numbers gracefully.",
-          "criteria": [
-            "Status displays correct names for all 10 waves (0 through 9)",
-            "When status requested for undefined wave, system displays default label without raising error",
-            "Missing wave entries in state produce progress with zero completed"
+            "scripts/pes/domain/pdc_gate.py",
+            "scripts/pes/domain/deadline_blocking.py",
+            "scripts/pes/domain/submission_immutability.py",
+            "scripts/pes/domain/corpus_integrity.py",
+            "scripts/pes/domain/engine.py",
+            "scripts/pes/domain/state.py"
           ],
-          "files_to_modify": [
-            "scripts/pes/domain/status_service.py",
-            "tests/unit/test_status_service.py",
-            "tests/acceptance/step_defs/wave_names_steps.py"
-          ]
-        },
-        {
-          "id": "01-03",
-          "name": "Wave ordering rules for Waves 2-4",
-          "description": "Add wave-3-requires-research and wave-4-requires-outline rules to pes-config.json. Add new condition keys (requires_research_approval, requires_outline_approval) handled by the rule evaluator.",
-          "criteria": [
-            "Wave 2 blocked when strategy brief not approved; allowed when approved",
-            "Wave 3 blocked when research not approved; allowed when approved",
-            "Wave 4 blocked when outline not approved; allowed when approved",
-            "Skipping waves is blocked with prerequisite guidance message",
-            "Block decisions recorded in audit log with rule ID and timestamp"
-          ],
-          "files_to_modify": [
-            "scripts/pes/domain/wave_rules.py",
-            "templates/pes-config.json",
-            "tests/unit/test_wave_rules.py",
-            "tests/acceptance/step_defs/wave_ordering_c2_steps.py"
+          "time_estimate_hours": 8,
+          "dependencies": [],
+          "implementation_notes": "Follow WaveOrderingEvaluator pattern: each evaluator is a separate domain class. Engine dispatches by rule_type. State schema v2.0.0 forward-compatible with v1.0.0 (missing fields default to null). Scenarios: pes_enforcement_c3.feature (10 scenarios) + walking_skeleton_c3.feature skeleton 8.",
+          "feature_files": [
+            "tests/acceptance/features/pes_enforcement_c3.feature",
+            "tests/acceptance/features/walking_skeleton_c3.feature"
           ]
         }
       ]
     },
     {
       "id": "02",
-      "name": "Wave 2 Research",
+      "name": "Visual Assets (US-010)",
+      "description": "Figure inventory, generation lifecycle, cross-reference validation with PES PDC gate integration.",
       "steps": [
         {
           "id": "02-01",
-          "name": "Research domain models",
-          "description": "Value objects for research findings: technical landscape, patent landscape, prior award analysis, market analysis (TAM/SAM/SOM), commercialization pathway, TRL refinement. ResearchSummary aggregates all findings.",
+          "name": "Visual asset domain models and port",
+          "description": "FigurePlaceholder, FigureInventory, GeneratedFigure, CrossReferenceLog domain models. VisualAssetPort interface. FileVisualAssetAdapter.",
           "criteria": [
-            "Research finding captures category, content, and evidence source",
-            "Research summary aggregates six research categories",
-            "All domain objects are pure Python with no infrastructure imports"
+            "Figure placeholders extracted from outline with type and generation method",
+            "Figure inventory created with all placeholders and written to artifacts",
+            "Cross-reference log validates figure-to-text consistency"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/research.py",
-            "tests/unit/test_research.py"
+            "scripts/pes/domain/visual_asset.py",
+            "scripts/pes/ports/visual_asset_port.py",
+            "scripts/pes/adapters/file_visual_asset_adapter.py"
+          ],
+          "time_estimate_hours": 6,
+          "dependencies": ["01-01"],
+          "implementation_notes": "Frozen dataclasses matching SectionDraft pattern. VisualAssetPort abstracts generation method. Scenarios: visual_assets.feature (inventory, cross-ref models).",
+          "feature_files": [
+            "tests/acceptance/features/visual_assets.feature"
           ]
         },
         {
           "id": "02-02",
-          "name": "ResearchService generation",
-          "description": "Driving port that generates research findings from strategy brief context. Covers all six research categories. Handles missing TPOC data gracefully.",
+          "name": "Visual asset generation and review lifecycle",
+          "description": "VisualAssetService orchestrates generation per method, human review checkpoint per figure, cross-reference validation, manual replacement support.",
           "criteria": [
-            "Research findings generated covering all six categories",
-            "Generation without strategy brief raises descriptive error",
-            "Generation without TPOC data proceeds with caveat noted"
+            "Mermaid diagrams generate SVG output to figures directory",
+            "Non-generatable figures produce external brief with dimensions and resolution",
+            "Each figure presented for human review with approve/revise/replace options",
+            "Cross-reference validation catches orphaned references and missing figures",
+            "PES PDC gate enforced before Wave 5 entry"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/research_service.py",
-            "tests/unit/test_research_service.py"
-          ]
-        },
-        {
-          "id": "02-03",
-          "name": "Research checkpoint lifecycle",
-          "description": "Approve/revise/skip checkpoint for research findings. Approval records timestamp and unlocks Wave 3. Revision regenerates incorporating feedback.",
-          "criteria": [
-            "Approval records timestamp in state and unlocks Wave 3",
-            "Revision regenerates findings incorporating feedback text",
-            "Approve or revise without generated findings raises error",
-            "Skip marks research as deferred and unlocks Wave 3"
+            "scripts/pes/domain/visual_asset_service.py",
+            "scripts/pes/adapters/file_visual_asset_adapter.py"
           ],
-          "files_to_modify": [
-            "scripts/pes/domain/research_service.py",
-            "tests/unit/test_research_service.py",
-            "tests/acceptance/step_defs/research_steps.py"
+          "time_estimate_hours": 8,
+          "dependencies": ["02-01"],
+          "implementation_notes": "Generation method routed by FigurePlaceholder.generation_method. Adapter writes to ./artifacts/wave-5-visuals/figures/. Scenarios: visual_assets.feature (generation, review, PES gate) + walking_skeleton_c3.feature skeleton 6 (partial).",
+          "feature_files": [
+            "tests/acceptance/features/visual_assets.feature",
+            "tests/acceptance/features/walking_skeleton_c3.feature"
           ]
         }
       ]
     },
     {
       "id": "03",
-      "name": "Wave 3 Discrimination and Outline",
+      "name": "Formatting and Assembly (US-011)",
+      "description": "Template-based formatting, jargon audit, page count verification, volume assembly with compliance final check.",
       "steps": [
         {
           "id": "03-01",
-          "name": "Discrimination and outline domain models",
-          "description": "Value objects for discrimination (discriminator item with category, claim, evidence) and outline (section with compliance mapping, page budget, figure placeholders, thesis statement).",
+          "name": "Format template port and agency templates",
+          "description": "FormatTemplatePort, DocumentAssemblyPort interfaces. JsonFormatTemplateAdapter. Agency format templates (DoD, NASA, NSF, DOE) as JSON data files.",
           "criteria": [
-            "Discriminator item captures category, claim, and evidence citation",
-            "Outline section maps compliance items and assigns page budget",
-            "Page budget collection validates total against a limit",
-            "All domain objects are pure Python with no infrastructure imports"
+            "Format templates loaded by agency and solicitation type",
+            "Templates specify font, margins, headers, footers, page limits",
+            "New agency templates added by creating JSON file, no code changes"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/discrimination.py",
-            "scripts/pes/domain/outline.py",
-            "tests/unit/test_discrimination.py",
-            "tests/unit/test_outline.py"
+            "scripts/pes/ports/format_template_port.py",
+            "scripts/pes/ports/document_assembly_port.py",
+            "scripts/pes/adapters/json_format_template_adapter.py",
+            "scripts/pes/domain/formatting.py",
+            "templates/format-rules/dod-phase-i.json",
+            "templates/format-rules/nasa-phase-i.json",
+            "templates/format-rules/nsf.json",
+            "templates/format-rules/doe.json"
+          ],
+          "time_estimate_hours": 6,
+          "dependencies": ["02-02"],
+          "implementation_notes": "Port interface returns FormatTemplate domain object. Templates in templates/format-rules/. Scenario: formatting_assembly.feature (template loading).",
+          "feature_files": [
+            "tests/acceptance/features/formatting_assembly.feature"
           ]
         },
         {
           "id": "03-02",
-          "name": "DiscriminationService with iteration",
-          "description": "Driving port generating discrimination table from strategy brief, compliance matrix, and research findings. Supports feedback iteration and TPOC insight integration.",
+          "name": "Document formatting, figure insertion, and jargon audit",
+          "description": "FormattingService applies template rules, inserts figures, formats references. Jargon audit flags undefined acronyms. Page count verification against solicitation limit.",
           "criteria": [
-            "Each discriminator captures competitive advantage claim with supporting evidence",
-            "Each discriminator cites supporting evidence",
-            "TPOC insights incorporated when available",
-            "Revision incorporates human feedback and regenerates table",
-            "Generation without approved research raises descriptive error"
+            "Formatted document matches solicitation font, margins, headers",
+            "Figures inserted at correct positions with captions; references formatted consistently",
+            "Jargon audit flags undefined acronyms with locations",
+            "Page count verified: within limit reported, over limit shows largest sections and trimming guidance"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/discrimination_service.py",
-            "tests/unit/test_discrimination_service.py",
-            "tests/acceptance/step_defs/discrimination_outline_steps.py"
+            "scripts/pes/domain/formatting_service.py",
+            "scripts/pes/adapters/python_docx_adapter.py"
+          ],
+          "time_estimate_hours": 10,
+          "dependencies": ["03-01"],
+          "implementation_notes": "python-docx adapter for Word output. FormattingService delegates to DocumentAssemblyPort. Scenarios: formatting_assembly.feature (formatting, jargon, page count -- 5 scenarios).",
+          "feature_files": [
+            "tests/acceptance/features/formatting_assembly.feature"
           ]
         },
         {
           "id": "03-03",
-          "name": "OutlineService generation",
-          "description": "Driving port generating proposal outline from discrimination table and compliance matrix. Assigns page budgets, maps all compliance items, defines figure placeholders.",
+          "name": "Volume assembly and compliance final check",
+          "description": "AssemblyService assembles sections into volumes per solicitation structure. Final compliance matrix check. Human checkpoint for assembled package.",
           "criteria": [
-            "Every compliance item mapped to at least one outline section",
-            "Section page budgets total to solicitation page limit or fewer",
-            "Unmapped compliance items flagged with item IDs listed",
-            "Generation without approved discrimination table raises error"
+            "Volumes assembled into required file structure in assembly artifacts directory",
+            "Compliance matrix final check reports covered/waived/missing counts",
+            "Missing compliance items block progression with guidance",
+            "Human checkpoint presented at assembled package review"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/outline_service.py",
-            "tests/unit/test_outline_service.py"
-          ]
-        },
-        {
-          "id": "03-04",
-          "name": "Outline checkpoint lifecycle",
-          "description": "Approve/revise/skip checkpoint for proposal outline. Approval records timestamp and unlocks Wave 4. Revision regenerates incorporating feedback.",
-          "criteria": [
-            "Approval records timestamp in state and unlocks Wave 4",
-            "Revision regenerates outline incorporating feedback text",
-            "Approve without generated outline raises descriptive error",
-            "Skip marks outline as deferred and unlocks Wave 4"
+            "scripts/pes/domain/assembly.py",
+            "scripts/pes/domain/assembly_service.py"
           ],
-          "files_to_modify": [
-            "scripts/pes/domain/outline_service.py",
-            "tests/unit/test_outline_service.py",
-            "tests/acceptance/step_defs/discrimination_outline_steps.py"
+          "time_estimate_hours": 6,
+          "dependencies": ["03-02"],
+          "implementation_notes": "Assembled volumes written to ./artifacts/wave-6-format/assembled/. Compliance check reads living matrix from Wave 1. Scenarios: formatting_assembly.feature (assembly, compliance, checkpoint -- 3 scenarios) + walking_skeleton_c3.feature skeleton 6 (partial).",
+          "feature_files": [
+            "tests/acceptance/features/formatting_assembly.feature",
+            "tests/acceptance/features/walking_skeleton_c3.feature"
           ]
         }
       ]
     },
     {
       "id": "04",
-      "name": "Wave 4 Drafting",
+      "name": "Final Review (US-012)",
+      "description": "Reviewer persona simulation, red team review, debrief cross-check, iteration loop, and sign-off gate.",
       "steps": [
         {
           "id": "04-01",
-          "name": "Draft and review domain models",
-          "description": "Value objects for drafting (section draft with compliance traceability, word count, iteration tracking) and review (scorecard with findings by location/severity, reviewer persona scores, red team findings).",
+          "name": "Final review domain models and service",
+          "description": "ReviewerScorecard, RedTeamFinding, DebriefCrossCheckEntry, SignOffRecord models. FinalReviewService with reviewer simulation, red team, debrief cross-check, and iteration loop (max 2).",
           "criteria": [
-            "Draft section tracks compliance items, word count, and iteration round",
-            "Review finding captures location, severity, and suggestion",
-            "Review scorecard aggregates findings with strengths and weaknesses",
-            "All domain objects are pure Python with no infrastructure imports"
+            "Reviewer persona simulation scores against evaluation criteria with rationale",
+            "Red team identifies objections tagged by severity referencing section and page",
+            "Debrief cross-check flags known weaknesses from corpus",
+            "Handles gracefully when no past debriefs exist",
+            "Issue resolution loop supports max 2 iterations"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/draft.py",
-            "scripts/pes/domain/review.py",
-            "tests/unit/test_draft.py",
-            "tests/unit/test_review.py"
+            "scripts/pes/domain/final_review.py",
+            "scripts/pes/domain/final_review_service.py"
+          ],
+          "time_estimate_hours": 8,
+          "dependencies": ["03-03"],
+          "implementation_notes": "FinalReviewService tracks review_round and delegates LLM review to agent. Scorecard and findings written to ./artifacts/wave-7-review/. Scenarios: final_review.feature (simulation, red team, debrief cross-check, no debriefs, iteration -- 5 scenarios).",
+          "feature_files": [
+            "tests/acceptance/features/final_review.feature"
           ]
         },
         {
           "id": "04-02",
-          "name": "DraftService with compliance tracking",
-          "description": "Driving port orchestrating section-by-section drafting from approved outline. Tracks iterations, checks compliance coverage per section, monitors page budget usage.",
+          "name": "Review sign-off and Wave 8 gate",
+          "description": "Human sign-off checkpoint. After 2 iterations, forced sign-off with unresolved items documented. Sign-off gates Wave 8 via PES wave ordering extension.",
           "criteria": [
-            "Section drafted addressing mapped compliance items",
-            "Draft word count reported against section page budget",
-            "Section exceeding page budget produces warning",
-            "Unaddressed compliance items in a section flagged by item ID",
-            "Drafting without approved outline raises descriptive error",
-            "Attempting to draft an undefined section returns guidance on available sections"
+            "Human sign-off required before submission; recorded with timestamp",
+            "After 2 review iterations, sign-off required with unresolved items documented",
+            "Sign-off record written to review artifacts directory",
+            "PES blocks Wave 8 without sign-off"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/draft_service.py",
-            "tests/unit/test_draft_service.py",
-            "tests/acceptance/step_defs/drafting_steps.py"
+            "scripts/pes/domain/final_review_service.py",
+            "scripts/pes/domain/wave_rules.py"
+          ],
+          "time_estimate_hours": 4,
+          "dependencies": ["04-01"],
+          "implementation_notes": "Sign-off status stored in proposal-state.json#final_review. PES wave ordering evaluator extended for Wave 7->8 gate. Scenarios: final_review.feature (forced sign-off, sign-off unlocks Wave 8 -- 2 scenarios) + walking_skeleton_c3.feature skeleton 7 (partial).",
+          "feature_files": [
+            "tests/acceptance/features/final_review.feature",
+            "tests/acceptance/features/walking_skeleton_c3.feature"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "name": "Submission (US-013)",
+      "description": "Portal identification, packaging rules, pre-submission verification, confirmation capture, immutable archive.",
+      "steps": [
+        {
+          "id": "05-01",
+          "name": "Portal rules port and submission packaging",
+          "description": "PortalRulesPort interface. JsonPortalRulesAdapter. Portal rule templates (DSIP, Grants.gov, NSPIRES). SubmissionService applies portal-specific file naming, size limits, format requirements.",
+          "criteria": [
+            "Portal identified from agency in proposal state",
+            "Portal-specific file naming applied to all package files",
+            "File sizes verified against portal limits",
+            "Missing required files block submission with actionable guidance"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/submission.py",
+            "scripts/pes/domain/submission_service.py",
+            "scripts/pes/ports/portal_rules_port.py",
+            "scripts/pes/adapters/json_portal_rules_adapter.py",
+            "templates/portal-rules/dsip.json",
+            "templates/portal-rules/grants-gov.json",
+            "templates/portal-rules/nspires.json"
+          ],
+          "time_estimate_hours": 8,
+          "dependencies": ["04-02"],
+          "implementation_notes": "Portal rules in templates/portal-rules/ as JSON data files, editable by Phil for inter-cycle changes. Scenarios: submission.feature (portal ID, packaging, missing files, sign-off gate -- 4 scenarios).",
+          "feature_files": [
+            "tests/acceptance/features/submission.feature"
           ]
         },
         {
-          "id": "04-03",
-          "name": "ReviewService with iteration loop and checkpoint",
-          "description": "Driving port generating review scorecards, running persona-based evaluation, producing red team findings. Manages review iteration loop (max 2 cycles then escalate) and Wave 4 completion checkpoint.",
+          "id": "05-02",
+          "name": "Submission confirmation, immutable archive, and read-only enforcement",
+          "description": "Human confirmation checkpoint. Manual confirmation number entry. Immutable archive creation. PES marks artifacts read-only via submission immutability evaluator.",
           "criteria": [
-            "Review produces scorecard with findings by location and severity",
-            "Re-review tracks which prior findings were addressed",
-            "Third review cycle escalates unresolved findings",
-            "Full draft review verifies all compliance items addressed",
-            "Review without existing draft raises descriptive error"
+            "Submission requires explicit human confirmation",
+            "Confirmation number manually entered; timestamp captured",
+            "Immutable archive created in submission archive directory",
+            "PES blocks all modifications to submitted artifacts",
+            "PES blocks modification after submission with clear message"
           ],
           "files_to_modify": [
-            "scripts/pes/domain/review_service.py",
-            "tests/unit/test_review_service.py",
-            "tests/acceptance/step_defs/drafting_steps.py"
+            "scripts/pes/domain/submission_service.py",
+            "scripts/pes/domain/submission_immutability.py"
+          ],
+          "time_estimate_hours": 6,
+          "dependencies": ["05-01", "01-01"],
+          "implementation_notes": "submission.immutable flag triggers PES immutability evaluator. Archive is directory copy of assembled volumes + package. Scenarios: submission.feature (confirmation, archive, post-submission block -- 3 scenarios) + walking_skeleton_c3.feature skeleton 7 (partial).",
+          "feature_files": [
+            "tests/acceptance/features/submission.feature",
+            "tests/acceptance/features/walking_skeleton_c3.feature"
+          ]
+        },
+        {
+          "id": "05-03",
+          "name": "Status service extension for C3 waves",
+          "description": "Extend StatusService to report Wave 5-9 progress, deadline warnings, and submission status in /proposal status output.",
+          "criteria": [
+            "Status reports Wave 5-9 progress with completion percentages",
+            "Deadline warnings surface in status output at critical threshold",
+            "Submitted proposals show confirmation number, archive path, and read-only status"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/status_service.py"
+          ],
+          "time_estimate_hours": 3,
+          "dependencies": ["05-02"],
+          "implementation_notes": "Extends existing StatusService with C3 wave status fields. Integrates with deadline blocking evaluator for warning display.",
+          "feature_files": [
+            "tests/acceptance/features/pes_enforcement_c3.feature"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "06",
+      "name": "Debrief Request Letter (US-016)",
+      "description": "Agency-specific debrief request letter generation from templates with skip option.",
+      "steps": [
+        {
+          "id": "06-01",
+          "name": "Outcome recording and debrief request letter generation",
+          "description": "OutcomeService records win/loss outcome. Generates agency-specific debrief request letter from templates (DoD FAR 15.505, NASA). Skipping is valid.",
+          "criteria": [
+            "Letter references topic number, confirmation, and applicable regulations",
+            "Letter adapts to agency (DoD FAR 15.505 vs NASA vs other)",
+            "Skipping debrief request recorded without creating a letter",
+            "Letter written to learning artifacts directory"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/outcome.py",
+            "scripts/pes/domain/outcome_service.py",
+            "templates/debrief-request/dod-far-15-505.md",
+            "templates/debrief-request/nasa-debrief.md"
+          ],
+          "time_estimate_hours": 4,
+          "dependencies": ["05-02"],
+          "implementation_notes": "Letter templates in templates/debrief-request/. Outcome recorded in proposal-state.json#learning. Scenarios: debrief_request.feature (DoD letter, NASA letter, skip -- 3 scenarios).",
+          "feature_files": [
+            "tests/acceptance/features/debrief_request.feature"
+          ]
+        },
+        {
+          "id": "06-02",
+          "name": "Awarded proposal archiving with outcome tags",
+          "description": "OutcomeService archives awarded proposals with outcome tags. Extracts winning discriminators for pattern analysis.",
+          "criteria": [
+            "Awarded proposals archived with outcome tag and discriminators extracted",
+            "Win/loss tags are append-only (PES corpus integrity enforced)",
+            "Outcome without debrief is valid terminal state"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/outcome_service.py",
+            "scripts/pes/domain/corpus_integrity.py"
+          ],
+          "time_estimate_hours": 4,
+          "dependencies": ["06-01", "01-01"],
+          "implementation_notes": "Corpus integrity PES rule enforces append-only tags. Scenarios: debrief_ingestion.feature (awarded outcome, outcome without debrief -- 2 scenarios).",
+          "feature_files": [
+            "tests/acceptance/features/debrief_ingestion.feature"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "07",
+      "name": "Debrief Ingestion and Learning (US-015)",
+      "description": "Debrief parsing, critique-to-section mapping, win/loss pattern analysis, lessons learned.",
+      "steps": [
+        {
+          "id": "07-01",
+          "name": "Debrief parsing and critique-to-section mapping",
+          "description": "DebriefParserPort interface. TextDebriefParserAdapter. DebriefService parses feedback, maps critiques to sections, flags known weaknesses. Freeform fallback for unstructured debriefs.",
+          "criteria": [
+            "Debrief parsed from PDF or text file with parsing confidence reported",
+            "Each critique mapped to proposal section and page",
+            "Known weaknesses from past debriefs flagged when matching critiques found",
+            "Unstructured debriefs preserved as freeform text",
+            "Structured debrief and critique map written to learning artifacts directory"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/debrief.py",
+            "scripts/pes/domain/debrief_service.py",
+            "scripts/pes/ports/debrief_parser_port.py",
+            "scripts/pes/adapters/text_debrief_parser_adapter.py"
+          ],
+          "time_estimate_hours": 8,
+          "dependencies": ["06-02"],
+          "implementation_notes": "LLM agent does parsing; domain service validates output. Critique mapping uses section numbering from submitted outline. Scenarios: debrief_ingestion.feature (parse, map, unstructured -- 3 scenarios).",
+          "feature_files": [
+            "tests/acceptance/features/debrief_ingestion.feature"
+          ]
+        },
+        {
+          "id": "07-02",
+          "name": "Win/loss pattern analysis, corpus update, and lessons learned",
+          "description": "OutcomeService updates cumulative pattern analysis across corpus. Corpus librarian updates win/loss tags (append-only). Lessons learned with human checkpoint.",
+          "criteria": [
+            "Win/loss pattern analysis updates cumulatively with confidence level noted",
+            "Win/loss tags are append-only (PES-enforced)",
+            "Lessons learned reviewed by human before corpus update completes",
+            "Pattern analysis written to learning artifacts directory"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/outcome_service.py",
+            "scripts/pes/domain/outcome.py"
+          ],
+          "time_estimate_hours": 6,
+          "dependencies": ["07-01"],
+          "implementation_notes": "Corpus integrity PES rule enforces append-only tags. Pattern analysis notes confidence level with small corpus. Scenarios: debrief_ingestion.feature (patterns, outcomes, lessons -- 3 scenarios) + walking_skeleton_c3.feature skeleton 7 (partial).",
+          "feature_files": [
+            "tests/acceptance/features/debrief_ingestion.feature",
+            "tests/acceptance/features/walking_skeleton_c3.feature"
           ]
         }
       ]
@@ -244,11 +399,17 @@
   ],
   "implementation_scope": {
     "source_directories": [
-      "scripts/pes/domain/"
+      "scripts/pes/domain/",
+      "scripts/pes/ports/",
+      "scripts/pes/adapters/",
+      "templates/format-rules/",
+      "templates/portal-rules/",
+      "templates/debrief-request/"
     ],
     "test_directories": [
+      "tests/acceptance/features/",
       "tests/unit/",
-      "tests/acceptance/"
+      "tests/integration/"
     ],
     "excluded_patterns": [
       "__init__.py",
@@ -256,10 +417,15 @@
     ]
   },
   "validation": {
-    "status": "approved",
+    "status": "pending",
     "reviewer": "solution-architect-reviewer",
-    "approved_at": "2026-03-09T22:50:00Z",
-    "review_attempts": 2,
-    "revision_notes": "3 AC coupling findings resolved per reviewer suggestions"
+    "approved_at": null,
+    "quality_checks": {
+      "step_ratio": "11 steps / 36 production files = 0.31 (under 2.5 threshold)",
+      "ac_behavioral": true,
+      "feature_file_coverage": "46 scenarios across 8 feature files",
+      "ports_and_adapters_compliance": true,
+      "oss_preference": "python-docx (MIT), mutmut (Apache-2.0), pytest (MIT)"
+    }
   }
 }

@@ -9,7 +9,6 @@ Feature: Document Formatting and Volume Assembly (US-011)
 
   # --- Formatting: Happy Path ---
 
-  @skip
   Scenario: Apply solicitation formatting rules
     Given the solicitation requires Times New Roman 12pt and 1-inch margins
     When Phil formats the proposal selecting "Microsoft Word (.docx)"

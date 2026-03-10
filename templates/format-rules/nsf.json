@@ -1,0 +1,14 @@
+{
+    "agency": "nsf",
+    "solicitation_type": "sbir",
+    "font_family": "Arial",
+    "font_size_pt": 11,
+    "margin_top_inches": 1.0,
+    "margin_bottom_inches": 1.0,
+    "margin_left_inches": 1.0,
+    "margin_right_inches": 1.0,
+    "header": "NSF SBIR/STTR Proposal",
+    "footer": "Page {page_number} of {total_pages}",
+    "page_limit": 15,
+    "line_spacing": 1.15
+}
