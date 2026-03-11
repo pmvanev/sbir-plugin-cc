@@ -37,7 +37,6 @@ sbir-plugin-cc/
   scripts/pes/                   -- PES Python code (ports-and-adapters)
   skills/                        -- Domain knowledge per agent
   templates/                     -- JSON/Markdown templates
-  rules/                         -- Auto-loaded Claude Code rules
   docs/architecture/             -- Architecture document
   docs/adrs/                     -- Architecture Decision Records
 ```
