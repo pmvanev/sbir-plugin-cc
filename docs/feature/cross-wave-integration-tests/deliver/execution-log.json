@@ -135,6 +135,111 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-03-11T18:10:00Z"
+    },
+    {
+      "sid": "01-04",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:10:31Z"
+    },
+    {
+      "sid": "01-05",
+      "p": "PREPARE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:13:22Z"
+    },
+    {
+      "sid": "01-05",
+      "p": "RED_ACCEPTANCE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:13:29Z"
+    },
+    {
+      "sid": "01-05",
+      "p": "RED_UNIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:13:32Z"
+    },
+    {
+      "sid": "01-05",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:13:35Z"
+    },
+    {
+      "sid": "01-05",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:13:37Z"
+    },
+    {
+      "sid": "01-06",
+      "p": "PREPARE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:15:47Z"
+    },
+    {
+      "sid": "01-06",
+      "p": "RED_ACCEPTANCE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:15:50Z"
+    },
+    {
+      "sid": "01-06",
+      "p": "RED_UNIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:15:53Z"
+    },
+    {
+      "sid": "01-06",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:15:56Z"
+    },
+    {
+      "sid": "01-06",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:15:59Z"
+    },
+    {
+      "sid": "01-07",
+      "p": "PREPARE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:17:40Z"
+    },
+    {
+      "sid": "01-07",
+      "p": "RED_ACCEPTANCE",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: Integration tests for existing StatusService",
+      "t": "2026-03-11T18:17:50Z"
+    },
+    {
+      "sid": "01-07",
+      "p": "RED_UNIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:17:52Z"
+    },
+    {
+      "sid": "01-07",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T18:17:55Z"
     }
   ]
 }
