@@ -112,16 +112,26 @@ def debrief_and_patterns_complete():
 
 @given(
     parsers.parse('the submission confirmation is "{confirmation}"'),
+    target_fixture="confirmation_number",
 )
 def submission_confirmation(confirmation):
     """Submission confirmation number."""
-    pass
+    return confirmation
 
 
-@given("N244-012 was submitted to NSPIRES and not selected")
-def nasa_not_selected():
-    """NASA submission not selected."""
-    pass
+@given(
+    "N244-012 was submitted to NSPIRES and not selected",
+    target_fixture="active_state",
+)
+def nasa_not_selected(active_state, write_state):
+    """NASA submission not selected -- update state to NASA agency and topic."""
+    active_state["topic"]["id"] = "N244-012"
+    active_state["topic"]["agency"] = "NASA"
+    active_state["learning"]["outcome"] = "not_selected"
+    active_state["learning"]["outcome_recorded_at"] = "2026-07-01T10:00:00Z"
+    active_state["submission"]["confirmation_number"] = "NSPIRES-2026-N244-012"
+    write_state(active_state)
+    return active_state
 
 
 @given("any proposal with an existing outcome tag")
@@ -165,16 +175,39 @@ def present_lessons():
     pytest.skip("Awaiting OutcomeService implementation")
 
 
-@when("Phil requests a debrief letter draft")
-def request_debrief_letter():
+@when(
+    "Phil requests a debrief letter draft",
+    target_fixture="debrief_letter_result",
+)
+def request_debrief_letter(active_state, proposal_dir):
     """Generate debrief request letter through OutcomeService."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    from pes.domain.outcome_service import OutcomeService
+
+    topic_id = active_state["topic"]["id"]
+    agency = active_state["topic"]["agency"]
+    confirmation = active_state["submission"]["confirmation_number"]
+    artifacts_dir = str(proposal_dir / "artifacts" / "wave-9-learning")
+
+    service = OutcomeService()
+    return service.generate_debrief_letter(
+        topic_id=topic_id,
+        agency=agency,
+        confirmation_number=confirmation,
+        artifacts_dir=artifacts_dir,
+    )
 
 
-@when("Phil decides not to request a debrief")
-def skip_debrief_request():
+@when(
+    "Phil decides not to request a debrief",
+    target_fixture="skip_debrief_result",
+)
+def skip_debrief_request(active_state):
     """Skip debrief request through OutcomeService."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    from pes.domain.outcome_service import OutcomeService
+
+    topic_id = active_state["topic"]["id"]
+    service = OutcomeService()
+    return service.skip_debrief_request(topic_id=topic_id)
 
 
 @when("any process attempts to overwrite the tag")
@@ -295,43 +328,50 @@ def verify_lessons_checkpoint():
 @then(
     parsers.parse("the tool generates a letter referencing {topic} and the confirmation number"),
 )
-def verify_letter_references(topic):
+def verify_letter_references(topic, debrief_letter_result):
     """Verify letter references topic and confirmation."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert topic in debrief_letter_result.content
+    assert debrief_letter_result.confirmation_number in debrief_letter_result.content
 
 
 @then(
     parsers.parse("the letter cites {regulation}"),
 )
-def verify_regulation_cited(regulation):
+def verify_regulation_cited(regulation, debrief_letter_result):
     """Verify regulation is cited in letter."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert regulation in debrief_letter_result.content
 
 
 @then("the draft is written to the learning artifacts directory")
-def verify_draft_written():
+def verify_draft_written(debrief_letter_result, proposal_dir):
     """Verify debrief request draft artifact."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    from pathlib import Path
+
+    written_path = Path(debrief_letter_result.file_path)
+    assert written_path.exists()
+    artifacts_dir = proposal_dir / "artifacts" / "wave-9-learning"
+    assert str(written_path).startswith(str(artifacts_dir))
 
 
 @then("the tool generates a letter using NASA-specific debrief procedures")
-def verify_nasa_letter():
+def verify_nasa_letter(debrief_letter_result):
     """Verify NASA-specific letter generated."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert "NASA" in debrief_letter_result.content
+    assert "FAR 15.505" not in debrief_letter_result.content
 
 
 @then(
     parsers.parse('the tool records "{status}"'),
 )
-def verify_status_recorded(status):
+def verify_status_recorded(status, skip_debrief_result):
     """Verify status recorded."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert skip_debrief_result.status == status
 
 
 @then("proceeds to outcome recording without creating a request letter")
-def verify_no_letter_created():
+def verify_no_letter_created(skip_debrief_result):
     """Verify no letter when debrief skipped."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert skip_debrief_result.letter_created is False
 
 
 @then("the modification is blocked")

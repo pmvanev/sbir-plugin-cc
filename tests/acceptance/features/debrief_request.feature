@@ -9,7 +9,6 @@ Feature: Debrief Request Letter Draft (US-016)
 
   # --- Happy Path ---
 
-  @skip
   Scenario: Generate debrief request letter for DoD submission
     Given AF243-001 was not selected
     And the submission confirmation is "DSIP-2026-AF243-001-7842"
@@ -18,7 +17,6 @@ Feature: Debrief Request Letter Draft (US-016)
     And the letter cites FAR 15.505(a)(1)
     And the draft is written to the learning artifacts directory
 
-  @skip
   Scenario: Generate debrief request for NASA submission
     Given N244-012 was submitted to NSPIRES and not selected
     When Phil requests a debrief letter draft
@@ -26,7 +24,6 @@ Feature: Debrief Request Letter Draft (US-016)
 
   # --- Edge Case ---
 
-  @skip
   Scenario: Skip debrief request
     Given AF243-001 was not selected
     When Phil decides not to request a debrief
