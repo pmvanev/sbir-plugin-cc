@@ -1,0 +1,34 @@
+{
+  "schema_version": "3.0",
+  "feature_id": "cross-wave-integration-tests",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "PREPARE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T17:57:14Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED_ACCEPTANCE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T17:58:05Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED_UNIT",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: smoke test serves as both acceptance and unit test for fixture infrastructure",
+      "t": "2026-03-11T17:58:15Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-11T17:59:22Z"
+    }
+  ]
+}
