@@ -50,7 +50,7 @@ def process_hook_event(
         tool_name = hook_input.get("tool", {}).get("name", "")
         return _handle_pre_tool_use(engine, state_dir, tool_name)
 
-    return {"exit_code": 0}
+    return {"exit_code": 0}  # unknown event — allow
 
 
 def _handle_session_start(engine: EnforcementEngine, state_dir: str) -> dict[str, Any]:
@@ -83,4 +83,55 @@ def _handle_pre_tool_use(
             "message": "; ".join(result.messages),
         }
 
-    return {"exit_code": 0}
+    return {"exit_code": 0}  # pre-tool-use allowed
+
+
+def main() -> None:
+    """CLI entry point for Claude Code hooks.
+
+    Usage: python -m pes.adapters.hook_adapter <event-type>
+    Reads JSON from stdin, writes JSON to stdout, exits with 0=allow or 1=block.
+    """
+    import json
+    import os
+    import sys
+
+    if len(sys.argv) < 2:
+        print(json.dumps({"error": "Usage: hook_adapter <session-start|pre-tool-use>"}))
+        sys.exit(2)
+
+    subcommand = sys.argv[1]
+    event_map = {
+        "session-start": "SessionStart",
+        "pre-tool-use": "PreToolUse",
+    }
+
+    event = event_map.get(subcommand)
+    if event is None:
+        print(json.dumps({"error": f"Unknown subcommand: {subcommand}"}))
+        sys.exit(2)
+
+    # Read hook input from stdin
+    try:
+        raw = sys.stdin.read()
+        hook_input = json.loads(raw) if raw.strip() else {}
+    except (json.JSONDecodeError, ValueError):
+        hook_input = {}
+
+    hook_input["event"] = event
+
+    # Resolve paths: state in CWD/.sbir, config relative to plugin root
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", os.getcwd())
+    state_dir = os.path.join(os.getcwd(), ".sbir")
+    config_path = os.path.join(plugin_root, "templates", "pes-config.json")
+
+    result = process_hook_event(hook_input, state_dir, config_path)
+
+    exit_code = result.pop("exit_code", 0)
+    if result:
+        print(json.dumps(result))
+    sys.exit(exit_code)
+
+
+if __name__ == "__main__":
+    main()
