@@ -1,14 +1,15 @@
 """Outcome service -- driving port for outcome recording and debrief request letter generation.
 
 Orchestrates: agency-specific debrief letter generation from templates,
-debrief skip recording, and letter artifact persistence.
+debrief skip recording, outcome archiving, and letter artifact persistence.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from pes.domain.outcome import DebriefLetterResult, DebriefSkipRecord
+from pes.domain.outcome import DebriefLetterResult, DebriefSkipRecord, OutcomeRecord
 
 # Agency-to-template mapping
 _AGENCY_TEMPLATES: dict[str, str] = {
@@ -83,4 +84,57 @@ class OutcomeService:
             topic_id=topic_id,
             status="debrief not requested",
             letter_created=False,
+        )
+
+    def record_outcome(
+        self,
+        *,
+        topic_id: str,
+        outcome: str,
+        artifacts_dir: str,
+    ) -> OutcomeRecord:
+        """Record a proposal outcome and archive if awarded.
+
+        For awarded proposals: archives with outcome tag, extracts discriminators
+        placeholder, and suggests Phase II pre-planning.
+
+        For not_selected proposals: records outcome as valid terminal state,
+        noting that debrief can be ingested later.
+        """
+        output_dir = Path(artifacts_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        if outcome == "awarded":
+            # Archive the winning proposal with outcome tag
+            archive_data = {
+                "topic_id": topic_id,
+                "outcome": "awarded",
+                "discriminators": [],
+            }
+            archive_file = output_dir / f"outcome-{topic_id}.json"
+            archive_file.write_text(
+                json.dumps(archive_data, indent=2), encoding="utf-8"
+            )
+
+            return OutcomeRecord(
+                topic_id=topic_id,
+                outcome_tag="awarded",
+                archived=True,
+                discriminators=[],
+                debrief_artifacts_created=False,
+                archive_path=str(archive_file),
+                message=f"Awarded proposal {topic_id} archived. "
+                "Consider Phase II pre-planning.",
+            )
+
+        # Not selected -- valid terminal state without debrief
+        return OutcomeRecord(
+            topic_id=topic_id,
+            outcome_tag=outcome,
+            archived=False,
+            discriminators=[],
+            debrief_artifacts_created=False,
+            archive_path="",
+            message=f"Outcome '{outcome}' recorded for {topic_id}. "
+            "Debrief can be ingested later if received.",
         )

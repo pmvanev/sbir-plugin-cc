@@ -1,8 +1,9 @@
-"""Unit tests for OutcomeService (driving port) -- debrief request letter generation.
+"""Unit tests for OutcomeService (driving port) -- debrief request letter generation
+and outcome recording.
 
-Test Budget: 5 behaviors x 2 = 10 unit tests max.
+Test Budget: 7 behaviors x 2 = 14 unit tests max.
 Tests enter through driving port (OutcomeService).
-Domain objects (DebriefLetterResult, DebriefSkipRecord) are real collaborators.
+Domain objects (DebriefLetterResult, DebriefSkipRecord, OutcomeRecord) are real collaborators.
 
 Behaviors (step 06-01):
 1. Generate DoD debrief request letter with topic reference and confirmation number
@@ -10,6 +11,10 @@ Behaviors (step 06-01):
 3. Generate NASA debrief request letter with NASA-specific procedures
 4. Skip debrief request records status without creating letter
 5. Letter written to learning artifacts directory
+
+Behaviors (step 06-02):
+6. Awarded proposals archived with outcome tag and discriminators extracted
+7. Outcome without debrief is valid terminal state
 """
 
 from __future__ import annotations
@@ -170,3 +175,72 @@ class TestLetterArtifactWritten:
 
         filename = Path(result.file_path).name
         assert expected_in_filename in filename
+
+
+# ---------------------------------------------------------------------------
+# Behavior 6: Awarded proposals archived with outcome tag and discriminators
+# ---------------------------------------------------------------------------
+
+
+class TestAwardedProposalArchiving:
+    def test_awarded_outcome_archives_with_tag_and_discriminators(self, tmp_path: Path):
+        service = _make_service()
+        artifacts_dir = str(tmp_path)
+
+        result = service.record_outcome(
+            topic_id="AF243-001",
+            outcome="awarded",
+            artifacts_dir=artifacts_dir,
+        )
+
+        assert result.outcome_tag == "awarded"
+        assert result.archived is True
+        assert result.discriminators is not None
+        assert "Phase II" in result.message
+
+    def test_awarded_outcome_writes_archive_artifact(self, tmp_path: Path):
+        service = _make_service()
+        artifacts_dir = str(tmp_path)
+
+        result = service.record_outcome(
+            topic_id="AF243-001",
+            outcome="awarded",
+            artifacts_dir=artifacts_dir,
+        )
+
+        archive_path = Path(result.archive_path)
+        assert archive_path.exists()
+        assert "AF243-001" in archive_path.name
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: Outcome without debrief is valid terminal state
+# ---------------------------------------------------------------------------
+
+
+class TestOutcomeWithoutDebrief:
+    def test_not_selected_without_debrief_is_valid_terminal_state(self, tmp_path: Path):
+        service = _make_service()
+        artifacts_dir = str(tmp_path)
+
+        result = service.record_outcome(
+            topic_id="AF243-001",
+            outcome="not_selected",
+            artifacts_dir=artifacts_dir,
+        )
+
+        assert result.outcome_tag == "not_selected"
+        assert result.debrief_artifacts_created is False
+        assert "Debrief can be ingested later if received" in result.message
+
+    def test_not_selected_preserves_topic_id(self, tmp_path: Path):
+        service = _make_service()
+        artifacts_dir = str(tmp_path)
+
+        result = service.record_outcome(
+            topic_id="AF243-001",
+            outcome="not_selected",
+            artifacts_dir=artifacts_dir,
+        )
+
+        assert result.topic_id == "AF243-001"

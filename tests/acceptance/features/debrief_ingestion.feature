@@ -26,7 +26,6 @@ Feature: Debrief Ingestion and Critique-to-Section Mapping (US-015)
     And identifies recurring strengths across wins
     And writes pattern analysis to the learning artifacts directory
 
-  @skip
   Scenario: Record awarded outcome and archive winner
     Given AF243-001 was awarded
     When Phil records the outcome as "awarded"
@@ -36,7 +35,6 @@ Feature: Debrief Ingestion and Critique-to-Section Mapping (US-015)
 
   # --- Edge Cases ---
 
-  @skip
   Scenario: Record outcome without debrief
     Given AF243-001 was not selected
     And no debrief letter is available

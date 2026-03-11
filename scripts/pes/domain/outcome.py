@@ -1,8 +1,8 @@
-"""Outcome domain model -- debrief request letter results and skip records."""
+"""Outcome domain model -- debrief request letter results, skip records, and outcome records."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -23,3 +23,16 @@ class DebriefSkipRecord:
     topic_id: str
     status: str
     letter_created: bool
+
+
+@dataclass(frozen=True)
+class OutcomeRecord:
+    """Result of recording a proposal outcome (awarded or not_selected)."""
+
+    topic_id: str
+    outcome_tag: str
+    archived: bool
+    discriminators: list[str] = field(default_factory=list)
+    debrief_artifacts_created: bool = False
+    archive_path: str = ""
+    message: str = ""

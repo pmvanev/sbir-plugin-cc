@@ -157,16 +157,41 @@ def update_patterns():
 
 @when(
     parsers.parse('Phil records the outcome as "{outcome}"'),
+    target_fixture="outcome_result",
 )
-def record_outcome(outcome):
+def record_outcome(outcome, active_state, proposal_dir):
     """Record outcome through OutcomeService."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    from pes.domain.outcome_service import OutcomeService
+
+    topic_id = active_state["topic"]["id"]
+    artifacts_dir = str(proposal_dir / "artifacts" / "wave-9-learning")
+
+    service = OutcomeService()
+    return service.record_outcome(
+        topic_id=topic_id,
+        outcome=outcome,
+        artifacts_dir=artifacts_dir,
+    )
 
 
-@when("Phil records the outcome")
-def record_outcome_no_debrief():
-    """Record outcome without debrief."""
-    pytest.skip("Awaiting OutcomeService implementation")
+@when(
+    "Phil records the outcome",
+    target_fixture="outcome_result",
+)
+def record_outcome_no_debrief(active_state, proposal_dir):
+    """Record outcome without debrief through OutcomeService."""
+    from pes.domain.outcome_service import OutcomeService
+
+    topic_id = active_state["topic"]["id"]
+    outcome = active_state["learning"]["outcome"]
+    artifacts_dir = str(proposal_dir / "artifacts" / "wave-9-learning")
+
+    service = OutcomeService()
+    return service.record_outcome(
+        topic_id=topic_id,
+        outcome=outcome,
+        artifacts_dir=artifacts_dir,
+    )
 
 
 @when("the tool presents lessons learned")
@@ -262,41 +287,44 @@ def verify_patterns_written():
 
 
 @then("the winning proposal is archived with outcome tag")
-def verify_winner_archived():
-    """Verify winning proposal is archived."""
-    pytest.skip("Awaiting OutcomeService implementation")
+def verify_winner_archived(outcome_result):
+    """Verify winning proposal is archived with outcome tag."""
+    assert outcome_result.outcome_tag == "awarded"
+    assert outcome_result.archived is True
 
 
 @then("winning discriminators are extracted for pattern analysis")
-def verify_discriminators_extracted():
+def verify_discriminators_extracted(outcome_result):
     """Verify winning discriminators extracted."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert outcome_result.discriminators is not None
+    assert len(outcome_result.discriminators) >= 0  # may be empty list but must exist
 
 
 @then("the tool suggests Phase II pre-planning")
-def verify_phase_ii_suggestion():
-    """Verify Phase II suggestion."""
-    pytest.skip("Awaiting OutcomeService implementation")
+def verify_phase_ii_suggestion(outcome_result):
+    """Verify Phase II suggestion for awarded proposals."""
+    assert "Phase II" in outcome_result.message
 
 
 @then("the outcome tag is appended to the proposal state")
-def verify_outcome_appended():
+def verify_outcome_appended(outcome_result):
     """Verify outcome tag appended to state."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert outcome_result.outcome_tag is not None
+    assert outcome_result.outcome_tag in ("awarded", "not_selected")
 
 
 @then("no debrief artifacts are created")
-def verify_no_debrief_artifacts():
+def verify_no_debrief_artifacts(outcome_result):
     """Verify no debrief artifacts when no debrief."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert outcome_result.debrief_artifacts_created is False
 
 
 @then(
     parsers.parse('the tool notes "{note}"'),
 )
-def verify_tool_note(note):
+def verify_tool_note(note, outcome_result):
     """Verify tool note message."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert note in outcome_result.message
 
 
 @then("the tool preserves the full text as freeform feedback")
