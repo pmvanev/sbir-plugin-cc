@@ -9,7 +9,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pes.domain.outcome import DebriefLetterResult, DebriefSkipRecord, OutcomeRecord
+from pes.domain.outcome import (
+    DebriefLetterResult,
+    DebriefSkipRecord,
+    LessonsLearnedResult,
+    OutcomeRecord,
+    PatternAnalysisResult,
+)
 
 # Agency-to-template mapping
 _AGENCY_TEMPLATES: dict[str, str] = {
@@ -21,9 +27,7 @@ _AGENCY_TEMPLATES: dict[str, str] = {
 
 # Resolve templates directory relative to project root
 _TEMPLATES_DIR = (
-    Path(__file__).resolve().parent.parent.parent.parent
-    / "templates"
-    / "debrief-request"
+    Path(__file__).resolve().parent.parent.parent.parent / "templates" / "debrief-request"
 )
 
 
@@ -112,9 +116,7 @@ class OutcomeService:
                 "discriminators": [],
             }
             archive_file = output_dir / f"outcome-{topic_id}.json"
-            archive_file.write_text(
-                json.dumps(archive_data, indent=2), encoding="utf-8"
-            )
+            archive_file.write_text(json.dumps(archive_data, indent=2), encoding="utf-8")
 
             return OutcomeRecord(
                 topic_id=topic_id,
@@ -123,8 +125,7 @@ class OutcomeService:
                 discriminators=[],
                 debrief_artifacts_created=False,
                 archive_path=str(archive_file),
-                message=f"Awarded proposal {topic_id} archived. "
-                "Consider Phase II pre-planning.",
+                message=f"Awarded proposal {topic_id} archived. Consider Phase II pre-planning.",
             )
 
         # Not selected -- valid terminal state without debrief
@@ -137,4 +138,84 @@ class OutcomeService:
             archive_path="",
             message=f"Outcome '{outcome}' recorded for {topic_id}. "
             "Debrief can be ingested later if received.",
+        )
+
+    def update_pattern_analysis(
+        self,
+        *,
+        corpus_outcomes: list[dict[str, object]],
+        artifacts_dir: str,
+    ) -> PatternAnalysisResult:
+        """Update cumulative win/loss pattern analysis across the corpus.
+
+        Analyzes recurring strengths from awarded proposals and recurring
+        weaknesses from not-selected proposals. Notes confidence level
+        based on corpus size.
+        """
+        # Tally patterns across outcomes
+        weakness_counts: dict[str, int] = {}
+        strength_counts: dict[str, int] = {}
+
+        for entry in corpus_outcomes:
+            for w in entry.get("weaknesses", []):
+                if isinstance(w, str):
+                    weakness_counts[w] = weakness_counts.get(w, 0) + 1
+            for s in entry.get("strengths", []):
+                if isinstance(s, str):
+                    strength_counts[s] = strength_counts.get(s, 0) + 1
+
+        recurring_weaknesses = [
+            {"pattern": pattern, "count": count}
+            for pattern, count in sorted(weakness_counts.items(), key=lambda x: x[1], reverse=True)
+        ]
+        recurring_strengths = [
+            {"pattern": pattern, "count": count}
+            for pattern, count in sorted(strength_counts.items(), key=lambda x: x[1], reverse=True)
+        ]
+
+        # Confidence scales with corpus size
+        corpus_size = len(corpus_outcomes)
+        if corpus_size >= 20:
+            confidence_level = "high"
+        elif corpus_size >= 10:
+            confidence_level = "medium"
+        else:
+            confidence_level = "low"
+
+        # Write pattern analysis artifact
+        output_dir = Path(artifacts_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        analysis_data = {
+            "corpus_size": corpus_size,
+            "confidence_level": confidence_level,
+            "recurring_weaknesses": recurring_weaknesses,
+            "recurring_strengths": recurring_strengths,
+        }
+        artifact_file = output_dir / "pattern-analysis.json"
+        artifact_file.write_text(json.dumps(analysis_data, indent=2), encoding="utf-8")
+
+        return PatternAnalysisResult(
+            recurring_weaknesses=recurring_weaknesses,
+            recurring_strengths=recurring_strengths,
+            confidence_level=confidence_level,
+            corpus_size=corpus_size,
+            artifact_path=str(artifact_file),
+        )
+
+    def present_lessons_learned(
+        self,
+        *,
+        artifacts_dir: str,
+    ) -> LessonsLearnedResult:
+        """Present lessons learned for human review checkpoint.
+
+        Returns a result with requires_human_acknowledgment=True and
+        status='pending_review'. The corpus update does not complete
+        until the human acknowledges the lessons.
+        """
+        return LessonsLearnedResult(
+            requires_human_acknowledgment=True,
+            status="pending_review",
+            lessons=[],
+            artifact_path=artifacts_dir,
         )

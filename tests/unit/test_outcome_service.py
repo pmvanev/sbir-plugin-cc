@@ -1,9 +1,10 @@
-"""Unit tests for OutcomeService (driving port) -- debrief request letter generation
-and outcome recording.
+"""Unit tests for OutcomeService (driving port) -- debrief request letter generation,
+outcome recording, pattern analysis, and lessons learned.
 
-Test Budget: 7 behaviors x 2 = 14 unit tests max.
+Test Budget: 12 behaviors x 2 = 24 unit tests max.
 Tests enter through driving port (OutcomeService).
-Domain objects (DebriefLetterResult, DebriefSkipRecord, OutcomeRecord) are real collaborators.
+Domain objects (DebriefLetterResult, DebriefSkipRecord, OutcomeRecord,
+PatternAnalysisResult, LessonsLearnedResult) are real collaborators.
 
 Behaviors (step 06-01):
 1. Generate DoD debrief request letter with topic reference and confirmation number
@@ -15,6 +16,13 @@ Behaviors (step 06-01):
 Behaviors (step 06-02):
 6. Awarded proposals archived with outcome tag and discriminators extracted
 7. Outcome without debrief is valid terminal state
+
+Behaviors (step 07-02):
+8. Pattern analysis identifies recurring weaknesses across losses
+9. Pattern analysis identifies recurring strengths across wins
+10. Pattern analysis notes confidence level for small corpus
+11. Pattern analysis written to learning artifacts directory
+12. Lessons learned require human acknowledgment checkpoint
 """
 
 from __future__ import annotations
@@ -244,3 +252,146 @@ class TestOutcomeWithoutDebrief:
         )
 
         assert result.topic_id == "AF243-001"
+
+
+# ---------------------------------------------------------------------------
+# Helpers for corpus outcomes (step 07-02)
+# ---------------------------------------------------------------------------
+
+
+def _build_corpus_outcomes(
+    wins: int = 3,
+    losses: int = 4,
+    win_strengths: list[str] | None = None,
+    loss_weaknesses: list[str] | None = None,
+) -> list[dict[str, object]]:
+    """Build corpus outcome entries for pattern analysis tests."""
+    strengths = win_strengths or ["strong technical approach", "experienced team"]
+    weaknesses = loss_weaknesses or ["cost realism", "schedule risk"]
+    outcomes: list[dict[str, object]] = []
+    for i in range(wins):
+        outcomes.append(
+            {
+                "topic_id": f"WIN-{i + 1:03d}",
+                "outcome": "awarded",
+                "strengths": strengths,
+                "weaknesses": [],
+            }
+        )
+    for i in range(losses):
+        outcomes.append(
+            {
+                "topic_id": f"LOSS-{i + 1:03d}",
+                "outcome": "not_selected",
+                "strengths": [],
+                "weaknesses": weaknesses,
+            }
+        )
+    return outcomes
+
+
+# ---------------------------------------------------------------------------
+# Behavior 8: Pattern analysis identifies recurring weaknesses across losses
+# ---------------------------------------------------------------------------
+
+
+class TestPatternAnalysisWeaknesses:
+    def test_identifies_recurring_weaknesses(self, tmp_path: Path):
+        service = _make_service()
+        corpus = _build_corpus_outcomes(losses=4)
+
+        result = service.update_pattern_analysis(
+            corpus_outcomes=corpus,
+            artifacts_dir=str(tmp_path),
+        )
+
+        assert len(result.recurring_weaknesses) > 0
+        weakness_names = [w["pattern"] for w in result.recurring_weaknesses]
+        assert "cost realism" in weakness_names
+
+
+# ---------------------------------------------------------------------------
+# Behavior 9: Pattern analysis identifies recurring strengths across wins
+# ---------------------------------------------------------------------------
+
+
+class TestPatternAnalysisStrengths:
+    def test_identifies_recurring_strengths(self, tmp_path: Path):
+        service = _make_service()
+        corpus = _build_corpus_outcomes(wins=3)
+
+        result = service.update_pattern_analysis(
+            corpus_outcomes=corpus,
+            artifacts_dir=str(tmp_path),
+        )
+
+        assert len(result.recurring_strengths) > 0
+        strength_names = [s["pattern"] for s in result.recurring_strengths]
+        assert "strong technical approach" in strength_names
+
+
+# ---------------------------------------------------------------------------
+# Behavior 10: Pattern analysis notes confidence level for small corpus
+# ---------------------------------------------------------------------------
+
+
+class TestPatternAnalysisConfidence:
+    @pytest.mark.parametrize(
+        "total_proposals,expected_confidence",
+        [
+            (3, "low"),
+            (10, "medium"),
+            (25, "high"),
+        ],
+    )
+    def test_confidence_level_scales_with_corpus_size(
+        self, tmp_path: Path, total_proposals: int, expected_confidence: str
+    ):
+        service = _make_service()
+        wins = total_proposals // 3
+        losses = total_proposals - wins
+        corpus = _build_corpus_outcomes(wins=wins, losses=losses)
+
+        result = service.update_pattern_analysis(
+            corpus_outcomes=corpus,
+            artifacts_dir=str(tmp_path),
+        )
+
+        assert result.confidence_level == expected_confidence
+
+
+# ---------------------------------------------------------------------------
+# Behavior 11: Pattern analysis written to learning artifacts directory
+# ---------------------------------------------------------------------------
+
+
+class TestPatternAnalysisArtifact:
+    def test_writes_pattern_analysis_to_artifacts_dir(self, tmp_path: Path):
+        service = _make_service()
+        corpus = _build_corpus_outcomes()
+
+        result = service.update_pattern_analysis(
+            corpus_outcomes=corpus,
+            artifacts_dir=str(tmp_path),
+        )
+
+        written = Path(result.artifact_path)
+        assert written.exists()
+        assert str(written).startswith(str(tmp_path))
+
+
+# ---------------------------------------------------------------------------
+# Behavior 12: Lessons learned require human acknowledgment checkpoint
+# ---------------------------------------------------------------------------
+
+
+class TestLessonsLearnedCheckpoint:
+    def test_lessons_require_human_acknowledgment(self, tmp_path: Path):
+        service = _make_service()
+
+        result = service.present_lessons_learned(
+            artifacts_dir=str(tmp_path),
+        )
+
+        assert result.requires_human_acknowledgment is True
+        assert result.status == "pending_review"

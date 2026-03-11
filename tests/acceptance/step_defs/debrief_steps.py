@@ -6,7 +6,6 @@ Does NOT import internal debrief parsers or pattern analyzers directly.
 
 from __future__ import annotations
 
-import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
@@ -98,10 +97,33 @@ def proposal_not_selected_with_debrief(active_state, write_state, proposal_dir):
     parsers.parse(
         "the corpus contains {total:d} proposals with {wins:d} awarded and {losses:d} not selected"
     ),
+    target_fixture="corpus_outcomes",
 )
-def corpus_with_outcomes(total, wins, losses):
-    """Corpus with specified outcome distribution."""
-    pass
+def corpus_with_outcomes(total, wins, losses, proposal_dir):
+    """Corpus with specified outcome distribution -- build corpus entries."""
+    outcomes = []
+    for i in range(wins):
+        outcomes.append(
+            {
+                "topic_id": f"WIN-{i + 1:03d}",
+                "outcome": "awarded",
+                "strengths": ["strong technical approach", "experienced team"],
+                "weaknesses": [],
+            }
+        )
+    for i in range(losses):
+        outcomes.append(
+            {
+                "topic_id": f"LOSS-{i + 1:03d}",
+                "outcome": "not_selected",
+                "strengths": [],
+                "weaknesses": ["cost realism", "schedule risk"],
+            }
+        )
+    return {
+        "outcomes": outcomes,
+        "artifacts_dir": str(proposal_dir / "artifacts" / "wave-9-learning"),
+    }
 
 
 @given("AF243-001 was awarded")
@@ -145,10 +167,14 @@ def unstructured_debrief(proposal_dir):
     }
 
 
-@given("debrief ingestion and pattern analysis are complete")
-def debrief_and_patterns_complete():
-    """Debrief ingested and patterns updated."""
-    pass
+@given(
+    "debrief ingestion and pattern analysis are complete",
+    target_fixture="lessons_context",
+)
+def debrief_and_patterns_complete(proposal_dir):
+    """Debrief ingested and patterns updated -- set up artifacts dir for lessons."""
+    artifacts_dir = str(proposal_dir / "artifacts" / "wave-9-learning")
+    return {"artifacts_dir": artifacts_dir}
 
 
 @given(
@@ -175,10 +201,17 @@ def nasa_not_selected(active_state, write_state):
     return active_state
 
 
-@given("any proposal with an existing outcome tag")
-def proposal_with_existing_tag():
-    """Precondition for append-only property test."""
-    pass
+@given(
+    "any proposal with an existing outcome tag",
+    target_fixture="tag_context",
+)
+def proposal_with_existing_tag(active_state, write_state):
+    """Precondition for append-only property test -- proposal with recorded outcome."""
+    active_state["learning"]["outcome"] = "not_selected"
+    active_state["learning"]["outcome_recorded_at"] = "2026-07-01T10:00:00Z"
+    active_state["requested_outcome_change"] = "awarded"
+    write_state(active_state)
+    return active_state
 
 
 # --- When steps ---
@@ -204,10 +237,19 @@ def ingest_debrief(debrief_context):
     )
 
 
-@when("the tool updates pattern analysis")
-def update_patterns():
+@when(
+    "the tool updates pattern analysis",
+    target_fixture="pattern_result",
+)
+def update_patterns(corpus_outcomes):
     """Update pattern analysis through OutcomeService."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    from pes.domain.outcome_service import OutcomeService
+
+    service = OutcomeService()
+    return service.update_pattern_analysis(
+        corpus_outcomes=corpus_outcomes["outcomes"],
+        artifacts_dir=corpus_outcomes["artifacts_dir"],
+    )
 
 
 @when(
@@ -249,10 +291,18 @@ def record_outcome_no_debrief(active_state, proposal_dir):
     )
 
 
-@when("the tool presents lessons learned")
-def present_lessons():
+@when(
+    "the tool presents lessons learned",
+    target_fixture="lessons_result",
+)
+def present_lessons(lessons_context):
     """Present lessons learned through OutcomeService."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    from pes.domain.outcome_service import OutcomeService
+
+    service = OutcomeService()
+    return service.present_lessons_learned(
+        artifacts_dir=lessons_context["artifacts_dir"],
+    )
 
 
 @when(
@@ -290,10 +340,20 @@ def skip_debrief_request(active_state):
     return service.skip_debrief_request(topic_id=topic_id)
 
 
-@when("any process attempts to overwrite the tag")
-def attempt_overwrite_tag():
-    """Attempt to overwrite existing outcome tag."""
-    pytest.skip("Awaiting CorpusIntegrityEvaluator implementation")
+@when(
+    "any process attempts to overwrite the tag",
+    target_fixture="overwrite_result",
+)
+def attempt_overwrite_tag(tag_context, enforcement_engine, state_file):
+    """Attempt to overwrite existing outcome tag through PES enforcement."""
+    import json
+
+    state = json.loads(state_file.read_text())
+    result = enforcement_engine.evaluate(
+        state=state,
+        tool_name="record_outcome",
+    )
+    return result
 
 
 # --- Then steps ---
@@ -337,21 +397,27 @@ def verify_debrief_written(debrief_result, proposal_dir):
 
 
 @then("it identifies recurring weaknesses across losses")
-def verify_recurring_weaknesses():
+def verify_recurring_weaknesses(pattern_result):
     """Verify recurring weakness patterns identified."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert pattern_result.recurring_weaknesses is not None
+    assert len(pattern_result.recurring_weaknesses) > 0
 
 
 @then("identifies recurring strengths across wins")
-def verify_recurring_strengths():
+def verify_recurring_strengths(pattern_result):
     """Verify recurring strength patterns identified."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert pattern_result.recurring_strengths is not None
+    assert len(pattern_result.recurring_strengths) > 0
 
 
 @then("writes pattern analysis to the learning artifacts directory")
-def verify_patterns_written():
+def verify_patterns_written(pattern_result):
     """Verify pattern analysis artifact."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    from pathlib import Path
+
+    assert pattern_result.artifact_path is not None
+    written = Path(pattern_result.artifact_path)
+    assert written.exists()
 
 
 @then("the winning proposal is archived with outcome tag")
@@ -420,9 +486,10 @@ def verify_freeform_searchable(debrief_result):
 
 
 @then("Phil can review, edit, and acknowledge before corpus update completes")
-def verify_lessons_checkpoint():
+def verify_lessons_checkpoint(lessons_result):
     """Verify lessons learned human checkpoint."""
-    pytest.skip("Awaiting OutcomeService implementation")
+    assert lessons_result.requires_human_acknowledgment is True
+    assert lessons_result.status == "pending_review"
 
 
 @then(
@@ -475,12 +542,14 @@ def verify_no_letter_created(skip_debrief_result):
 
 
 @then("the modification is blocked")
-def verify_tag_modification_blocked():
+def verify_tag_modification_blocked(overwrite_result):
     """Verify outcome tag modification is blocked."""
-    pytest.skip("Awaiting CorpusIntegrityEvaluator implementation")
+    from pes.domain.rules import Decision
+
+    assert overwrite_result.decision == Decision.BLOCK
 
 
 @then("the original tag is preserved")
-def verify_original_tag():
+def verify_original_tag(tag_context):
     """Verify original tag is unchanged."""
-    pytest.skip("Awaiting CorpusIntegrityEvaluator implementation")
+    assert tag_context["learning"]["outcome"] == "not_selected"

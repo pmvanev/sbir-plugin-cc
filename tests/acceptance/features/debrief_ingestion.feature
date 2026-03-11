@@ -17,7 +17,6 @@ Feature: Debrief Ingestion and Critique-to-Section Mapping (US-015)
     And flags critiques matching known weaknesses from past debriefs
     And writes the structured debrief to the learning artifacts directory
 
-  @skip
   Scenario: Win/loss pattern analysis updates across corpus
     Given the corpus contains 7 proposals with 3 awarded and 4 not selected
     When the tool updates pattern analysis
@@ -49,7 +48,6 @@ Feature: Debrief Ingestion and Critique-to-Section Mapping (US-015)
     And notes "Structured scores could not be extracted from this debrief"
     And the freeform text is available for keyword-based pattern matching
 
-  @skip
   Scenario: Lessons learned human checkpoint
     Given debrief ingestion and pattern analysis are complete
     When the tool presents lessons learned
@@ -57,7 +55,6 @@ Feature: Debrief Ingestion and Critique-to-Section Mapping (US-015)
 
   # --- Error Path ---
 
-  @skip
   @property
   Scenario: Win/loss tags are append-only regardless of outcome changes
     Given any proposal with an existing outcome tag
