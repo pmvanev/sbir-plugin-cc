@@ -30,9 +30,13 @@ class FileVisualAssetAdapter(VisualAssetPort):
     def __init__(self, artifacts_dir: Path) -> None:
         self._dir = artifacts_dir
 
+    def _ensure_dir(self, directory: Path) -> None:
+        """Ensure the given directory exists."""
+        directory.mkdir(parents=True, exist_ok=True)
+
     def write_inventory(self, inventory: FigureInventory) -> None:
         """Write figure inventory to figure-inventory.json."""
-        self._dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_dir(self._dir)
         path = self._dir / "figure-inventory.json"
         data = {
             "placeholders": [
@@ -66,7 +70,7 @@ class FileVisualAssetAdapter(VisualAssetPort):
 
     def write_cross_reference_log(self, log: CrossReferenceLog) -> None:
         """Write cross-reference log to cross-reference-log.json."""
-        self._dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_dir(self._dir)
         path = self._dir / "cross-reference-log.json"
         data = {
             "entries": [
@@ -100,14 +104,14 @@ class FileVisualAssetAdapter(VisualAssetPort):
     def write_figure(self, figure: GeneratedFigure, content: str) -> None:
         """Write generated figure file to figures directory."""
         figures_dir = self._dir / "figures"
-        figures_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_dir(figures_dir)
         path = figures_dir / figure.file_path
         path.write_text(content, encoding="utf-8")
 
     def write_external_brief(self, brief: ExternalBrief) -> None:
         """Write external brief as JSON to figures directory."""
         figures_dir = self._dir / "figures"
-        figures_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_dir(figures_dir)
         path = figures_dir / f"figure-{brief.figure_number}-brief.json"
         data = {
             "figure_number": brief.figure_number,
@@ -120,10 +124,10 @@ class FileVisualAssetAdapter(VisualAssetPort):
 
     def replace_figure(self, figure_number: int, new_path: str) -> GeneratedFigure:
         """Replace a figure with a manual file path."""
-        fmt = new_path.split(".")[-1] if "." in new_path else "unknown"
+        file_format = new_path.split(".")[-1] if "." in new_path else "unknown"
         return GeneratedFigure(
             figure_number=figure_number,
             section_id="replaced",
             file_path=new_path,
-            format=fmt,
+            format=file_format,
         )

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from pes.domain.rules import EnforcementRule
 
@@ -15,7 +15,7 @@ class WaveOrderingEvaluator:
     """
 
     # Maps condition keys to (state_key, approval_field) for approval-based checks.
-    _APPROVAL_CONDITIONS: dict[str, tuple[str, str]] = {
+    _APPROVAL_CONDITIONS: ClassVar[dict[str, tuple[str, str]]] = {
         "requires_strategy_approval": ("strategy_brief", "approved_at"),
         "requires_research_approval": ("research_summary", "approved_at"),
         "requires_outline_approval": ("outline", "approved_at"),

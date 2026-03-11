@@ -7,7 +7,7 @@ Delegates to FormatTemplateLoader and DocumentAssembler driven ports.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from pes.domain.formatting import (
     AcronymFlag,
@@ -19,9 +19,6 @@ from pes.domain.formatting import (
     SectionPageCount,
 )
 from pes.ports.format_template_port import FormatTemplateLoader
-
-if TYPE_CHECKING:
-    pass
 
 
 class DocumentAssemblerPort(Protocol):
@@ -54,16 +51,12 @@ class FormattingService:
         self._loader = format_template_loader
         self._assembler = document_assembler
 
-    def load_format_template(
-        self, *, agency: str, solicitation_type: str
-    ) -> FormatTemplateResult:
+    def load_format_template(self, *, agency: str, solicitation_type: str) -> FormatTemplateResult:
         """Load format template for the given agency and solicitation type.
 
         Returns FormatTemplateResult with template or error details.
         """
-        template = self._loader.load_template(
-            agency=agency, solicitation_type=solicitation_type
-        )
+        template = self._loader.load_template(agency=agency, solicitation_type=solicitation_type)
 
         if template is None:
             return FormatTemplateResult(
@@ -88,9 +81,7 @@ class FormattingService:
             raise RuntimeError(msg)
         return self._assembler.insert_figures(figures, document)
 
-    def format_references(
-        self, *, citations: list[dict[str, Any]], style: str
-    ) -> int:
+    def format_references(self, *, citations: list[dict[str, Any]], style: str) -> int:
         """Format citations in a consistent style.
 
         Returns the number of citations formatted.
@@ -177,13 +168,8 @@ class FormattingService:
         if largest_sections:
             top = largest_sections[0]
             suggestions.append(
-                f"Consider condensing '{top.title}' ({top.page_count} pages) "
-                f"-- largest section"
+                f"Consider condensing '{top.title}' ({top.page_count} pages) -- largest section"
             )
-        suggestions.append(
-            f"Reduce content by {over_by} pages to meet the solicitation limit"
-        )
-        suggestions.append(
-            "Review figures and tables for opportunities to consolidate or resize"
-        )
+        suggestions.append(f"Reduce content by {over_by} pages to meet the solicitation limit")
+        suggestions.append("Review figures and tables for opportunities to consolidate or resize")
         return suggestions

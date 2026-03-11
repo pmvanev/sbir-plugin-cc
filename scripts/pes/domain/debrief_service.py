@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pes.domain.debrief import CritiqueMapping, DebriefIngestionResult
+from pes.domain.debrief import CritiqueMapping, DebriefIngestionResult, DebriefParseResult
 from pes.ports.debrief_parser_port import DebriefParser
 
 
@@ -96,15 +96,12 @@ class DebriefService:
     def _write_artifact(
         self,
         *,
-        parse_result: object,
+        parse_result: DebriefParseResult,
         flagged_weaknesses: list[str],
         critique_map: list[CritiqueMapping],
         artifacts_dir: str,
     ) -> str:
         """Write structured debrief data to artifacts directory."""
-        from pes.domain.debrief import DebriefParseResult
-
-        assert isinstance(parse_result, DebriefParseResult)
 
         output_dir = Path(artifacts_dir)
         output_dir.mkdir(parents=True, exist_ok=True)

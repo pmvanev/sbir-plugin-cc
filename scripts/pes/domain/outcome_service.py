@@ -152,26 +152,8 @@ class OutcomeService:
         weaknesses from not-selected proposals. Notes confidence level
         based on corpus size.
         """
-        # Tally patterns across outcomes
-        weakness_counts: dict[str, int] = {}
-        strength_counts: dict[str, int] = {}
-
-        for entry in corpus_outcomes:
-            for w in entry.get("weaknesses", []):
-                if isinstance(w, str):
-                    weakness_counts[w] = weakness_counts.get(w, 0) + 1
-            for s in entry.get("strengths", []):
-                if isinstance(s, str):
-                    strength_counts[s] = strength_counts.get(s, 0) + 1
-
-        recurring_weaknesses = [
-            {"pattern": pattern, "count": count}
-            for pattern, count in sorted(weakness_counts.items(), key=lambda x: x[1], reverse=True)
-        ]
-        recurring_strengths = [
-            {"pattern": pattern, "count": count}
-            for pattern, count in sorted(strength_counts.items(), key=lambda x: x[1], reverse=True)
-        ]
+        recurring_weaknesses = self._tally_patterns(corpus_outcomes, "weaknesses")
+        recurring_strengths = self._tally_patterns(corpus_outcomes, "strengths")
 
         # Confidence scales with corpus size
         corpus_size = len(corpus_outcomes)
@@ -219,3 +201,21 @@ class OutcomeService:
             lessons=[],
             artifact_path=artifacts_dir,
         )
+
+    @staticmethod
+    def _tally_patterns(
+        corpus_outcomes: list[dict[str, object]], key: str
+    ) -> list[dict[str, object]]:
+        """Tally recurring patterns from corpus outcomes by key (weaknesses/strengths)."""
+        counts: dict[str, int] = {}
+        for entry in corpus_outcomes:
+            items = entry.get(key, [])
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, str):
+                    counts[item] = counts.get(item, 0) + 1
+        return [
+            {"pattern": pattern, "count": count}
+            for pattern, count in sorted(counts.items(), key=lambda x: x[1], reverse=True)
+        ]

@@ -152,15 +152,9 @@ class StatusService:
 
     def _build_warnings(self, state: dict[str, Any]) -> list[str]:
         warnings: list[str] = []
-        deadline_str = state.get("topic", {}).get("deadline", "")
-        if deadline_str:
-            try:
-                deadline = date.fromisoformat(deadline_str)
-                days_remaining = (deadline - date.today()).days
-                if days_remaining <= CRITICAL_THRESHOLD_DAYS:
-                    warnings.append(f"{days_remaining} days remaining -- critical threshold")
-            except ValueError:
-                pass
+        days_remaining = self._days_to_deadline(state)
+        if days_remaining is not None and days_remaining <= CRITICAL_THRESHOLD_DAYS:
+            warnings.append(f"{days_remaining} days remaining -- critical threshold")
         return warnings
 
     def _suggest_next_action(self, state: dict[str, Any], async_events: list[AsyncEvent]) -> str:
