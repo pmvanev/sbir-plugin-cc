@@ -58,12 +58,40 @@ def submitted_proposal_af243(sample_state, write_state):
     return state
 
 
-@given("AF243-001 was not selected and Phil has a debrief letter")
-def proposal_not_selected_with_debrief(active_state, write_state):
-    """Record not-selected outcome with debrief available."""
+@given(
+    "AF243-001 was not selected and Phil has a debrief letter",
+    target_fixture="debrief_context",
+)
+def proposal_not_selected_with_debrief(active_state, write_state, proposal_dir):
+    """Record not-selected outcome with debrief available and provide debrief text."""
     active_state["learning"]["outcome"] = "not_selected"
     active_state["learning"]["outcome_recorded_at"] = "2026-07-01T10:00:00Z"
     write_state(active_state)
+
+    # Simulate a structured debrief letter as extracted text from PDF
+    debrief_text = (
+        "SBIR Phase I Proposal Evaluation Summary\n"
+        "Topic: AF243-001\n"
+        "Proposal: Compact Directed Energy for Maritime UAS Defense\n\n"
+        "Evaluator Scores:\n"
+        "  Technical Merit: 3.5/5.0\n"
+        "  Team Qualifications: 4.0/5.0\n"
+        "  Cost Realism: 2.5/5.0\n\n"
+        "Critique Comments:\n"
+        "1. Section 3.1 (Technical Approach), Page 5: "
+        "The proposed beam-steering mechanism lacks sufficient detail "
+        "on thermal management under sustained operation.\n"
+        "2. Section 4.2 (Project Schedule), Page 12: "
+        "Timeline appears aggressive given the TRL advancement required.\n"
+        "3. Section 2.1 (Innovation), Page 3: "
+        "Novel waveguide design is promising but risk mitigation "
+        "for manufacturing scalability is insufficient.\n"
+    )
+    return {
+        "debrief_text": debrief_text,
+        "known_weaknesses": ["thermal management", "cost realism"],
+        "proposal_dir": proposal_dir,
+    }
 
 
 @given(
@@ -98,10 +126,23 @@ def no_debrief_available():
     pass
 
 
-@given("the debrief letter is a single paragraph with no scores")
-def unstructured_debrief():
-    """Debrief is unstructured freeform text."""
-    pass
+@given(
+    "the debrief letter is a single paragraph with no scores",
+    target_fixture="debrief_context",
+)
+def unstructured_debrief(proposal_dir):
+    """Debrief is unstructured freeform text with no structure."""
+    debrief_text = (
+        "Thank you for your submission. After careful review, your proposal "
+        "was not selected for award. The evaluation panel noted that while "
+        "the concept showed promise, several areas needed improvement "
+        "including cost justification and timeline feasibility."
+    )
+    return {
+        "debrief_text": debrief_text,
+        "known_weaknesses": [],
+        "proposal_dir": proposal_dir,
+    }
 
 
 @given("debrief ingestion and pattern analysis are complete")
@@ -143,10 +184,24 @@ def proposal_with_existing_tag():
 # --- When steps ---
 
 
-@when("Phil ingests the debrief from a PDF file")
-def ingest_debrief():
-    """Ingest debrief through DebriefService."""
-    pytest.skip("Awaiting DebriefService implementation")
+@when(
+    "Phil ingests the debrief from a PDF file",
+    target_fixture="debrief_result",
+)
+def ingest_debrief(debrief_context):
+    """Ingest debrief through DebriefService (driving port)."""
+    from pes.adapters.text_debrief_parser_adapter import TextDebriefParserAdapter
+    from pes.domain.debrief_service import DebriefService
+
+    parser = TextDebriefParserAdapter()
+    service = DebriefService(parser=parser)
+    artifacts_dir = str(debrief_context["proposal_dir"] / "artifacts" / "wave-9-learning")
+
+    return service.ingest_debrief(
+        debrief_text=debrief_context["debrief_text"],
+        known_weaknesses=debrief_context["known_weaknesses"],
+        artifacts_dir=artifacts_dir,
+    )
 
 
 @when("the tool updates pattern analysis")
@@ -245,27 +300,40 @@ def attempt_overwrite_tag():
 
 
 @then("the tool parses reviewer scores and critique comments")
-def verify_scores_parsed():
+def verify_scores_parsed(debrief_result):
     """Verify debrief scores are parsed."""
-    pytest.skip("Awaiting DebriefService implementation")
+    assert debrief_result.scores is not None
+    assert len(debrief_result.scores) > 0
+    assert debrief_result.parsing_confidence > 0.0
 
 
 @then("maps each critique to a specific proposal section and page")
-def verify_critique_mapped():
+def verify_critique_mapped(debrief_result):
     """Verify critiques mapped to sections."""
-    pytest.skip("Awaiting DebriefService implementation")
+    assert debrief_result.critique_map is not None
+    assert len(debrief_result.critique_map) > 0
+    for critique in debrief_result.critique_map:
+        assert critique.section is not None
+        assert critique.page is not None
 
 
 @then("flags critiques matching known weaknesses from past debriefs")
-def verify_weaknesses_flagged():
+def verify_weaknesses_flagged(debrief_result):
     """Verify known weaknesses are flagged."""
-    pytest.skip("Awaiting DebriefService implementation")
+    assert debrief_result.flagged_weaknesses is not None
+    assert len(debrief_result.flagged_weaknesses) > 0
 
 
 @then("writes the structured debrief to the learning artifacts directory")
-def verify_debrief_written():
+def verify_debrief_written(debrief_result, proposal_dir):
     """Verify structured debrief artifact."""
-    pytest.skip("Awaiting DebriefService implementation")
+    from pathlib import Path
+
+    assert debrief_result.artifact_path is not None
+    written = Path(debrief_result.artifact_path)
+    assert written.exists()
+    artifacts_dir = proposal_dir / "artifacts" / "wave-9-learning"
+    assert str(written).startswith(str(artifacts_dir))
 
 
 @then("it identifies recurring weaknesses across losses")
@@ -328,23 +396,27 @@ def verify_tool_note(note, outcome_result):
 
 
 @then("the tool preserves the full text as freeform feedback")
-def verify_freeform_preserved():
+def verify_freeform_preserved(debrief_result):
     """Verify freeform text is preserved."""
-    pytest.skip("Awaiting DebriefService implementation")
+    assert debrief_result.freeform_text is not None
+    assert len(debrief_result.freeform_text) > 0
 
 
 @then(
     parsers.parse('notes "{note}"'),
 )
-def verify_parsing_note(note):
+def verify_parsing_note(note, debrief_result):
     """Verify parsing limitation note."""
-    pytest.skip("Awaiting DebriefService implementation")
+    assert debrief_result.message is not None
+    assert note in debrief_result.message
 
 
 @then("the freeform text is available for keyword-based pattern matching")
-def verify_freeform_searchable():
-    """Verify freeform text is searchable."""
-    pytest.skip("Awaiting DebriefService implementation")
+def verify_freeform_searchable(debrief_result):
+    """Verify freeform text is searchable via keywords."""
+    assert debrief_result.freeform_text is not None
+    # Freeform text should contain searchable content
+    assert "cost" in debrief_result.freeform_text.lower() or len(debrief_result.freeform_text) > 0
 
 
 @then("Phil can review, edit, and acknowledge before corpus update completes")

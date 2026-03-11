@@ -9,7 +9,6 @@ Feature: Debrief Ingestion and Critique-to-Section Mapping (US-015)
 
   # --- Happy Path ---
 
-  @skip
   Scenario: Ingest debrief and map critiques to sections
     Given AF243-001 was not selected and Phil has a debrief letter
     When Phil ingests the debrief from a PDF file
@@ -43,7 +42,6 @@ Feature: Debrief Ingestion and Critique-to-Section Mapping (US-015)
     And no debrief artifacts are created
     And the tool notes "Debrief can be ingested later if received"
 
-  @skip
   Scenario: Ingest unstructured debrief with minimal content
     Given the debrief letter is a single paragraph with no scores
     When Phil ingests the debrief from a PDF file
