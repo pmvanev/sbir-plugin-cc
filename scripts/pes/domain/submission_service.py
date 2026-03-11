@@ -1,13 +1,23 @@
-"""Submission service -- driving port for submission package preparation.
+"""Submission service -- driving port for submission package preparation and confirmation.
 
 Orchestrates: portal identification from agency, portal-specific file naming,
-file size verification against portal limits, and missing file detection.
+file size verification against portal limits, missing file detection,
+human confirmation checkpoint, and immutable archive creation.
 Delegates to PortalRulesLoader driven port for portal configuration.
 """
 
 from __future__ import annotations
 
-from pes.domain.submission import PackageFile, PackageResult
+import shutil
+from datetime import UTC, datetime
+from pathlib import Path
+
+from pes.domain.submission import (
+    ConfirmationPrompt,
+    PackageFile,
+    PackageResult,
+    SubmissionRecord,
+)
 from pes.ports.portal_rules_port import PortalRulesLoader
 
 # Bytes per megabyte for size comparison
@@ -94,4 +104,54 @@ class SubmissionService:
             blocked=blocked,
             missing_files=missing_files,
             guidance=guidance_messages,
+        )
+
+    def confirm_submission(self) -> ConfirmationPrompt:
+        """Present a confirmation prompt requiring explicit human approval.
+
+        Returns ConfirmationPrompt with requires_confirmation=True.
+        No state mutation occurs -- declining is always safe.
+        """
+        return ConfirmationPrompt(
+            requires_confirmation=True,
+            message=(
+                "You are about to submit this proposal. "
+                "This action is irreversible -- all artifacts will become read-only. "
+                "Do you confirm?"
+            ),
+        )
+
+    def record_submission(
+        self,
+        *,
+        confirmation_number: str,
+        package_dir: str,
+        archive_dir: str,
+    ) -> SubmissionRecord:
+        """Record submission confirmation, create immutable archive.
+
+        Raises ValueError if confirmation_number is empty.
+        Copies all files from package_dir into archive_dir.
+        Returns SubmissionRecord with immutable=True for PES enforcement.
+        """
+        if not confirmation_number.strip():
+            raise ValueError(
+                "A confirmation number is required to record the submission."
+            )
+
+        # Capture timestamp
+        submitted_at = datetime.now(UTC).isoformat()
+
+        # Create immutable archive by copying package files
+        source = Path(package_dir)
+        target = Path(archive_dir)
+        for item in source.iterdir():
+            if item.is_file():
+                shutil.copy2(str(item), str(target / item.name))
+
+        return SubmissionRecord(
+            confirmation_number=confirmation_number,
+            submitted_at=submitted_at,
+            archive_path=str(target),
+            immutable=True,
         )

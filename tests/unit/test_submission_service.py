@@ -1,18 +1,26 @@
 """Unit tests for SubmissionService (driving port) -- submission packaging with portal rules.
 
-Test Budget: 4 behaviors x 2 = 8 unit tests max.
+Test Budget: 8 behaviors x 2 = 16 unit tests max.
 Tests enter through driving port (SubmissionService).
 Driven port (PortalRulesLoader) faked at port boundary.
 Domain objects (PackageFile, PortalRules, PackageResult) are real collaborators.
 
-Behaviors:
+Behaviors (step 05-01):
 1. Portal identified from agency in proposal state
 2. Portal-specific file naming applied to all package files
 3. File sizes verified against portal limits
 4. Missing required files block submission with actionable guidance
+
+Behaviors (step 05-02):
+5. Submission confirmation requires explicit human confirmation
+6. Recording submission captures confirmation number and timestamp
+7. Recording submission creates immutable archive from package directory
+8. Submission record sets immutable flag for PES enforcement
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 
@@ -217,3 +225,115 @@ class TestMissingFilesBlocking:
         assert len(result.guidance) > 0
         assert any("dsip" in g.lower() or "firm certification" in g.lower()
                     for g in result.guidance)
+
+
+# ---------------------------------------------------------------------------
+# Behavior 5: Submission confirmation requires explicit human confirmation
+# ---------------------------------------------------------------------------
+
+
+class TestSubmissionConfirmation:
+    def test_confirm_submission_requires_explicit_confirmation(self):
+        service = _make_service()
+
+        prompt = service.confirm_submission()
+
+        assert prompt.requires_confirmation is True
+        assert len(prompt.message) > 0
+
+    def test_confirm_submission_message_warns_irreversible(self):
+        service = _make_service()
+
+        prompt = service.confirm_submission()
+
+        # Message must warn that this action is irreversible
+        assert "irreversible" in prompt.message.lower() or "read-only" in prompt.message.lower()
+
+
+# ---------------------------------------------------------------------------
+# Behavior 6: Recording submission captures confirmation number and timestamp
+# ---------------------------------------------------------------------------
+
+
+class TestSubmissionRecording:
+    def test_records_confirmation_number_and_timestamp(self, tmp_path):
+        service = _make_service()
+        package_dir = tmp_path / "package"
+        package_dir.mkdir()
+        (package_dir / "test.pdf").write_text("content")
+        archive_dir = tmp_path / "archive"
+        archive_dir.mkdir()
+
+        record = service.record_submission(
+            confirmation_number="DSIP-2026-AF243-001-7842",
+            package_dir=str(package_dir),
+            archive_dir=str(archive_dir),
+        )
+
+        assert record.confirmation_number == "DSIP-2026-AF243-001-7842"
+        assert record.submitted_at is not None
+        assert len(record.submitted_at) > 0  # ISO timestamp string
+
+    def test_rejects_empty_confirmation_number(self, tmp_path):
+        service = _make_service()
+        package_dir = tmp_path / "package"
+        package_dir.mkdir()
+        archive_dir = tmp_path / "archive"
+        archive_dir.mkdir()
+
+        with pytest.raises(ValueError, match="confirmation number"):
+            service.record_submission(
+                confirmation_number="",
+                package_dir=str(package_dir),
+                archive_dir=str(archive_dir),
+            )
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: Recording submission creates immutable archive
+# ---------------------------------------------------------------------------
+
+
+class TestSubmissionArchive:
+    def test_creates_archive_with_package_files(self, tmp_path):
+        service = _make_service()
+        package_dir = tmp_path / "package"
+        package_dir.mkdir()
+        (package_dir / "Technical_Volume.pdf").write_text("technical content")
+        (package_dir / "Cost_Volume.pdf").write_text("cost content")
+        archive_dir = tmp_path / "archive"
+        archive_dir.mkdir()
+
+        record = service.record_submission(
+            confirmation_number="DSIP-2026-001",
+            package_dir=str(package_dir),
+            archive_dir=str(archive_dir),
+        )
+
+        archive_path = Path(record.archive_path)
+        assert archive_path.exists()
+        archived_files = list(archive_path.iterdir())
+        assert len(archived_files) == 2
+
+
+# ---------------------------------------------------------------------------
+# Behavior 8: Submission record sets immutable flag for PES enforcement
+# ---------------------------------------------------------------------------
+
+
+class TestSubmissionImmutableFlag:
+    def test_submission_record_sets_immutable_true(self, tmp_path):
+        service = _make_service()
+        package_dir = tmp_path / "package"
+        package_dir.mkdir()
+        (package_dir / "file.pdf").write_text("content")
+        archive_dir = tmp_path / "archive"
+        archive_dir.mkdir()
+
+        record = service.record_submission(
+            confirmation_number="DSIP-2026-001",
+            package_dir=str(package_dir),
+            archive_dir=str(archive_dir),
+        )
+
+        assert record.immutable is True

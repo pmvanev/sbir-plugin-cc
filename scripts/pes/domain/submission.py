@@ -1,4 +1,4 @@
-"""Submission domain model -- portal rules, package files, and packaging results."""
+"""Submission domain model -- portal rules, package files, packaging results, and confirmation."""
 
 from __future__ import annotations
 
@@ -38,3 +38,21 @@ class PackageResult:
     blocked: bool = False
     missing_files: list[str] = field(default_factory=list)
     guidance: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ConfirmationPrompt:
+    """Prompt requiring explicit human confirmation before submission."""
+
+    requires_confirmation: bool
+    message: str
+
+
+@dataclass(frozen=True)
+class SubmissionRecord:
+    """Record of a completed submission with confirmation and archive."""
+
+    confirmation_number: str
+    submitted_at: str
+    archive_path: str
+    immutable: bool

@@ -23,14 +23,12 @@ Feature: Submission Preparation and Portal-Specific Packaging (US-013)
     Then it reports all checks passing
     And the checklist is written to the submission artifacts directory
 
-  @skip
   Scenario: Human confirms submission at point of no return
     Given all checks pass
     When the tool presents the submission confirmation
     Then Phil must explicitly confirm before any submission occurs
     And declining returns to preparation without any irreversible action
 
-  @skip
   Scenario: Manual submission with confirmation entry
     Given all checks pass and Phil has confirmed readiness
     When Phil enters the confirmation number "DSIP-2026-AF243-001-7842"
@@ -53,7 +51,6 @@ Feature: Submission Preparation and Portal-Specific Packaging (US-013)
     Then the enforcement system blocks the action
     And Phil sees "Wave 8 requires final review sign-off from Wave 7"
 
-  @skip
   Scenario: PES blocks modification after submission
     Given AF243-001 has been submitted with confirmation recorded
     When Phil attempts to edit any submitted artifact

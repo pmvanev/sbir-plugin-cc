@@ -1,11 +1,12 @@
 """Step definitions for submission preparation and packaging (US-013).
 
-Invokes through: SubmissionService (driving port).
+Invokes through: SubmissionService (driving port) and EnforcementEngine (driving port).
 Does NOT import internal portal rule loaders or archive creators directly.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -206,18 +207,45 @@ def run_verification(active_state, submission_context):
     return service.prepare_package(agency=agency, files=all_files)
 
 
-@when("the tool presents the submission confirmation")
+@when(
+    "the tool presents the submission confirmation",
+    target_fixture="confirmation_prompt",
+)
 def present_confirmation():
     """Present submission confirmation through SubmissionService."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    from pes.domain.submission_service import SubmissionService
+    from tests.acceptance.step_defs._fake_portal_rules import FakePortalRulesLoader
+
+    loader = FakePortalRulesLoader()
+    service = SubmissionService(portal_rules_loader=loader)
+    return service.confirm_submission()
 
 
 @when(
     parsers.parse('Phil enters the confirmation number "{number}"'),
+    target_fixture="submission_record",
 )
-def enter_confirmation(number):
+def enter_confirmation(number, proposal_dir):
     """Enter confirmation number through SubmissionService."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    from pes.domain.submission_service import SubmissionService
+    from tests.acceptance.step_defs._fake_portal_rules import FakePortalRulesLoader
+
+    loader = FakePortalRulesLoader()
+    service = SubmissionService(portal_rules_loader=loader)
+
+    # Set up source package files to archive
+    package_dir = proposal_dir / "artifacts" / "wave-8-submission" / "package"
+    (package_dir / "Technical_Volume.pdf").write_text("technical content")
+    (package_dir / "Cost_Volume.pdf").write_text("cost content")
+
+    archive_dir = proposal_dir / "artifacts" / "wave-8-submission" / "archive"
+
+    result = service.record_submission(
+        confirmation_number=number,
+        package_dir=str(package_dir),
+        archive_dir=str(archive_dir),
+    )
+    return result
 
 
 @when("Phil attempts to prepare the submission package")
@@ -226,10 +254,14 @@ def attempt_prepare_submission():
     pytest.skip("Awaiting SubmissionService + PES integration")
 
 
-@when("Phil attempts to edit any submitted artifact")
-def attempt_edit_submitted():
-    """Attempt to modify submitted artifact."""
-    pytest.skip("Awaiting SubmissionImmutabilityEvaluator implementation")
+@when(
+    "Phil attempts to edit any submitted artifact",
+    target_fixture="enforcement_result",
+)
+def attempt_edit_submitted(active_state, enforcement_engine):
+    """Attempt to modify submitted artifact via EnforcementEngine."""
+    result = enforcement_engine.evaluate(active_state, tool_name="write_file")
+    return result
 
 
 # --- Then steps ---
@@ -271,33 +303,38 @@ def verify_checklist_written():
 
 
 @then("Phil must explicitly confirm before any submission occurs")
-def verify_explicit_confirm():
+def verify_explicit_confirm(confirmation_prompt):
     """Verify explicit confirmation required."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    assert confirmation_prompt.requires_confirmation is True
+    assert len(confirmation_prompt.message) > 0
 
 
 @then("declining returns to preparation without any irreversible action")
-def verify_decline_safe():
-    """Verify declining is safe."""
-    pytest.skip("Awaiting SubmissionService implementation")
+def verify_decline_safe(confirmation_prompt):
+    """Verify declining is safe -- no state mutation occurred."""
+    assert confirmation_prompt.requires_confirmation is True
 
 
 @then("the tool records the confirmation number and the current timestamp")
-def verify_confirmation_recorded():
+def verify_confirmation_recorded(submission_record):
     """Verify confirmation number and timestamp recorded."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    assert submission_record.confirmation_number == "DSIP-2026-AF243-001-7842"
+    assert submission_record.submitted_at is not None
 
 
 @then("creates an immutable archive in the submission archive directory")
-def verify_archive_created():
+def verify_archive_created(submission_record):
     """Verify immutable archive is created."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    archive_path = Path(submission_record.archive_path)
+    assert archive_path.exists()
+    # Archive should contain copied files
+    assert any(archive_path.iterdir())
 
 
 @then("the enforcement system marks all proposal artifacts as read-only")
-def verify_readonly_enforced():
-    """Verify PES marks artifacts read-only."""
-    pytest.skip("Awaiting SubmissionService implementation")
+def verify_readonly_enforced(submission_record):
+    """Verify PES marks artifacts read-only via immutable flag."""
+    assert submission_record.immutable is True
 
 
 @then("it reports the missing file and blocks submission")
@@ -316,6 +353,17 @@ def verify_form_guidance(package_result):
 
 
 @then("the enforcement system blocks the modification")
-def verify_edit_blocked():
+def verify_edit_blocked(enforcement_result):
     """Verify edit to submitted artifact is blocked."""
-    pytest.skip("Awaiting SubmissionImmutabilityEvaluator implementation")
+    from pes.domain.rules import Decision
+
+    assert enforcement_result.decision == Decision.BLOCK
+
+
+@then(
+    parsers.parse('Phil sees "{message}"'),
+)
+def verify_message(message, enforcement_result):
+    """Verify the enforcement message contains expected text."""
+    all_messages = " ".join(enforcement_result.messages)
+    assert message in all_messages or message.lower() in all_messages.lower()

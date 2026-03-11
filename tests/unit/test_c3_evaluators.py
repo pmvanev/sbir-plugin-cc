@@ -249,6 +249,20 @@ class TestSubmissionImmutability:
 
         assert result.decision == Decision.ALLOW
 
+    def test_block_message_includes_proposal_id(self) -> None:
+        engine, _ = _make_engine([_submission_immutability_rule()])
+        state: dict[str, Any] = {
+            "proposal_id": "p-001",
+            "topic": {"id": "AF243-001"},
+            "submission": {"status": "submitted", "immutable": True},
+        }
+
+        result = engine.evaluate(state, tool_name="write_file")
+
+        assert result.decision == Decision.BLOCK
+        all_messages = " ".join(result.messages)
+        assert "AF243-001" in all_messages
+
 
 # --- Corpus Integrity Tests ---
 

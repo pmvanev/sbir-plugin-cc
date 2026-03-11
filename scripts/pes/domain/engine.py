@@ -101,4 +101,6 @@ class EnforcementEngine:
             return self._pdc_gate_evaluator.build_block_message(rule, state)
         if rule.rule_type == "deadline_blocking":
             return self._deadline_evaluator.build_block_message(rule, state)
+        if rule.rule_type == "submission_immutability":
+            return self._submission_evaluator.build_block_message(rule, state)
         return rule.message

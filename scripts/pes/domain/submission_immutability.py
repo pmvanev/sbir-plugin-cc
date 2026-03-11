@@ -31,3 +31,16 @@ class SubmissionImmutabilityEvaluator:
             submission.get("status") == "submitted"
             and submission.get("immutable") is True
         )
+
+    def build_block_message(
+        self, rule: EnforcementRule, state: dict[str, Any]
+    ) -> str:
+        """Build a block message that includes the proposal topic ID if available."""
+        topic = state.get("topic", {})
+        topic_id = topic.get("id") if isinstance(topic, dict) else None
+
+        if topic_id:
+            return (
+                f"Proposal {topic_id} is submitted. Artifacts are read-only."
+            )
+        return rule.message
