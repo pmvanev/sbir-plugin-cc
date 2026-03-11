@@ -1,3 +1,8 @@
+---
+description: "Run simulated government evaluator review with red team analysis and sign-off gate"
+argument-hint: "[iterate|sign-off] - Optional subcommand for review iteration or sign-off"
+---
+
 # /proposal wave final-review
 
 Run simulated government evaluator review with red team analysis, debrief cross-check, and sign-off gate. Supports max 2 iteration rounds before forced sign-off.
@@ -34,7 +39,9 @@ Run simulated government evaluator review with red team analysis, debrief cross-
 
 ## Agent Invocation
 
-Dispatch to `sbir-reviewer` agent for Wave 7 full review.
+@sbir-reviewer
+
+Dispatch to sbir-reviewer agent for Wave 7 full review.
 
 The reviewer agent handles: evaluator persona construction from solicitation criteria | full proposal scoring | red team analysis | debrief cross-check | jargon and cross-reference audits | iteration tracking with 2-round max | sign-off gate.
 

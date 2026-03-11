@@ -1,3 +1,8 @@
+---
+description: "Post-submission debrief lifecycle for outcomes, debrief requests, feedback ingestion, and lessons learned"
+argument-hint: "<outcome|request-letter|ingest|lessons> [args] - Subcommand with optional arguments"
+---
+
 # /proposal debrief
 
 Post-submission lifecycle command for Wave 9. Records outcomes, drafts debrief request letters, ingests debrief feedback, and generates lessons learned.
@@ -65,3 +70,9 @@ This command dispatches to `sbir-debrief-analyst` agent, which loads skills from
 **Templates:** `templates/debrief-request/dod-far-15-505.md`, `templates/debrief-request/nasa-debrief.md`
 
 **Skills loaded by agent:** `debrief-domain-knowledge`, `win-loss-analyzer`, `proposal-archive-reader`
+
+## Agent Invocation
+
+@sbir-debrief-analyst
+
+Execute the requested debrief subcommand (outcome, request-letter, ingest, or lessons) with the provided arguments.

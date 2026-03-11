@@ -1,3 +1,8 @@
+---
+description: "Execute portal submission with human-in-the-loop confirmation and immutable archival"
+argument-hint: "[confirm] - Optional subcommand to provide confirmation number after upload"
+---
+
 # /proposal submit
 
 Execute portal submission with human-in-the-loop confirmation capture and immutable archival. The user performs the actual portal upload; this command guides the process and records the result.
@@ -29,7 +34,9 @@ Execute portal submission with human-in-the-loop confirmation capture and immuta
 
 ## Agent Invocation
 
-Dispatch to `sbir-submission-agent` (Wave 8: Phase 4 PREPARE SUBMISSION GUIDE and Phase 5 ARCHIVE AND CONFIRM).
+@sbir-submission-agent
+
+Dispatch to sbir-submission-agent (Wave 8: Phase 4 PREPARE SUBMISSION GUIDE and Phase 5 ARCHIVE AND CONFIRM).
 
 SKILL_LOADING: The submission agent MUST load its skills from `skills/submission-agent/` before beginning work. Skills contain portal-specific packaging rules, naming conventions, size limits, and upload procedures.
 

@@ -1,3 +1,8 @@
+---
+description: "Format the drafted proposal to solicitation specifications and assemble submission-ready volumes"
+argument-hint: "[approve|revise] - Optional subcommand for checkpoint action"
+---
+
 # /proposal format
 
 Format the drafted proposal to solicitation specifications and assemble submission-ready volumes.
@@ -29,11 +34,11 @@ Format the drafted proposal to solicitation specifications and assemble submissi
 9. **Run compliance final check** -- Verify every compliance matrix item is covered or waived
 10. **Present checkpoint** -- Human review of formatted document: approve | revise
 
-## Agent
+## Agent Invocation
 
-Dispatches to `sbir-formatter` (Wave 6: Phase 3 FORMAT and Phase 4 ASSEMBLE).
+@sbir-formatter
 
-The agent loads these skills during execution:
+Dispatch to sbir-formatter agent (Wave 6: Phase 3 FORMAT and Phase 4 ASSEMBLE). The agent loads these skills during execution:
 - `skills/formatter/visual-asset-generator.md` -- figure positioning and cross-reference verification
 - `skills/compliance-sheriff/compliance-domain.md` -- FORMAT requirement extraction and final compliance check
 

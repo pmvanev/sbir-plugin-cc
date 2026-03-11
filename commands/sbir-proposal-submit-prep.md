@@ -1,3 +1,8 @@
+---
+description: "Prepare submission package for portal upload with compliance verification"
+argument-hint: "[approve|revise] - Optional subcommand for checkpoint action"
+---
+
 # /proposal submit prep
 
 Prepare submission package for portal upload. Identifies portal, applies packaging rules, verifies compliance, and stages files for manual submission.
@@ -28,11 +33,11 @@ Prepare submission package for portal upload. Identifies portal, applies packagi
 8. **Write packaging report** -- Document each file with portal slot, naming applied, size, and verification results
 9. **Present human checkpoint** -- Package is ready to submit | fix flagged issues
 
-## Agent
+## Agent Invocation
 
-Dispatches to `sbir-submission-agent` (Wave 8: Phases 1-4).
+@sbir-submission-agent
 
-The agent loads these skills during execution:
+Dispatch to sbir-submission-agent (Wave 8: Phases 1-4). The agent loads these skills during execution:
 - `skills/submission-agent/portal-packaging-rules.md` -- portal identification, naming conventions, size limits, required files, and upload procedures
 
 SKILL_LOADING: The submission agent MUST load its skills from `skills/submission-agent/` before beginning work. Skills contain portal-specific packaging rules without which generic packaging causes portal rejections.

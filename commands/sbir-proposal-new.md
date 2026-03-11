@@ -1,3 +1,8 @@
+---
+description: "Start a new SBIR/STTR proposal from a solicitation document"
+argument-hint: "<solicitation-file-path> - Path to solicitation PDF or text file"
+---
+
 # /proposal new
 
 Start a new proposal from a solicitation document.
@@ -54,3 +59,9 @@ This command invokes `ProposalCreationService.create_proposal()` (driving port) 
 - `StateWriter.save()` (driven port) to persist initial proposal state
 
 The Go/No-Go decision is recorded via `ProposalCreationService.record_decision()`.
+
+## Agent Invocation
+
+@sbir-orchestrator
+
+Parse the solicitation document, score fit, and present the Go/No-Go checkpoint for human decision.

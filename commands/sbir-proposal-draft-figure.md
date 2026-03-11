@@ -1,3 +1,8 @@
+---
+description: "Generate a specific figure by name from the figure specification with human review"
+argument-hint: "<figure-name> - Name of the figure from the figure plan"
+---
+
 # /proposal draft figure [name]
 
 Generate a specific figure by name from the figure specification, with human review loop.
@@ -80,3 +85,9 @@ Domain models (`visual_asset.py`):
 - `ExternalBrief` -- Brief for non-generatable figures with `content_description`, `dimensions`, `resolution`
 
 The formatter agent loads `skills/formatter/visual-asset-generator.md` for generation methodology.
+
+## Agent Invocation
+
+@sbir-formatter
+
+Generate the named figure using the specified method from figure specs, and present for human review.

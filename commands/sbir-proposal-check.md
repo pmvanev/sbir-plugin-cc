@@ -1,3 +1,8 @@
+---
+description: "Display compliance matrix coverage status with breakdown by category"
+argument-hint: "- No arguments required"
+---
+
 # /proposal check
 
 Display compliance matrix coverage status with breakdown by category.
@@ -41,3 +46,9 @@ Verify the compliance matrix file format is valid markdown with the expected tab
 ## Implementation
 
 This command invokes `ComplianceCheckService.check()` (driving port) which reads the compliance matrix domain model and produces a `ComplianceCheckResult` with coverage counts and summary.
+
+## Agent Invocation
+
+@sbir-compliance-sheriff
+
+Load the compliance matrix and present coverage breakdown with actionable guidance for missing or partial items.

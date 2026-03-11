@@ -1,3 +1,8 @@
+---
+description: "Generate strategy brief and manage Wave 1 strategy checkpoint"
+argument-hint: "[approve|revise|skip] - Optional subcommand for checkpoint action"
+---
+
 # /proposal wave strategy
 
 Generate strategy brief and manage Wave 1 strategy checkpoint.
@@ -46,3 +51,9 @@ This command invokes `StrategyService` (driving port):
 - `generate_brief()` -- Builds brief from compliance matrix and optional TPOC data
 - `approve_brief()` -- Records approval and unlocks Wave 2
 - `revise_brief()` -- Regenerates brief with user feedback
+
+## Agent Invocation
+
+@sbir-strategist
+
+Generate or update the strategy brief from compliance matrix and TPOC data, and manage the strategy checkpoint.

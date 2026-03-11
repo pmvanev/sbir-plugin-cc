@@ -1,3 +1,8 @@
+---
+description: "Display current proposal status, progress, and suggested next actions"
+argument-hint: "- No arguments required"
+---
+
 # /proposal status
 
 Display current proposal status, progress, and suggested next actions.
@@ -41,3 +46,9 @@ Start with /proposal new
 ## Implementation
 
 This command invokes `StatusService.get_status()` (driving port) which reads proposal state via `StateReader` (driven port) and produces a `StatusReport` domain model.
+
+## Agent Invocation
+
+@sbir-orchestrator
+
+Read proposal state and present current status, progress, deadline countdown, and suggested next action.

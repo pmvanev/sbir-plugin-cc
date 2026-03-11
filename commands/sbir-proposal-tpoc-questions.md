@@ -1,3 +1,8 @@
+---
+description: "Generate prioritized TPOC questions from solicitation ambiguities and strategic probes"
+argument-hint: "- No arguments required"
+---
+
 # /proposal tpoc questions
 
 Generate prioritized TPOC questions from solicitation ambiguities and strategic probes.
@@ -32,3 +37,9 @@ If the TPOC call does not happen, the pending state does not block proposal prog
 ## Implementation
 
 This command invokes `TpocService.generate_questions()` (driving port) which reads the `ComplianceMatrix` and produces a `TpocQuestionSet` domain model. The `MarkdownTpocAdapter` renders questions to an editable markdown file.
+
+## Agent Invocation
+
+@sbir-tpoc-analyst
+
+Generate prioritized TPOC questions from compliance matrix ambiguities and strategic probes, and write to editable markdown.

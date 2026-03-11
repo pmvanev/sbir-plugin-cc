@@ -1,3 +1,8 @@
+---
+description: "Manually add a missed compliance item to the compliance matrix"
+argument-hint: "<requirement-text> - Quoted text of the compliance requirement to add"
+---
+
 # /proposal compliance add
 
 Manually add a missed compliance item to the compliance matrix.
@@ -34,3 +39,9 @@ Generate one first with the strategy wave command
 ## Implementation
 
 This command invokes `ComplianceService.add_item()` (driving port) which adds a `ComplianceItem` with `RequirementType.MANUAL` to an existing `ComplianceMatrix`. The `MarkdownComplianceAdapter` persists the updated matrix.
+
+## Agent Invocation
+
+@sbir-compliance-sheriff
+
+Add the user-provided requirement text as a manual compliance item and update the matrix.

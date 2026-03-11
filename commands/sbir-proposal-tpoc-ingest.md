@@ -1,3 +1,8 @@
+---
+description: "Ingest TPOC call notes and match answers to original questions with delta analysis"
+argument-hint: "<notes-file-path> - Path to TPOC call notes file"
+---
+
 # /proposal tpoc ingest
 
 Ingest TPOC call notes, match answers to original questions, and generate delta analysis.
@@ -38,3 +43,9 @@ If the call was short and not all questions were covered, the ingestion handles 
 ## Implementation
 
 This command invokes `TpocIngestionService.ingest_notes()` (driving port) which parses structured notes, matches answers to the `TpocQuestionSet`, builds a `DeltaAnalysis` comparing answers to `ComplianceMatrix` requirements, and generates compliance update notes.
+
+## Agent Invocation
+
+@sbir-tpoc-analyst
+
+Parse the TPOC call notes, match answers to questions, generate delta analysis, and update compliance matrix.

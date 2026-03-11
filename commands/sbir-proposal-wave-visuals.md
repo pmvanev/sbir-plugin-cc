@@ -1,3 +1,8 @@
+---
+description: "Initialize Wave 5 visual assets with figure specifications and tool detection"
+argument-hint: "- No arguments required"
+---
+
 # /proposal wave visuals
 
 Initialize Wave 5 (Visual Assets). Reads the figure plan from the outline, checks tool availability, writes figure specifications, and presents a human checkpoint for approval.
@@ -38,11 +43,11 @@ Initialize Wave 5 (Visual Assets). Reads the figure plan from the outline, check
 - `.sbir/compliance-matrix.md` -- FORMAT items and cross-reference targets
 - `skills/formatter/visual-asset-generator.md` -- Loaded by agent for methodology
 
-## Agent
+## Agent Invocation
 
-Dispatches to **sbir-formatter** agent (Phase 1: FIGURE PLAN).
+@sbir-formatter
 
-The agent loads the `visual-asset-generator` skill for figure type selection, generation method routing, and specification format.
+Dispatch to sbir-formatter agent (Phase 1: FIGURE PLAN). The agent loads the `visual-asset-generator` skill for figure type selection, generation method routing, and specification format.
 
 ## Examples
 
