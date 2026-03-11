@@ -398,3 +398,12 @@
 {"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"29b4ea7a-992f-4842-a915-e0b1df40ac83","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-11T18:25:04.001593+00:00"}
 {"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"29b4ea7a-992f-4842-a915-e0b1df40ac83","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-11T18:25:04.018704+00:00"}
 {"decision":"allow","duration_ms":18.3406,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"29b4ea7a-992f-4842-a915-e0b1df40ac83","timestamp":"2026-03-11T18:25:04.019328+00:00"}
+{"event":"HOOK_INVOKED","handler":"pre_tool_use","hook_id":"f0d11f35-5b90-45da-955a-154fbf3d4304","input_summary":{"subagent_type":"Explore"},"timestamp":"2026-03-11T20:18:55.590970+00:00"}
+{"context":"non_des_task","event":"HOOK_PRE_TOOL_USE_ALLOWED","hook_id":"f0d11f35-5b90-45da-955a-154fbf3d4304","timestamp":"2026-03-11T20:18:55.607125+00:00"}
+{"decision":"allow","duration_ms":29.7958,"event":"HOOK_COMPLETED","exit_code":0,"handler":"pre_tool_use","hook_id":"f0d11f35-5b90-45da-955a-154fbf3d4304","timestamp":"2026-03-11T20:18:55.608067+00:00"}
+{"event":"HOOK_INVOKED","handler":"subagent_stop","hook_id":"fbe240c5-5324-423a-bace-0adeb606965f","input_summary":{"agent_id":"a13e4ba725a27e4e8","agent_type":"Explore","has_transcript":true},"timestamp":"2026-03-11T20:22:52.816906+00:00"}
+{"error":"'charmap' codec can't decode byte 0x81 in position 1079: character maps to <undefined>","error_type":"UnicodeDecodeError","event":"HOOK_ERROR","handler":"subagent_stop","stderr_capture":"","timestamp":"2026-03-11T20:22:52.818629+00:00"}
+{"decision":"error","duration_ms":14.7404,"event":"HOOK_COMPLETED","exit_code":1,"handler":"subagent_stop","hook_id":"fbe240c5-5324-423a-bace-0adeb606965f","timestamp":"2026-03-11T20:22:52.819246+00:00"}
+{"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"ee973b3d-fefa-4384-a2bf-a32837c2f71d","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-11T20:22:53.399126+00:00"}
+{"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"ee973b3d-fefa-4384-a2bf-a32837c2f71d","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-11T20:22:53.416861+00:00"}
+{"decision":"allow","duration_ms":19.0476,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"ee973b3d-fefa-4384-a2bf-a32837c2f71d","timestamp":"2026-03-11T20:22:53.417531+00:00"}

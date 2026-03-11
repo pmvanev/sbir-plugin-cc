@@ -60,12 +60,38 @@ sbir-plugin-cc/
 
 - **Strategy**: per-feature
 - **Scope**: `scripts/pes/` (Python PES code only)
-- **Tool**: mutmut (configured in `pyproject.toml`)
+- **Tool**: mutmut 2.4.x (configured in `pyproject.toml`)
 - **When**: After each feature delivery, scoped to modified Python files
 - **Kill rate gate**: >= 80%
 - **Rationale**: Under 50k LOC project with per-feature delivery cadence. PES enforces proposal invariants -- mutation testing validates that enforcement logic is meaningfully tested, not just covered.
-- **Run command**: `mutmut run --paths-to-mutate scripts/pes/`
-- **Results**: `mutmut results`
+
+### Running mutmut (Windows / Git Bash)
+
+mutmut does not run natively on Windows (`please use WSL` error). Use Docker instead.
+mutmut 3.x has a bug traversing `/proc` in Docker containers — use **2.4.x only**.
+
+**Single file (recommended for per-feature scoping):**
+```bash
+MSYS_NO_PATHCONV=1 docker run --rm \
+  -v "C:/Users/PhilVanEvery/Git/github/pmvanev/sbir-plugin-cc:/app" \
+  -w /app python:3.12-slim sh -c "
+pip install -q 'mutmut>=2.4,<2.5' pytest pytest-bdd jsonschema 2>/dev/null
+rm -f .mutmut-cache
+export PYTHONPATH=scripts
+python -m mutmut run \
+  --paths-to-mutate scripts/pes/domain/TARGET_FILE.py \
+  --tests-dir tests/ \
+  --runner 'python -m pytest tests/ -x -q' \
+  --no-progress
+python -m mutmut results
+"
+```
+
+**Key details:**
+- `MSYS_NO_PATHCONV=1` prevents Git Bash from mangling `/app` paths
+- `PYTHONPATH=scripts` must be set as an **env var before mutmut**, not inside `--runner` (mutmut 2.x passes runner to `subprocess.Popen` which doesn't parse shell env vars)
+- Scope to individual files for faster feedback; full `scripts/pes/` runs are slow in Docker
+- Results are stored in `.mutmut-cache` inside the container (ephemeral with `--rm`)
 
 ## CI/CD
 
