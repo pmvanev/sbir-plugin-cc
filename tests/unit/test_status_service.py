@@ -1,6 +1,6 @@
 """Unit tests for proposal status through StatusService (driving port).
 
-Test Budget: 8 behaviors x 2 = 16 unit tests max.
+Test Budget: 11 behaviors x 2 = 22 unit tests max.
 Tests enter through driving port (StatusService).
 StateReader driven port replaced with in-memory fake.
 Domain objects (StatusReport, WaveDetail, AsyncEvent) are real collaborators.
@@ -20,6 +20,7 @@ from pes.ports.state_port import StateReader
 # ---------------------------------------------------------------------------
 # Fake driven port
 # ---------------------------------------------------------------------------
+
 
 class InMemoryStateReader(StateReader):
     """Returns pre-configured state dict."""
@@ -183,12 +184,15 @@ class TestNextAction:
 
 
 class TestDeadlineWarning:
-    @pytest.mark.parametrize("days,should_warn", [
-        (4, True),
-        (5, True),
-        (6, False),
-        (18, False),
-    ])
+    @pytest.mark.parametrize(
+        "days,should_warn",
+        [
+            (4, True),
+            (5, True),
+            (6, False),
+            (18, False),
+        ],
+    )
     def test_deadline_warning_at_threshold(self, days, should_warn):
         state = _make_state(deadline_days=days)
         service = _make_service(state)
@@ -222,18 +226,21 @@ class TestNoProposal:
 
 
 class TestAllWaveNames:
-    @pytest.mark.parametrize("wave_num,expected_name", [
-        (0, "Wave 0: Intelligence & Fit"),
-        (1, "Wave 1: Requirements & Strategy"),
-        (2, "Wave 2: Research"),
-        (3, "Wave 3: Discrimination & Outline"),
-        (4, "Wave 4: Drafting"),
-        (5, "Wave 5: Visual Assets"),
-        (6, "Wave 6: Formatting & Assembly"),
-        (7, "Wave 7: Final Review"),
-        (8, "Wave 8: Submission"),
-        (9, "Wave 9: Debrief & Learning"),
-    ])
+    @pytest.mark.parametrize(
+        "wave_num,expected_name",
+        [
+            (0, "Wave 0: Intelligence & Fit"),
+            (1, "Wave 1: Requirements & Strategy"),
+            (2, "Wave 2: Research"),
+            (3, "Wave 3: Discrimination & Outline"),
+            (4, "Wave 4: Drafting"),
+            (5, "Wave 5: Visual Assets"),
+            (6, "Wave 6: Formatting & Assembly"),
+            (7, "Wave 7: Final Review"),
+            (8, "Wave 8: Submission"),
+            (9, "Wave 9: Debrief & Learning"),
+        ],
+    )
     def test_wave_name_matches_spec(self, wave_num, expected_name):
         state = _make_state(wave=wave_num)
         service = _make_service(state)
@@ -276,3 +283,83 @@ class TestMissingWaveEntries:
 
         assert "0/" in report.progress
         assert report.error is None
+
+
+# ---------------------------------------------------------------------------
+# Behavior 9: Wave 5-9 progress with completion percentages
+# ---------------------------------------------------------------------------
+
+
+class TestWaveCompletionPercentages:
+    def test_wave_details_include_completion_percentage(self):
+        """Each wave detail includes a completion_pct field."""
+        state = _make_state(wave=6)
+        # Add sub-task progress for wave 6
+        state["waves"]["5"]["tasks_total"] = 4
+        state["waves"]["5"]["tasks_completed"] = 4
+        state["waves"]["6"]["tasks_total"] = 3
+        state["waves"]["6"]["tasks_completed"] = 1
+        service = _make_service(state)
+
+        report = service.get_status()
+
+        wave_6 = next(w for w in report.waves if w.wave_number == 6)
+        assert wave_6.completion_pct == pytest.approx(33.3, abs=1)
+        wave_5 = next(w for w in report.waves if w.wave_number == 5)
+        assert wave_5.completion_pct == 100.0
+
+    def test_completed_wave_shows_100_percent(self):
+        """Completed waves always show 100% regardless of task data."""
+        state = _make_state(wave=7)
+        service = _make_service(state)
+
+        report = service.get_status()
+
+        wave_5 = next(w for w in report.waves if w.wave_number == 5)
+        assert wave_5.completion_pct == 100.0
+
+    def test_not_started_wave_shows_zero_percent(self):
+        """Waves with no task data and not completed show 0%."""
+        state = _make_state(wave=5)
+        state["waves"]["6"] = {"status": "not_started", "completed_at": None}
+        service = _make_service(state)
+
+        report = service.get_status()
+
+        wave_6 = next(w for w in report.waves if w.wave_number == 6)
+        assert wave_6.completion_pct == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Behavior 10: Submitted proposal shows confirmation and read-only status
+# ---------------------------------------------------------------------------
+
+
+class TestSubmissionDetails:
+    def test_submitted_proposal_shows_confirmation_and_archive(self):
+        """Submitted proposals include confirmation number and archive path."""
+        state = _make_state(wave=8)
+        state["submission"] = {
+            "status": "submitted",
+            "confirmation_number": "DSIP-2026-AF243-001-7842",
+            "archive_path": "./artifacts/wave-8-submission/archive/",
+            "submitted_at": "2026-04-07T14:23:17Z",
+            "immutable": True,
+        }
+        service = _make_service(state)
+
+        report = service.get_status()
+
+        assert report.submission is not None
+        assert report.submission.confirmation_number == "DSIP-2026-AF243-001-7842"
+        assert report.submission.archive_path == "./artifacts/wave-8-submission/archive/"
+        assert report.submission.read_only is True
+
+    def test_non_submitted_proposal_has_no_submission_details(self):
+        """Non-submitted proposals have no submission section."""
+        state = _make_state(wave=5)
+        service = _make_service(state)
+
+        report = service.get_status()
+
+        assert report.submission is None

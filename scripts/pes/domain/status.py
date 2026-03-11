@@ -13,6 +13,7 @@ class WaveDetail:
     name: str
     status: str
     detail: str | None = None
+    completion_pct: float = 0.0
 
 
 @dataclass
@@ -23,6 +24,15 @@ class AsyncEvent:
     status: str
     description: str
     days_since: int | None = None
+
+
+@dataclass
+class SubmissionDetail:
+    """Submission status for a submitted proposal."""
+
+    confirmation_number: str
+    archive_path: str
+    read_only: bool
 
 
 @dataclass
@@ -38,3 +48,4 @@ class StatusReport:
     warnings: list[str] = field(default_factory=list)
     error: str | None = None
     suggestion: str | None = None
+    submission: SubmissionDetail | None = None

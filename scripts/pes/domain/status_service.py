@@ -10,7 +10,7 @@ from datetime import date, datetime
 from typing import Any
 
 from pes.domain.state import StateNotFoundError
-from pes.domain.status import AsyncEvent, StatusReport, WaveDetail
+from pes.domain.status import AsyncEvent, StatusReport, SubmissionDetail, WaveDetail
 from pes.ports.state_port import StateReader
 
 WAVE_NAMES: dict[int, str] = {
@@ -50,7 +50,7 @@ class StatusService:
                 deadline_countdown="",
                 next_action="",
                 error="No active proposal found",
-                suggestion='Start with /proposal new',
+                suggestion="Start with /proposal new",
             )
 
         current_wave_num = state.get("current_wave", 0)
@@ -61,6 +61,7 @@ class StatusService:
         async_events = self._build_async_events(state)
         warnings = self._build_warnings(state)
         next_action = self._suggest_next_action(state, async_events)
+        submission = self._build_submission_detail(state)
 
         return StatusReport(
             current_wave=current_wave,
@@ -70,6 +71,7 @@ class StatusService:
             waves=waves,
             async_events=async_events,
             warnings=warnings,
+            submission=submission,
         )
 
     def _compute_deadline_countdown(self, state: dict[str, Any]) -> str:
@@ -89,26 +91,36 @@ class StatusService:
             name = WAVE_NAMES.get(wave_num, f"Wave {wave_num}")
             status = wave_info.get("status", "not_started")
             detail = self._wave_detail_text(state, wave_num, status)
-            details.append(WaveDetail(
-                wave_number=wave_num,
-                name=name,
-                status=status,
-                detail=detail,
-            ))
+            completion_pct = self._compute_wave_completion_pct(wave_info, status)
+            details.append(
+                WaveDetail(
+                    wave_number=wave_num,
+                    name=name,
+                    status=status,
+                    detail=detail,
+                    completion_pct=completion_pct,
+                )
+            )
         return details
 
-    def _wave_detail_text(
-        self, state: dict[str, Any], wave_num: int, status: str
-    ) -> str | None:
+    def _compute_wave_completion_pct(self, wave_info: dict[str, Any], status: str) -> float:
+        """Compute completion percentage for a wave."""
+        if status == "completed":
+            return 100.0
+        tasks_total = wave_info.get("tasks_total", 0)
+        tasks_completed = wave_info.get("tasks_completed", 0)
+        if tasks_total > 0:
+            return round(tasks_completed / tasks_total * 100, 1)
+        return 0.0
+
+    def _wave_detail_text(self, state: dict[str, Any], wave_num: int, status: str) -> str | None:
         if wave_num == 0 and status == "completed":
             go_no_go = state.get("go_no_go", "pending")
             display = "approved" if go_no_go == "go" else go_no_go
             return f"Go: {display}"
         return None
 
-    def _compute_progress(
-        self, state: dict[str, Any], waves: list[WaveDetail]
-    ) -> str:
+    def _compute_progress(self, state: dict[str, Any], waves: list[WaveDetail]) -> str:
         completed = sum(1 for w in waves if w.status == "completed")
         total = len(waves)
         current = state.get("current_wave", 0)
@@ -128,12 +140,14 @@ class StatusService:
                     days_since = (datetime.now() - generated_at).days
                 except ValueError:
                     pass
-            events.append(AsyncEvent(
-                name="TPOC",
-                status="pending",
-                description="TPOC questions generated -- PENDING CALL",
-                days_since=days_since,
-            ))
+            events.append(
+                AsyncEvent(
+                    name="TPOC",
+                    status="pending",
+                    description="TPOC questions generated -- PENDING CALL",
+                    days_since=days_since,
+                )
+            )
         return events
 
     def _build_warnings(self, state: dict[str, Any]) -> list[str]:
@@ -144,16 +158,12 @@ class StatusService:
                 deadline = date.fromisoformat(deadline_str)
                 days_remaining = (deadline - date.today()).days
                 if days_remaining <= CRITICAL_THRESHOLD_DAYS:
-                    warnings.append(
-                        f"{days_remaining} days remaining -- critical threshold"
-                    )
+                    warnings.append(f"{days_remaining} days remaining -- critical threshold")
             except ValueError:
                 pass
         return warnings
 
-    def _suggest_next_action(
-        self, state: dict[str, Any], async_events: list[AsyncEvent]
-    ) -> str:
+    def _suggest_next_action(self, state: dict[str, Any], async_events: list[AsyncEvent]) -> str:
         days_remaining = self._days_to_deadline(state)
         if days_remaining is not None and days_remaining <= CRITICAL_THRESHOLD_DAYS:
             return "Prioritize highest-impact incomplete work before deadline"
@@ -173,6 +183,17 @@ class StatusService:
             return "Start strategy brief with /proposal strategy"
 
         return f"Continue work on {WAVE_NAMES.get(current_wave, f'Wave {current_wave}')}"
+
+    def _build_submission_detail(self, state: dict[str, Any]) -> SubmissionDetail | None:
+        """Build submission details if proposal has been submitted."""
+        submission = state.get("submission", {})
+        if submission.get("status") != "submitted":
+            return None
+        return SubmissionDetail(
+            confirmation_number=submission.get("confirmation_number", ""),
+            archive_path=submission.get("archive_path", ""),
+            read_only=submission.get("immutable", False),
+        )
 
     def _days_to_deadline(self, state: dict[str, Any]) -> int | None:
         deadline_str = state.get("topic", {}).get("deadline", "")
