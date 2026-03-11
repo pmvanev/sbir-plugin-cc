@@ -9,7 +9,6 @@ Feature: Submission Preparation and Portal-Specific Packaging (US-013)
 
   # --- Happy Path ---
 
-  @skip
   Scenario: Identify submission portal and apply packaging rules
     Given AF243-001 is an Air Force topic
     When Phil prepares the submission package
@@ -41,7 +40,6 @@ Feature: Submission Preparation and Portal-Specific Packaging (US-013)
 
   # --- Error Paths ---
 
-  @skip
   Scenario: Missing attachment blocks submission
     Given the Firm Certification file is missing
     When the tool runs pre-submission verification

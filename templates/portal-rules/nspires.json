@@ -1,0 +1,18 @@
+{
+    "portal_id": "NSPIRES",
+    "agency_patterns": ["NASA"],
+    "naming_convention": "{category}_{proposal_id}.pdf",
+    "max_file_size_mb": 150.0,
+    "required_files": [
+        "technical_volume",
+        "budget_summary",
+        "current_pending_support",
+        "briefing_chart"
+    ],
+    "guidance": {
+        "technical_volume": "Technical Proposal. Assemble from Wave 6 formatted output per NASA SBIR solicitation.",
+        "budget_summary": "Budget Summary uses the NSPIRES budget template available in the solicitation appendices.",
+        "current_pending_support": "Current and Pending Support form -- list all active and pending proposals.",
+        "briefing_chart": "Briefing Chart (1 slide, quad-chart format) summarizing the proposed innovation."
+    }
+}

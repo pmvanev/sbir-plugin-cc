@@ -1,0 +1,18 @@
+{
+    "portal_id": "DSIP",
+    "agency_patterns": ["Air Force", "Army", "Navy", "DARPA", "DLA", "MDA", "SOCOM", "CBD", "DTRA"],
+    "naming_convention": "{category}_{proposal_id}.pdf",
+    "max_file_size_mb": 50.0,
+    "required_files": [
+        "technical_volume",
+        "cost_volume",
+        "firm_certification",
+        "fraud_waste_abuse"
+    ],
+    "guidance": {
+        "technical_volume": "Technical Volume is the main proposal document. Assemble from Wave 6 formatted output.",
+        "cost_volume": "Cost Volume uses the DoD SBIR/STTR Cost Volume template from DSIP portal.",
+        "firm_certification": "Download Firm Certification from DSIP portal (https://www.dodsbirsttr.mil) under 'Forms & Templates'.",
+        "fraud_waste_abuse": "Download Fraud, Waste, and Abuse Training certification from DSIP portal."
+    }
+}

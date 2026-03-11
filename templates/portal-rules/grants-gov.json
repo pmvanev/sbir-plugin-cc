@@ -1,0 +1,18 @@
+{
+    "portal_id": "Grants.gov",
+    "agency_patterns": ["NSF", "DOE", "NIH", "USDA", "EPA", "DOT", "DHS"],
+    "naming_convention": "{category}_{proposal_id}.pdf",
+    "max_file_size_mb": 100.0,
+    "required_files": [
+        "technical_volume",
+        "budget_justification",
+        "project_summary",
+        "facilities_equipment"
+    ],
+    "guidance": {
+        "technical_volume": "Technical Volume (Project Description). Assemble from Wave 6 formatted output.",
+        "budget_justification": "Budget Justification uses SF-424A or agency-specific budget template.",
+        "project_summary": "Project Summary/Abstract (max 1 page) required for Grants.gov submission.",
+        "facilities_equipment": "Facilities and Equipment description required per agency solicitation."
+    }
+}

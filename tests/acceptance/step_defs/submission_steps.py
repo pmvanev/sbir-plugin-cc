@@ -6,14 +6,24 @@ Does NOT import internal portal rule loaders or archive creators directly.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pes.domain.rules import Decision
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 
 # Link to feature file
 scenarios("../features/submission.feature")
+
+
+# --- Fixtures ---
+
+
+@pytest.fixture()
+def submission_context() -> dict[str, Any]:
+    """Shared context for submission scenario steps."""
+    return {}
 
 
 # --- Given steps ---
@@ -76,9 +86,9 @@ def checks_pass_and_confirmed():
 
 
 @given("the Firm Certification file is missing")
-def missing_certification():
-    """Firm Certification file is not in the package."""
-    pass
+def missing_certification(submission_context):
+    """Firm Certification file is not in the package -- exclude from package files."""
+    submission_context["exclude_file"] = "Firm_Certification"
 
 
 @given("Phil has not completed the final review sign-off")
@@ -117,16 +127,83 @@ def submitted_proposal_for_submission(sample_state, write_state):
 # --- When steps ---
 
 
-@when("Phil prepares the submission package")
-def prepare_submission():
+@when("Phil prepares the submission package", target_fixture="package_result")
+def prepare_submission(active_state, submission_context):
     """Prepare submission through SubmissionService."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    from pes.domain.submission import PackageFile
+    from pes.domain.submission_service import SubmissionService
+
+    # Build a fake portal rules loader with DSIP rules
+    from tests.acceptance.step_defs._fake_portal_rules import FakePortalRulesLoader
+
+    loader = FakePortalRulesLoader()
+
+    # Build package files -- all required files present for happy path
+    all_files = [
+        PackageFile(
+            original_name="Technical_Volume.pdf",
+            category="technical_volume",
+            size_bytes=2_000_000,
+        ),
+        PackageFile(
+            original_name="Cost_Volume.pdf",
+            category="cost_volume",
+            size_bytes=500_000,
+        ),
+        PackageFile(
+            original_name="Firm_Certification.pdf",
+            category="firm_certification",
+            size_bytes=100_000,
+        ),
+    ]
+
+    # Remove excluded file if specified
+    exclude = submission_context.get("exclude_file")
+    if exclude:
+        all_files = [f for f in all_files if exclude not in f.original_name]
+
+    service = SubmissionService(portal_rules_loader=loader)
+    agency = active_state["topic"]["agency"]
+    result = service.prepare_package(agency=agency, files=all_files)
+    return result
 
 
-@when("the tool runs pre-submission verification")
-def run_verification():
+@when("the tool runs pre-submission verification", target_fixture="package_result")
+def run_verification(active_state, submission_context):
     """Run pre-submission verification through SubmissionService."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    from pes.domain.submission import PackageFile
+    from pes.domain.submission_service import SubmissionService
+    from tests.acceptance.step_defs._fake_portal_rules import FakePortalRulesLoader
+
+    loader = FakePortalRulesLoader()
+
+    # Build all required files
+    all_files = [
+        PackageFile(
+            original_name="Technical_Volume.pdf",
+            category="technical_volume",
+            size_bytes=2_000_000,
+        ),
+        PackageFile(
+            original_name="Cost_Volume.pdf",
+            category="cost_volume",
+            size_bytes=500_000,
+        ),
+        PackageFile(
+            original_name="Firm_Certification.pdf",
+            category="firm_certification",
+            size_bytes=100_000,
+        ),
+    ]
+
+    # Remove excluded file if specified
+    exclude = submission_context.get("exclude_file")
+    if exclude:
+        all_files = [f for f in all_files if exclude not in f.original_name]
+
+    service = SubmissionService(portal_rules_loader=loader)
+    agency = active_state["topic"]["agency"]
+    return service.prepare_package(agency=agency, files=all_files)
 
 
 @when("the tool presents the submission confirmation")
@@ -159,21 +236,26 @@ def attempt_edit_submitted():
 
 
 @then("the tool identifies DSIP as the submission portal")
-def verify_dsip_identified():
+def verify_dsip_identified(package_result):
     """Verify DSIP portal identified."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    assert package_result.portal_id == "DSIP"
 
 
 @then("applies DSIP file naming conventions to all package files")
-def verify_naming_applied():
+def verify_naming_applied(package_result):
     """Verify DSIP naming conventions applied."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    for pf in package_result.packaged_files:
+        # DSIP naming convention uses underscores and uppercase prefix
+        assert pf.portal_name is not None
+        assert len(pf.portal_name) > 0
 
 
 @then("verifies file sizes against portal limits")
-def verify_file_sizes():
+def verify_file_sizes(package_result):
     """Verify file size checks."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    assert package_result.size_checks_passed is not None
+    # All files should pass size checks for the happy path
+    assert package_result.size_checks_passed is True
 
 
 @then("it reports all checks passing")
@@ -219,15 +301,18 @@ def verify_readonly_enforced():
 
 
 @then("it reports the missing file and blocks submission")
-def verify_missing_blocks():
+def verify_missing_blocks(package_result):
     """Verify missing file blocks submission."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    assert package_result.blocked is True
+    assert any("firm_certification" in m.lower() or "firm certification" in m.lower()
+               for m in package_result.missing_files)
 
 
 @then("suggests where to obtain the required form")
-def verify_form_guidance():
+def verify_form_guidance(package_result):
     """Verify guidance for obtaining missing form."""
-    pytest.skip("Awaiting SubmissionService implementation")
+    assert package_result.guidance is not None
+    assert len(package_result.guidance) > 0
 
 
 @then("the enforcement system blocks the modification")
