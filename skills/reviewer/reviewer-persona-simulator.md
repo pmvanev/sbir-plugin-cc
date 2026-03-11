@@ -1,6 +1,6 @@
 ---
 name: reviewer-persona-simulator
-description: Government technical evaluator simulation methodology -- scoring rubrics, persona construction, red team review, and debrief-informed weakness detection for SBIR/STTR proposals
+description: Government technical evaluator simulation methodology -- scoring rubrics, persona construction, red team review, debrief cross-check, iteration loop with sign-off gate, and PES domain model integration for SBIR/STTR proposals
 ---
 
 # Reviewer Persona Simulator
@@ -124,17 +124,33 @@ Red team methodology:
 
 Red team output: 3-5 strongest objections, ranked by severity, each with:
 - The objection (stated as the skeptical reviewer would phrase it)
+- The proposal section and page where the weakness appears
+- Severity: HIGH (would cause Unacceptable/fail), MEDIUM (would cause Marginal/point deduction), LOW (reduces polish)
 - Evidence from the proposal supporting the objection
 - Suggested mitigation (what would address this concern)
 
-## Debrief Weakness Checking
+### Red Team Finding Format
+```
+- **Objection**: {skeptical reviewer phrasing}
+- **Section**: {proposal volume/section}
+- **Page**: {page number}
+- **Severity**: {HIGH | MEDIUM | LOW}
+- **Evidence**: {quote or reference from proposal}
+- **Mitigation**: {specific action to address}
+```
 
-Cross-reference proposal sections against the known weakness profile from win-loss analysis:
+## Debrief Cross-Check
+
+Cross-reference proposal sections against the known weakness profile from win-loss analysis. This step uses the DebriefCorpus port -- when no corpus is configured or no debriefs exist, the check returns gracefully with a note that it improves as debriefs are ingested.
 
 1. Load weakness profile from corpus (via win-loss-analyzer skill output)
 2. For each weakness pattern with frequency >= 2: check whether current proposal exhibits the same pattern
 3. Flag matches with: weakness category, historical frequency, agencies that raised it, and the specific proposal text triggering the match
 4. Check for agency-specific patterns if the target agency appears in historical data
+5. Each entry records: the weakness, whether the current proposal has addressed it, and the source debrief reference
+
+### No Corpus Available
+When no past debrief data exists, report: "No past debrief data available. This check improves as debriefs are ingested." This is expected for first-time users -- do not treat it as an error.
 
 ## Clarity and Jargon Analysis
 
@@ -170,6 +186,46 @@ Severity definitions:
 
 ## Iteration Protocol
 
+Maximum review iterations: **2** (enforced by `MAX_REVIEW_ITERATIONS` in PES).
+
 Wave 4 (section-level): Review -> findings to writer -> writer revises -> re-review. Maximum 2 review cycles per section. If issues persist after 2 cycles, escalate to human checkpoint.
 
 Wave 7 (full proposal): Full review -> findings to orchestrator -> team addresses -> re-review. Maximum 2 full review cycles. After 2 cycles, present remaining issues at human checkpoint for sign-off decision.
+
+### Re-Review Resolution Tracking
+
+Each re-review compares current red team findings against prior findings:
+- **Resolved**: findings from the prior round that no longer appear in the current red team run
+- **Remaining**: findings from the prior round that still appear
+- Track the review round number (1-based)
+
+This produces a clear delta showing what was fixed and what persists across iterations.
+
+### Forced Sign-Off Gate
+
+When `review_round > MAX_REVIEW_ITERATIONS` (i.e., round 3+), the system stops iterating and returns a forced sign-off result:
+- Sign-off is required regardless of remaining issues
+- All unresolved findings carry forward as acknowledged risks
+- Message: "Sign-off required after 2 review iterations"
+
+The human must then decide: sign off with unresolved issues documented, or take manual corrective action outside the system.
+
+## Sign-Off Protocol
+
+Sign-off records the human's final approval of the review:
+- `signed_off`: boolean confirmation
+- `timestamp`: ISO timestamp of sign-off
+- `unresolved_issues`: list of RedTeamFindings the human accepts as risks
+- `artifact_written`: confirmation that the sign-off artifact was persisted
+
+Sign-off is the terminal gate of the final review flow. No proposal proceeds to submission without a sign-off record.
+
+## Architecture Integration
+
+PES Python code handles the domain logic. The agent orchestrates by invoking services and reading/writing artifacts:
+
+- `FinalReviewService` -- driving port orchestrating the full review flow
+- `ReviewSimulator` (protocol) -- driven port with `simulate_reviewer(proposal_id)` and `run_red_team(proposal_id)`
+- `DebriefCorpus` (protocol) -- driven port with `get_debrief_weaknesses(proposal_id)`
+- `MAX_REVIEW_ITERATIONS = 2` -- hard limit on review cycles before forced sign-off
+- Domain models: `CriterionScore` (criterion, score, rationale) | `ReviewerScorecard` (scores list, artifact_written) | `RedTeamFinding` (objection, severity, section, page) | `RedTeamResult` (findings list, artifact_written) | `DebriefCrossCheckEntry` (weakness, addressed, source_debrief) | `DebriefCrossCheckResult` (entries, message, improvement_note) | `SignOffRecord` (signed_off, timestamp, unresolved_issues, artifact_written) | `ReReviewResult` (resolved_issues, remaining_issues, review_round) | `ForcedSignOffResult` (sign_off_required, review_round, unresolved_issues, message)

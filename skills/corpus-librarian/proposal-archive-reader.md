@@ -1,9 +1,86 @@
 ---
 name: proposal-archive-reader
-description: Domain knowledge for ingesting and retrieving past proposals from corpus -- file scanning, deduplication workflow, wave-tailored retrieval strategies, and boilerplate extraction patterns
+description: Domain knowledge for reading submitted/archived SBIR proposals -- submission domain models, archive directory layout, immutability constraints, portal-specific packaging, and corpus ingestion/retrieval strategies
 ---
 
 # Proposal Archive Reader
+
+## Submission Archive Domain Model
+
+The submission domain in `scripts/pes/domain/submission.py` defines four core types:
+
+| Type | Purpose | Frozen? |
+|------|---------|---------|
+| `PortalRules` | Portal-specific rules (naming, size limits, required files, guidance) | Yes |
+| `PackageFile` | A file in the submission package with original name, category, size, portal name | No |
+| `PackageResult` | Result of `prepare_package` -- portal ID, files, size check results, missing files, guidance | No |
+| `SubmissionRecord` | Confirmation number, timestamp, archive path, immutable flag | Yes |
+
+`ConfirmationPrompt` is an intermediate type used for human confirmation before submission.
+
+## Archive Directory Layout
+
+After submission, artifacts are archived under the proposal's artifact directory:
+
+```
+artifacts/wave-8-submission/
+  submission-manifest.md          # Portal, timestamp, confirmation number, file checksums
+  submitted/                      # Exact copies of submitted files (immutable)
+    {category}_{proposal_id}.pdf  # Named per portal convention
+    ...
+  confirmation/
+    confirmation-receipt.md       # Portal confirmation number and timestamp
+    screenshot.png                # Optional portal screenshot
+```
+
+The `SubmissionService.record_submission()` method creates this archive by delegating to `ArchiveCreator.create_archive(package_dir, archive_dir)`. The archive creator copies all regular files from the package directory into the archive -- no subdirectories.
+
+## Immutability Enforcement
+
+Once a proposal is submitted (`submission.status == "submitted"` and `submission.immutable == True` in proposal state), PES blocks all write operations to the submitted artifacts.
+
+The enforcement chain:
+1. `SubmissionImmutabilityEvaluator.triggers()` checks if the rule has `requires_immutable` in its condition
+2. If triggered, checks proposal state for `submission.status == "submitted"` AND `submission.immutable == True`
+3. `build_block_message()` includes the topic ID if available: "Proposal {topic_id} is submitted. Artifacts are read-only."
+
+When reading archived proposals, agents operate in read-only mode. Use Read, Glob, and Grep tools only -- never Write or Edit against submitted archive paths.
+
+## Portal Identification and Packaging
+
+The `SubmissionService.prepare_package()` method orchestrates portal-specific packaging:
+
+1. **Identify portal**: `PortalRulesLoader.identify_portal(agency)` maps agency string to portal ID (DSIP, Grants.gov, NSPIRES)
+2. **Load rules**: `PortalRulesLoader.load_rules_for_portal(portal_id)` returns `PortalRules` with naming, size limits, required files
+3. **Apply naming**: Replaces `{category}` and `{proposal_id}` in the portal's naming convention template
+4. **Verify sizes**: Compares each file's `size_bytes` against `max_file_size_mb * 1_000_000` (strict `>=` comparison)
+5. **Check required files**: Compares provided file categories against `required_files` list; missing files block submission
+
+Portal rules are loaded from JSON files in `templates/portal-rules/` by the `JsonPortalRulesAdapter`:
+
+| Portal | File | Agency Patterns |
+|--------|------|-----------------|
+| DSIP | `dsip.json` | Air Force, Army, Navy, DARPA, DLA, MDA, SOCOM, CBD, DTRA |
+| Grants.gov | `grants-gov.json` | Multi-agency (NSF, ED, DOT, EPA, SBA) |
+| NSPIRES | `nspires.json` | NASA |
+
+New portals are added by creating a JSON file -- no code changes required.
+
+## Reading an Archived Proposal
+
+To read and analyze a submitted proposal archive:
+
+1. **Locate the archive**: Check `.sbir/proposal-state.json` for `submission.archive_path`
+2. **Read the manifest**: `artifacts/wave-8-submission/submission-manifest.md` contains the file inventory with SHA-256 checksums
+3. **Verify immutability**: Confirm `submission.immutable == True` in proposal state before proceeding (if false, archive may be incomplete)
+4. **Read submitted files**: Use Read tool on files in the `submitted/` subdirectory
+5. **Cross-reference confirmation**: Check `confirmation/confirmation-receipt.md` for portal confirmation number and submission timestamp
+
+When comparing archived proposals across projects:
+- Match by `portal_id` for portal-specific comparisons
+- Match by agency pattern for cross-portal analysis
+- Use `submitted_at` timestamp for temporal ordering
+- Use SHA-256 checksums from manifest to detect identical files across archives
 
 ## Ingestion Pipeline
 

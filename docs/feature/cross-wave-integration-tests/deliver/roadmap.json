@@ -1,0 +1,118 @@
+{
+  "roadmap": {
+    "project_id": "cross-wave-integration-tests",
+    "created_at": "2026-03-11T17:49:59Z",
+    "revised_at": "2026-03-11T19:30:00Z",
+    "total_steps": 8,
+    "phases": 1
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Cross-Wave Integration Tests",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Integration test fixtures and helpers",
+          "criteria": [
+            "State builder produces valid proposal state for any wave 0-9; returned state passes schema validation",
+            "Engine constructed with in-memory ports returns Decision.ALLOW for a valid Wave 0 tool invocation",
+            "Audit logger stub captures log entries with timestamp, event, decision, and proposal_id fields",
+            "Fixtures support all subsequent steps: wave transitions, prerequisite gates, data flow, error paths, and status queries"
+          ],
+          "notes": "Infrastructure step. State builder, in-memory RuleLoader stub, in-memory AuditLogger stub, pytest discovery configuration are implementation concerns for crafter."
+        },
+        {
+          "id": "01-02",
+          "name": "Happy path: Wave 0 through Wave 4 (intelligence to drafting)",
+          "criteria": [
+            "Proposal transitions from Wave 0 (go decision recorded) through Wave 4 (drafting active) without BLOCK",
+            "Each transition returns Decision.ALLOW with empty messages list",
+            "Audit logger records one entry per transition with decision=ALLOW",
+            "State after Wave 4 contains go_no_go='go', strategy approved, research approved, outline approved"
+          ]
+        },
+        {
+          "id": "01-03",
+          "name": "Happy path: Wave 5 through Wave 9 (visual assets to debrief)",
+          "criteria": [
+            "Proposal transitions from Wave 5 (PDC all GREEN) through Wave 9 (debrief recorded) without BLOCK",
+            "Wave 8 transition returns Decision.ALLOW only when final_review signed_off is truthy",
+            "Final state after Wave 9 contains submission with confirmation_number and learning with outcome recorded",
+            "Audit logger records one ALLOW entry per wave transition (5 entries total for Waves 5-9)"
+          ]
+        },
+        {
+          "id": "01-04",
+          "name": "Wave prerequisite gate enforcement",
+          "criteria": [
+            "Wave 1 tool with go_no_go!='go' returns Decision.BLOCK; message contains wave ordering rule ID",
+            "Wave 3 tool without research approved_at returns Decision.BLOCK; with approved_at returns Decision.ALLOW",
+            "Wave 5 tool with any section tier_1='RED' returns Decision.BLOCK; message contains 'RED PDC items'",
+            "Wave 8 tool without final_review signed_off returns Decision.BLOCK; with signed_off returns Decision.ALLOW",
+            "Each BLOCK decision produces audit log entry with rule ID, tool_name, and proposal_id"
+          ]
+        },
+        {
+          "id": "01-05",
+          "name": "Cross-wave data flow integrity",
+          "criteria": [
+            "Compliance matrix set during Wave 1 state is present and unchanged when read during Wave 4 evaluation",
+            "PDC status with tier_1='RED' computed from Wave 4 drafts causes Wave 5 evaluate to return Decision.BLOCK",
+            "Write tool invocation after submission immutable=true returns Decision.BLOCK with proposal topic ID in message",
+            "Wave 9 debrief evaluation accesses outcome and submission data set in Waves 8-9 without error"
+          ]
+        },
+        {
+          "id": "01-06",
+          "name": "Error paths: wave skips and concurrent evaluator composition",
+          "criteria": [
+            "Wave 0 to Wave 3 skip returns Decision.BLOCK from wave_ordering evaluator; message matches wave ordering rule",
+            "Wave 2 to Wave 5 skip returns Decision.BLOCK from wave_ordering (not pdc_gate); rule_type in audit is wave_ordering",
+            "Outcome tag modification when existing outcome differs returns Decision.BLOCK from corpus_integrity evaluator",
+            "Evaluate with wave_ordering + deadline_blocking both triggering returns Decision.BLOCK with messages from both evaluators",
+            "Evaluate with pdc_gate + deadline_blocking both triggering returns Decision.BLOCK with messages from both evaluators"
+          ]
+        },
+        {
+          "id": "01-07",
+          "name": "StatusService cross-wave integration",
+          "criteria": [
+            "StatusReport.current_wave matches WAVE_NAMES for the active wave after each transition (Wave 0, 4, 9 sampled)",
+            "StatusReport.progress contains correct completed/total count and active wave name at mid-lifecycle (Wave 4)",
+            "StatusReport.warnings includes critical threshold message when days_remaining <= 5 during active lifecycle",
+            "StatusReport.next_action changes appropriately as proposal progresses (go decision -> strategy -> continue)",
+            "StatusReport.submission is populated with confirmation_number and read_only=true after Wave 8 submission"
+          ]
+        },
+        {
+          "id": "01-08",
+          "name": "State schema integrity through lifecycle",
+          "criteria": [
+            "State dict retains all required keys after each wave transition; no keys lost or corrupted",
+            "Deadline blocking triggers Decision.BLOCK when days_remaining crosses critical threshold mid-lifecycle on non-essential wave",
+            "StatusReport at every sampled wave contains non-empty current_wave, progress, deadline_countdown, and next_action",
+            "Deadline blocking message includes days remaining count and submit/skip suggestion text"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/domain/"
+    ],
+    "test_directories": [
+      "tests/integration/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "software-crafter-reviewer",
+    "approved_at": "2026-03-11T19:45:00Z"
+  }
+}
