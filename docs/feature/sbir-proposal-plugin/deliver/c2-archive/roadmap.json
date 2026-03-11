@@ -1,0 +1,265 @@
+{
+  "roadmap": {
+    "project_id": "sbir-proposal-plugin",
+    "created_at": "2026-03-09T22:32:39Z",
+    "total_steps": 13,
+    "phases": 4
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Cross-cutting foundation",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Expand initial state schema for Waves 2-4",
+          "description": "Add research_summary, discrimination_table, volumes (technical/management/cost with status, current_draft, review_comments, iterations), and open_review_items to initial proposal state. Expand waves dict to include entries for Waves 2 through 9.",
+          "criteria": [
+            "New proposal state includes research_summary with empty findings list",
+            "New proposal state includes discrimination_table with empty items list",
+            "New proposal state includes volumes with technical, management, and cost entries",
+            "New proposal state includes open_review_items as empty list",
+            "Waves dict in new proposal state includes entries for Waves 0 through 9"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/proposal_service.py",
+            "scripts/pes/domain/state.py",
+            "tests/unit/test_proposal_service.py"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Expand WAVE_NAMES to all 10 waves",
+          "description": "Fix WAVE_NAMES dict in status_service.py to cover Waves 0-9 with correct names per spec. StatusService handles unknown wave numbers gracefully.",
+          "criteria": [
+            "Status displays correct names for all 10 waves (0 through 9)",
+            "When status requested for undefined wave, system displays default label without raising error",
+            "Missing wave entries in state produce progress with zero completed"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/status_service.py",
+            "tests/unit/test_status_service.py",
+            "tests/acceptance/step_defs/wave_names_steps.py"
+          ]
+        },
+        {
+          "id": "01-03",
+          "name": "Wave ordering rules for Waves 2-4",
+          "description": "Add wave-3-requires-research and wave-4-requires-outline rules to pes-config.json. Add new condition keys (requires_research_approval, requires_outline_approval) handled by the rule evaluator.",
+          "criteria": [
+            "Wave 2 blocked when strategy brief not approved; allowed when approved",
+            "Wave 3 blocked when research not approved; allowed when approved",
+            "Wave 4 blocked when outline not approved; allowed when approved",
+            "Skipping waves is blocked with prerequisite guidance message",
+            "Block decisions recorded in audit log with rule ID and timestamp"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/wave_rules.py",
+            "templates/pes-config.json",
+            "tests/unit/test_wave_rules.py",
+            "tests/acceptance/step_defs/wave_ordering_c2_steps.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Wave 2 Research",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Research domain models",
+          "description": "Value objects for research findings: technical landscape, patent landscape, prior award analysis, market analysis (TAM/SAM/SOM), commercialization pathway, TRL refinement. ResearchSummary aggregates all findings.",
+          "criteria": [
+            "Research finding captures category, content, and evidence source",
+            "Research summary aggregates six research categories",
+            "All domain objects are pure Python with no infrastructure imports"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/research.py",
+            "tests/unit/test_research.py"
+          ]
+        },
+        {
+          "id": "02-02",
+          "name": "ResearchService generation",
+          "description": "Driving port that generates research findings from strategy brief context. Covers all six research categories. Handles missing TPOC data gracefully.",
+          "criteria": [
+            "Research findings generated covering all six categories",
+            "Generation without strategy brief raises descriptive error",
+            "Generation without TPOC data proceeds with caveat noted"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/research_service.py",
+            "tests/unit/test_research_service.py"
+          ]
+        },
+        {
+          "id": "02-03",
+          "name": "Research checkpoint lifecycle",
+          "description": "Approve/revise/skip checkpoint for research findings. Approval records timestamp and unlocks Wave 3. Revision regenerates incorporating feedback.",
+          "criteria": [
+            "Approval records timestamp in state and unlocks Wave 3",
+            "Revision regenerates findings incorporating feedback text",
+            "Approve or revise without generated findings raises error",
+            "Skip marks research as deferred and unlocks Wave 3"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/research_service.py",
+            "tests/unit/test_research_service.py",
+            "tests/acceptance/step_defs/research_steps.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Wave 3 Discrimination and Outline",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Discrimination and outline domain models",
+          "description": "Value objects for discrimination (discriminator item with category, claim, evidence) and outline (section with compliance mapping, page budget, figure placeholders, thesis statement).",
+          "criteria": [
+            "Discriminator item captures category, claim, and evidence citation",
+            "Outline section maps compliance items and assigns page budget",
+            "Page budget collection validates total against a limit",
+            "All domain objects are pure Python with no infrastructure imports"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/discrimination.py",
+            "scripts/pes/domain/outline.py",
+            "tests/unit/test_discrimination.py",
+            "tests/unit/test_outline.py"
+          ]
+        },
+        {
+          "id": "03-02",
+          "name": "DiscriminationService with iteration",
+          "description": "Driving port generating discrimination table from strategy brief, compliance matrix, and research findings. Supports feedback iteration and TPOC insight integration.",
+          "criteria": [
+            "Each discriminator captures competitive advantage claim with supporting evidence",
+            "Each discriminator cites supporting evidence",
+            "TPOC insights incorporated when available",
+            "Revision incorporates human feedback and regenerates table",
+            "Generation without approved research raises descriptive error"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/discrimination_service.py",
+            "tests/unit/test_discrimination_service.py",
+            "tests/acceptance/step_defs/discrimination_outline_steps.py"
+          ]
+        },
+        {
+          "id": "03-03",
+          "name": "OutlineService generation",
+          "description": "Driving port generating proposal outline from discrimination table and compliance matrix. Assigns page budgets, maps all compliance items, defines figure placeholders.",
+          "criteria": [
+            "Every compliance item mapped to at least one outline section",
+            "Section page budgets total to solicitation page limit or fewer",
+            "Unmapped compliance items flagged with item IDs listed",
+            "Generation without approved discrimination table raises error"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/outline_service.py",
+            "tests/unit/test_outline_service.py"
+          ]
+        },
+        {
+          "id": "03-04",
+          "name": "Outline checkpoint lifecycle",
+          "description": "Approve/revise/skip checkpoint for proposal outline. Approval records timestamp and unlocks Wave 4. Revision regenerates incorporating feedback.",
+          "criteria": [
+            "Approval records timestamp in state and unlocks Wave 4",
+            "Revision regenerates outline incorporating feedback text",
+            "Approve without generated outline raises descriptive error",
+            "Skip marks outline as deferred and unlocks Wave 4"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/outline_service.py",
+            "tests/unit/test_outline_service.py",
+            "tests/acceptance/step_defs/discrimination_outline_steps.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Wave 4 Drafting",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "Draft and review domain models",
+          "description": "Value objects for drafting (section draft with compliance traceability, word count, iteration tracking) and review (scorecard with findings by location/severity, reviewer persona scores, red team findings).",
+          "criteria": [
+            "Draft section tracks compliance items, word count, and iteration round",
+            "Review finding captures location, severity, and suggestion",
+            "Review scorecard aggregates findings with strengths and weaknesses",
+            "All domain objects are pure Python with no infrastructure imports"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/draft.py",
+            "scripts/pes/domain/review.py",
+            "tests/unit/test_draft.py",
+            "tests/unit/test_review.py"
+          ]
+        },
+        {
+          "id": "04-02",
+          "name": "DraftService with compliance tracking",
+          "description": "Driving port orchestrating section-by-section drafting from approved outline. Tracks iterations, checks compliance coverage per section, monitors page budget usage.",
+          "criteria": [
+            "Section drafted addressing mapped compliance items",
+            "Draft word count reported against section page budget",
+            "Section exceeding page budget produces warning",
+            "Unaddressed compliance items in a section flagged by item ID",
+            "Drafting without approved outline raises descriptive error",
+            "Attempting to draft an undefined section returns guidance on available sections"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/draft_service.py",
+            "tests/unit/test_draft_service.py",
+            "tests/acceptance/step_defs/drafting_steps.py"
+          ]
+        },
+        {
+          "id": "04-03",
+          "name": "ReviewService with iteration loop and checkpoint",
+          "description": "Driving port generating review scorecards, running persona-based evaluation, producing red team findings. Manages review iteration loop (max 2 cycles then escalate) and Wave 4 completion checkpoint.",
+          "criteria": [
+            "Review produces scorecard with findings by location and severity",
+            "Re-review tracks which prior findings were addressed",
+            "Third review cycle escalates unresolved findings",
+            "Full draft review verifies all compliance items addressed",
+            "Review without existing draft raises descriptive error"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/review_service.py",
+            "tests/unit/test_review_service.py",
+            "tests/acceptance/step_defs/drafting_steps.py"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/domain/"
+    ],
+    "test_directories": [
+      "tests/unit/",
+      "tests/acceptance/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "solution-architect-reviewer",
+    "approved_at": "2026-03-09T22:50:00Z",
+    "review_attempts": 2,
+    "revision_notes": "3 AC coupling findings resolved per reviewer suggestions"
+  }
+}
