@@ -6,6 +6,8 @@ Does NOT import internal debrief parsers or pattern analyzers directly.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from tests.acceptance.step_defs.common_steps import *  # noqa: F403
@@ -13,6 +15,22 @@ from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 # Link to both feature files
 scenarios("../features/debrief_ingestion.feature")
 scenarios("../features/debrief_request.feature")
+
+# Project root for template resolution
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+_TEMPLATES_DIR = str(_PROJECT_ROOT / "templates" / "debrief-request")
+
+
+def _make_outcome_service():
+    """Create OutcomeService with real filesystem adapters for acceptance tests."""
+    from pes.adapters.filesystem_artifact_writer_adapter import FilesystemArtifactWriter
+    from pes.adapters.filesystem_template_loader_adapter import FilesystemTemplateLoader
+    from pes.domain.outcome_service import OutcomeService
+
+    return OutcomeService(
+        template_loader=FilesystemTemplateLoader(_TEMPLATES_DIR),
+        artifact_writer=FilesystemArtifactWriter(),
+    )
 
 
 # --- Given steps ---
@@ -223,11 +241,13 @@ def proposal_with_existing_tag(active_state, write_state):
 )
 def ingest_debrief(debrief_context):
     """Ingest debrief through DebriefService (driving port)."""
+    from pes.adapters.filesystem_artifact_writer_adapter import FilesystemArtifactWriter
     from pes.adapters.text_debrief_parser_adapter import TextDebriefParserAdapter
     from pes.domain.debrief_service import DebriefService
 
     parser = TextDebriefParserAdapter()
-    service = DebriefService(parser=parser)
+    writer = FilesystemArtifactWriter()
+    service = DebriefService(parser=parser, artifact_writer=writer)
     artifacts_dir = str(debrief_context["proposal_dir"] / "artifacts" / "wave-9-learning")
 
     return service.ingest_debrief(
@@ -243,9 +263,7 @@ def ingest_debrief(debrief_context):
 )
 def update_patterns(corpus_outcomes):
     """Update pattern analysis through OutcomeService."""
-    from pes.domain.outcome_service import OutcomeService
-
-    service = OutcomeService()
+    service = _make_outcome_service()
     return service.update_pattern_analysis(
         corpus_outcomes=corpus_outcomes["outcomes"],
         artifacts_dir=corpus_outcomes["artifacts_dir"],
@@ -258,12 +276,10 @@ def update_patterns(corpus_outcomes):
 )
 def record_outcome(outcome, active_state, proposal_dir):
     """Record outcome through OutcomeService."""
-    from pes.domain.outcome_service import OutcomeService
-
     topic_id = active_state["topic"]["id"]
     artifacts_dir = str(proposal_dir / "artifacts" / "wave-9-learning")
 
-    service = OutcomeService()
+    service = _make_outcome_service()
     return service.record_outcome(
         topic_id=topic_id,
         outcome=outcome,
@@ -277,13 +293,11 @@ def record_outcome(outcome, active_state, proposal_dir):
 )
 def record_outcome_no_debrief(active_state, proposal_dir):
     """Record outcome without debrief through OutcomeService."""
-    from pes.domain.outcome_service import OutcomeService
-
     topic_id = active_state["topic"]["id"]
     outcome = active_state["learning"]["outcome"]
     artifacts_dir = str(proposal_dir / "artifacts" / "wave-9-learning")
 
-    service = OutcomeService()
+    service = _make_outcome_service()
     return service.record_outcome(
         topic_id=topic_id,
         outcome=outcome,
@@ -297,9 +311,7 @@ def record_outcome_no_debrief(active_state, proposal_dir):
 )
 def present_lessons(lessons_context):
     """Present lessons learned through OutcomeService."""
-    from pes.domain.outcome_service import OutcomeService
-
-    service = OutcomeService()
+    service = _make_outcome_service()
     return service.present_lessons_learned(
         artifacts_dir=lessons_context["artifacts_dir"],
     )
@@ -311,14 +323,12 @@ def present_lessons(lessons_context):
 )
 def request_debrief_letter(active_state, proposal_dir):
     """Generate debrief request letter through OutcomeService."""
-    from pes.domain.outcome_service import OutcomeService
-
     topic_id = active_state["topic"]["id"]
     agency = active_state["topic"]["agency"]
     confirmation = active_state["submission"]["confirmation_number"]
     artifacts_dir = str(proposal_dir / "artifacts" / "wave-9-learning")
 
-    service = OutcomeService()
+    service = _make_outcome_service()
     return service.generate_debrief_letter(
         topic_id=topic_id,
         agency=agency,
@@ -333,10 +343,8 @@ def request_debrief_letter(active_state, proposal_dir):
 )
 def skip_debrief_request(active_state):
     """Skip debrief request through OutcomeService."""
-    from pes.domain.outcome_service import OutcomeService
-
     topic_id = active_state["topic"]["id"]
-    service = OutcomeService()
+    service = _make_outcome_service()
     return service.skip_debrief_request(topic_id=topic_id)
 
 

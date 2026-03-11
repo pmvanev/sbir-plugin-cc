@@ -44,7 +44,7 @@ def _make_entry(name: str, ext: str, content: str = "content") -> CorpusEntry:
 
     content_hash = hashlib.sha256(content.encode()).hexdigest()
     return CorpusEntry(
-        path=Path(f"/fake/{name}{ext}"),
+        path=f"/fake/{name}{ext}",
         content_hash=content_hash,
         file_type=ext,
         size_bytes=len(content),
@@ -77,7 +77,7 @@ class TestCorpusIngestionHappyPath:
         corpus_dir = tmp_path / "docs"
         corpus_dir.mkdir()
         for e in entries:
-            (corpus_dir / e.path.name).write_text("x")
+            (corpus_dir / Path(e.path).name).write_text("x")
 
         service = _make_service(entries)
         result = service.ingest_directory(corpus_dir)

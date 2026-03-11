@@ -2,7 +2,7 @@
 
 Test Budget: 6 behaviors x 2 = 12 unit tests max.
 Tests enter through driving port (DebriefService).
-Driven port (DebriefParser) mocked at port boundary.
+Driven ports (DebriefParser, ArtifactWriter) faked at port boundary.
 Domain objects (DebriefIngestionResult, CritiqueMapping, etc.) are real collaborators.
 
 Behaviors (step 07-01):
@@ -16,7 +16,7 @@ Behaviors (step 07-01):
 
 from __future__ import annotations
 
-from pathlib import Path
+import json
 
 from pes.domain.debrief import (
     CritiqueMapping,
@@ -24,10 +24,11 @@ from pes.domain.debrief import (
     ReviewerScore,
 )
 from pes.domain.debrief_service import DebriefService
+from pes.ports.artifact_writer_port import ArtifactWriter
 from pes.ports.debrief_parser_port import DebriefParser
 
 # ---------------------------------------------------------------------------
-# Fake driven port -- mock at port boundary only
+# Fake driven ports -- mock at port boundary only
 # ---------------------------------------------------------------------------
 
 
@@ -39,6 +40,21 @@ class FakeDebriefParser(DebriefParser):
 
     def parse(self, text: str) -> DebriefParseResult:
         return self._result
+
+
+class FakeArtifactWriter(ArtifactWriter):
+    """Fake artifact writer capturing written artifacts in memory."""
+
+    def __init__(self) -> None:
+        self.written_artifacts: dict[str, str] = {}
+        self.written_json: dict[str, dict[str, object]] = {}
+
+    def write_artifact(self, path: str, content: str) -> None:
+        self.written_artifacts[path] = content
+
+    def write_json(self, path: str, data: dict[str, object]) -> None:
+        self.written_json[path] = data
+        self.written_artifacts[path] = json.dumps(data, indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -92,34 +108,42 @@ def _unstructured_parse_result() -> DebriefParseResult:
     )
 
 
+def _make_service(
+    parse_result: DebriefParseResult | None = None,
+) -> tuple[DebriefService, FakeArtifactWriter]:
+    """Wire DebriefService with fake driven ports."""
+    parser = FakeDebriefParser(parse_result or _structured_parse_result())
+    writer = FakeArtifactWriter()
+    service = DebriefService(parser=parser, artifact_writer=writer)
+    return service, writer
+
+
 # ---------------------------------------------------------------------------
 # Behavior 1: Parse structured debrief with scores and confidence
 # ---------------------------------------------------------------------------
 
 
 class TestParseStructuredDebrief:
-    def test_returns_scores_from_structured_debrief(self, tmp_path: Path):
-        parser = FakeDebriefParser(_structured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_returns_scores_from_structured_debrief(self):
+        service, _ = _make_service()
 
         result = service.ingest_debrief(
             debrief_text="structured debrief content",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert len(result.scores) == 3
         assert result.scores[0].category == "Technical Merit"
         assert result.parsing_confidence > 0.0
 
-    def test_reports_parsing_confidence(self, tmp_path: Path):
-        parser = FakeDebriefParser(_structured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_reports_parsing_confidence(self):
+        service, _ = _make_service()
 
         result = service.ingest_debrief(
             debrief_text="structured debrief content",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert result.parsing_confidence == 0.85
@@ -131,28 +155,26 @@ class TestParseStructuredDebrief:
 
 
 class TestCritiqueMapping:
-    def test_maps_critiques_to_sections_and_pages(self, tmp_path: Path):
-        parser = FakeDebriefParser(_structured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_maps_critiques_to_sections_and_pages(self):
+        service, _ = _make_service()
 
         result = service.ingest_debrief(
             debrief_text="structured debrief content",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert len(result.critique_map) == 3
         assert result.critique_map[0].section == "3.1"
         assert result.critique_map[0].page == 5
 
-    def test_each_critique_has_comment(self, tmp_path: Path):
-        parser = FakeDebriefParser(_structured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_each_critique_has_comment(self):
+        service, _ = _make_service()
 
         result = service.ingest_debrief(
             debrief_text="structured debrief content",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         for critique in result.critique_map:
@@ -166,28 +188,26 @@ class TestCritiqueMapping:
 
 
 class TestFlagKnownWeaknesses:
-    def test_flags_critiques_matching_known_weaknesses(self, tmp_path: Path):
-        parser = FakeDebriefParser(_structured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_flags_critiques_matching_known_weaknesses(self):
+        service, _ = _make_service()
 
         result = service.ingest_debrief(
             debrief_text="structured debrief content",
             known_weaknesses=["thermal management", "cost realism"],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert len(result.flagged_weaknesses) > 0
         # "thermal management" should match critique about thermal management
         assert any("thermal" in w.lower() for w in result.flagged_weaknesses)
 
-    def test_no_flags_when_no_known_weaknesses(self, tmp_path: Path):
-        parser = FakeDebriefParser(_structured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_no_flags_when_no_known_weaknesses(self):
+        service, _ = _make_service()
 
         result = service.ingest_debrief(
             debrief_text="structured debrief content",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert len(result.flagged_weaknesses) == 0
@@ -199,32 +219,29 @@ class TestFlagKnownWeaknesses:
 
 
 class TestWriteDebriefArtifact:
-    def test_writes_artifact_to_artifacts_directory(self, tmp_path: Path):
-        parser = FakeDebriefParser(_structured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_writes_artifact_to_artifacts_directory(self):
+        service, writer = _make_service()
 
         result = service.ingest_debrief(
             debrief_text="structured debrief content",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert result.artifact_path is not None
-        written = Path(result.artifact_path)
-        assert written.exists()
-        assert str(written).startswith(str(tmp_path))
+        assert result.artifact_path in writer.written_json
+        assert "/artifacts" in result.artifact_path
 
-    def test_artifact_contains_structured_data(self, tmp_path: Path):
-        parser = FakeDebriefParser(_structured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_artifact_contains_structured_data(self):
+        service, writer = _make_service()
 
         result = service.ingest_debrief(
             debrief_text="structured debrief content",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
-        content = Path(result.artifact_path).read_text(encoding="utf-8")
+        content = writer.written_artifacts[result.artifact_path]
         assert "Technical Merit" in content
 
 
@@ -234,27 +251,25 @@ class TestWriteDebriefArtifact:
 
 
 class TestUnstructuredDebriefFallback:
-    def test_preserves_freeform_text(self, tmp_path: Path):
-        parser = FakeDebriefParser(_unstructured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_preserves_freeform_text(self):
+        service, _ = _make_service(_unstructured_parse_result())
 
         result = service.ingest_debrief(
             debrief_text="unstructured paragraph",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert result.freeform_text is not None
         assert len(result.freeform_text) > 0
 
-    def test_reports_parsing_limitation_message(self, tmp_path: Path):
-        parser = FakeDebriefParser(_unstructured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_reports_parsing_limitation_message(self):
+        service, _ = _make_service(_unstructured_parse_result())
 
         result = service.ingest_debrief(
             debrief_text="unstructured paragraph",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert "Structured scores could not be extracted" in result.message
@@ -266,14 +281,13 @@ class TestUnstructuredDebriefFallback:
 
 
 class TestFreeformKeywordMatching:
-    def test_freeform_text_contains_searchable_content(self, tmp_path: Path):
-        parser = FakeDebriefParser(_unstructured_parse_result())
-        service = DebriefService(parser=parser)
+    def test_freeform_text_contains_searchable_content(self):
+        service, _ = _make_service(_unstructured_parse_result())
 
         result = service.ingest_debrief(
             debrief_text="unstructured paragraph",
             known_weaknesses=[],
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         # Freeform text should be the full original text, searchable

@@ -17,7 +17,7 @@ SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({".pdf", ".docx", ".txt", ".md"
 class CorpusEntry:
     """A single document cataloged in the corpus."""
 
-    path: Path
+    path: str
     content_hash: str
     file_type: str
     size_bytes: int

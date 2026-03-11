@@ -37,7 +37,7 @@ class FilesystemCorpusAdapter(CorpusScanner):
             content_hash = hashlib.sha256(content).hexdigest()
 
             entries.append(CorpusEntry(
-                path=file_path,
+                path=str(file_path),
                 content_hash=content_hash,
                 file_type=file_path.suffix.lower(),
                 size_bytes=len(content),

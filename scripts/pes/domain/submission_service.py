@@ -3,14 +3,13 @@
 Orchestrates: portal identification from agency, portal-specific file naming,
 file size verification against portal limits, missing file detection,
 human confirmation checkpoint, and immutable archive creation.
-Delegates to PortalRulesLoader driven port for portal configuration.
+Delegates to PortalRulesLoader driven port for portal configuration
+and ArchiveCreator driven port for archive operations.
 """
 
 from __future__ import annotations
 
-import shutil
 from datetime import UTC, datetime
-from pathlib import Path
 
 from pes.domain.submission import (
     ConfirmationPrompt,
@@ -18,6 +17,7 @@ from pes.domain.submission import (
     PackageResult,
     SubmissionRecord,
 )
+from pes.ports.archive_port import ArchiveCreator
 from pes.ports.portal_rules_port import PortalRulesLoader
 
 # Bytes per megabyte for size comparison
@@ -32,11 +32,16 @@ class SubmissionService:
     """Driving port: prepares submission packages with portal-specific rules.
 
     Delegates to PortalRulesLoader driven port for portal identification
-    and rule loading.
+    and rule loading, and ArchiveCreator driven port for archive operations.
     """
 
-    def __init__(self, portal_rules_loader: PortalRulesLoader) -> None:
+    def __init__(
+        self,
+        portal_rules_loader: PortalRulesLoader,
+        archive_creator: ArchiveCreator,
+    ) -> None:
         self._loader = portal_rules_loader
+        self._archive_creator = archive_creator
 
     def prepare_package(
         self,
@@ -143,15 +148,11 @@ class SubmissionService:
         submitted_at = datetime.now(UTC).isoformat()
 
         # Create immutable archive by copying package files
-        source = Path(package_dir)
-        target = Path(archive_dir)
-        for item in source.iterdir():
-            if item.is_file():
-                shutil.copy2(str(item), str(target / item.name))
+        self._archive_creator.create_archive(package_dir, archive_dir)
 
         return SubmissionRecord(
             confirmation_number=confirmation_number,
             submitted_at=submitted_at,
-            archive_path=str(target),
+            archive_path=archive_dir,
             immutable=True,
         )

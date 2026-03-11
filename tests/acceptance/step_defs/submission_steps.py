@@ -18,6 +18,13 @@ from tests.acceptance.step_defs.common_steps import *  # noqa: F403
 scenarios("../features/submission.feature")
 
 
+def _make_archive_creator():
+    """Create real filesystem archive creator for acceptance tests."""
+    from pes.adapters.filesystem_archive_adapter import FilesystemArchiveCreator
+
+    return FilesystemArchiveCreator()
+
+
 # --- Fixtures ---
 
 
@@ -163,7 +170,7 @@ def prepare_submission(active_state, submission_context):
     if exclude:
         all_files = [f for f in all_files if exclude not in f.original_name]
 
-    service = SubmissionService(portal_rules_loader=loader)
+    service = SubmissionService(portal_rules_loader=loader, archive_creator=_make_archive_creator())
     agency = active_state["topic"]["agency"]
     result = service.prepare_package(agency=agency, files=all_files)
     return result
@@ -202,7 +209,7 @@ def run_verification(active_state, submission_context):
     if exclude:
         all_files = [f for f in all_files if exclude not in f.original_name]
 
-    service = SubmissionService(portal_rules_loader=loader)
+    service = SubmissionService(portal_rules_loader=loader, archive_creator=_make_archive_creator())
     agency = active_state["topic"]["agency"]
     return service.prepare_package(agency=agency, files=all_files)
 
@@ -217,7 +224,7 @@ def present_confirmation():
     from tests.acceptance.step_defs._fake_portal_rules import FakePortalRulesLoader
 
     loader = FakePortalRulesLoader()
-    service = SubmissionService(portal_rules_loader=loader)
+    service = SubmissionService(portal_rules_loader=loader, archive_creator=_make_archive_creator())
     return service.confirm_submission()
 
 
@@ -231,7 +238,7 @@ def enter_confirmation(number, proposal_dir):
     from tests.acceptance.step_defs._fake_portal_rules import FakePortalRulesLoader
 
     loader = FakePortalRulesLoader()
-    service = SubmissionService(portal_rules_loader=loader)
+    service = SubmissionService(portal_rules_loader=loader, archive_creator=_make_archive_creator())
 
     # Set up source package files to archive
     package_dir = proposal_dir / "artifacts" / "wave-8-submission" / "package"

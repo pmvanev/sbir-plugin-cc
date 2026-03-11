@@ -3,6 +3,7 @@ outcome recording, pattern analysis, and lessons learned.
 
 Test Budget: 12 behaviors x 2 = 24 unit tests max.
 Tests enter through driving port (OutcomeService).
+Driven ports (TemplateLoader, ArtifactWriter) faked at port boundary.
 Domain objects (DebriefLetterResult, DebriefSkipRecord, OutcomeRecord,
 PatternAnalysisResult, LessonsLearnedResult) are real collaborators.
 
@@ -27,19 +28,82 @@ Behaviors (step 07-02):
 
 from __future__ import annotations
 
-from pathlib import Path
+import json
 
 import pytest
 
 from pes.domain.outcome_service import OutcomeService
+from pes.ports.artifact_writer_port import ArtifactWriter
+from pes.ports.template_loader_port import TemplateLoader
+
+# ---------------------------------------------------------------------------
+# Fake driven ports -- mock at port boundary only
+# ---------------------------------------------------------------------------
+
+
+class FakeTemplateLoader(TemplateLoader):
+    """Fake template loader returning pre-configured templates."""
+
+    def __init__(self, templates: dict[str, str] | None = None) -> None:
+        self._templates: dict[str, str] = templates or {}
+
+    def add_template(self, name: str, content: str) -> None:
+        self._templates[name] = content
+
+    def load_template(self, name: str) -> str:
+        if name not in self._templates:
+            raise FileNotFoundError(f"Template not found: {name}")
+        return self._templates[name]
+
+
+class FakeArtifactWriter(ArtifactWriter):
+    """Fake artifact writer capturing written artifacts in memory."""
+
+    def __init__(self) -> None:
+        self.written_artifacts: dict[str, str] = {}
+        self.written_json: dict[str, dict[str, object]] = {}
+
+    def write_artifact(self, path: str, content: str) -> None:
+        self.written_artifacts[path] = content
+
+    def write_json(self, path: str, data: dict[str, object]) -> None:
+        self.written_json[path] = data
+        # Also store as text for content assertions
+        self.written_artifacts[path] = json.dumps(data, indent=2)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+_DOD_TEMPLATE = (
+    "Subject: Debrief Request for {topic_id}\n"
+    "Confirmation: {confirmation_number}\n"
+    "Per FAR 15.505(a)(1), we request a post-award debrief.\n"
+)
 
-def _make_service() -> OutcomeService:
-    return OutcomeService()
+_NASA_TEMPLATE = (
+    "Subject: NASA Debrief Request for {topic_id}\n"
+    "Confirmation: {confirmation_number}\n"
+    "Per NASA debrief procedures, we request feedback.\n"
+)
+
+
+def _make_template_loader() -> FakeTemplateLoader:
+    loader = FakeTemplateLoader()
+    loader.add_template("dod-far-15-505.md", _DOD_TEMPLATE)
+    loader.add_template("nasa-debrief.md", _NASA_TEMPLATE)
+    return loader
+
+
+def _make_service(
+    template_loader: FakeTemplateLoader | None = None,
+    artifact_writer: FakeArtifactWriter | None = None,
+) -> tuple[OutcomeService, FakeArtifactWriter]:
+    loader = template_loader or _make_template_loader()
+    writer = artifact_writer or FakeArtifactWriter()
+    service = OutcomeService(template_loader=loader, artifact_writer=writer)
+    return service, writer
 
 
 # ---------------------------------------------------------------------------
@@ -48,28 +112,26 @@ def _make_service() -> OutcomeService:
 
 
 class TestDodLetterReferences:
-    def test_letter_contains_topic_id(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_letter_contains_topic_id(self):
+        service, _ = _make_service()
 
         result = service.generate_debrief_letter(
             topic_id="AF243-001",
             agency="Air Force",
             confirmation_number="DSIP-2026-AF243-001-7842",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
         assert "AF243-001" in result.content
 
-    def test_letter_contains_confirmation_number(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_letter_contains_confirmation_number(self):
+        service, _ = _make_service()
 
         result = service.generate_debrief_letter(
             topic_id="AF243-001",
             agency="Air Force",
             confirmation_number="DSIP-2026-AF243-001-7842",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
         assert "DSIP-2026-AF243-001-7842" in result.content
@@ -81,15 +143,14 @@ class TestDodLetterReferences:
 
 
 class TestDodLetterRegulation:
-    def test_dod_letter_cites_far_15_505(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_dod_letter_cites_far_15_505(self):
+        service, _ = _make_service()
 
         result = service.generate_debrief_letter(
             topic_id="AF243-001",
             agency="Air Force",
             confirmation_number="DSIP-2026-AF243-001-7842",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
         assert "FAR 15.505(a)(1)" in result.content
@@ -101,15 +162,14 @@ class TestDodLetterRegulation:
 
 
 class TestNasaLetter:
-    def test_nasa_letter_uses_nasa_procedures(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_nasa_letter_uses_nasa_procedures(self):
+        service, _ = _make_service()
 
         result = service.generate_debrief_letter(
             topic_id="N244-012",
             agency="NASA",
             confirmation_number="NSPIRES-2026-N244-012",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
         # NASA letters should reference NASA-specific debrief procedures
@@ -125,7 +185,7 @@ class TestNasaLetter:
 
 class TestSkipDebriefRequest:
     def test_skip_records_debrief_not_requested(self):
-        service = _make_service()
+        service, _ = _make_service()
 
         record = service.skip_debrief_request(topic_id="AF243-001")
 
@@ -133,7 +193,7 @@ class TestSkipDebriefRequest:
         assert record.letter_created is False
 
     def test_skip_preserves_topic_id(self):
-        service = _make_service()
+        service, _ = _make_service()
 
         record = service.skip_debrief_request(topic_id="AF243-001")
 
@@ -146,20 +206,18 @@ class TestSkipDebriefRequest:
 
 
 class TestLetterArtifactWritten:
-    def test_letter_written_to_artifacts_dir(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_letter_written_to_artifacts_dir(self):
+        service, writer = _make_service()
 
         result = service.generate_debrief_letter(
             topic_id="AF243-001",
             agency="Air Force",
             confirmation_number="DSIP-2026-AF243-001-7842",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
-        written = Path(result.file_path)
-        assert written.exists()
-        assert str(written).startswith(str(tmp_path))
+        assert result.file_path in writer.written_artifacts
+        assert "/artifacts" in result.file_path
 
     @pytest.mark.parametrize(
         "agency,expected_in_filename",
@@ -169,20 +227,18 @@ class TestLetterArtifactWritten:
         ],
     )
     def test_letter_filename_identifies_debrief_request(
-        self, tmp_path: Path, agency: str, expected_in_filename: str
+        self, agency: str, expected_in_filename: str
     ):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+        service, _ = _make_service()
 
         result = service.generate_debrief_letter(
             topic_id="AF243-001",
             agency=agency,
             confirmation_number="CONF-001",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
-        filename = Path(result.file_path).name
-        assert expected_in_filename in filename
+        assert expected_in_filename in result.file_path
 
 
 # ---------------------------------------------------------------------------
@@ -191,14 +247,13 @@ class TestLetterArtifactWritten:
 
 
 class TestAwardedProposalArchiving:
-    def test_awarded_outcome_archives_with_tag_and_discriminators(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_awarded_outcome_archives_with_tag_and_discriminators(self):
+        service, _ = _make_service()
 
         result = service.record_outcome(
             topic_id="AF243-001",
             outcome="awarded",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
         assert result.outcome_tag == "awarded"
@@ -206,19 +261,17 @@ class TestAwardedProposalArchiving:
         assert result.discriminators is not None
         assert "Phase II" in result.message
 
-    def test_awarded_outcome_writes_archive_artifact(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_awarded_outcome_writes_archive_artifact(self):
+        service, writer = _make_service()
 
         result = service.record_outcome(
             topic_id="AF243-001",
             outcome="awarded",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
-        archive_path = Path(result.archive_path)
-        assert archive_path.exists()
-        assert "AF243-001" in archive_path.name
+        assert result.archive_path in writer.written_json
+        assert "AF243-001" in result.archive_path
 
 
 # ---------------------------------------------------------------------------
@@ -227,28 +280,26 @@ class TestAwardedProposalArchiving:
 
 
 class TestOutcomeWithoutDebrief:
-    def test_not_selected_without_debrief_is_valid_terminal_state(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_not_selected_without_debrief_is_valid_terminal_state(self):
+        service, _ = _make_service()
 
         result = service.record_outcome(
             topic_id="AF243-001",
             outcome="not_selected",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
         assert result.outcome_tag == "not_selected"
         assert result.debrief_artifacts_created is False
         assert "Debrief can be ingested later if received" in result.message
 
-    def test_not_selected_preserves_topic_id(self, tmp_path: Path):
-        service = _make_service()
-        artifacts_dir = str(tmp_path)
+    def test_not_selected_preserves_topic_id(self):
+        service, _ = _make_service()
 
         result = service.record_outcome(
             topic_id="AF243-001",
             outcome="not_selected",
-            artifacts_dir=artifacts_dir,
+            artifacts_dir="/artifacts",
         )
 
         assert result.topic_id == "AF243-001"
@@ -296,13 +347,13 @@ def _build_corpus_outcomes(
 
 
 class TestPatternAnalysisWeaknesses:
-    def test_identifies_recurring_weaknesses(self, tmp_path: Path):
-        service = _make_service()
+    def test_identifies_recurring_weaknesses(self):
+        service, _ = _make_service()
         corpus = _build_corpus_outcomes(losses=4)
 
         result = service.update_pattern_analysis(
             corpus_outcomes=corpus,
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert len(result.recurring_weaknesses) > 0
@@ -316,13 +367,13 @@ class TestPatternAnalysisWeaknesses:
 
 
 class TestPatternAnalysisStrengths:
-    def test_identifies_recurring_strengths(self, tmp_path: Path):
-        service = _make_service()
+    def test_identifies_recurring_strengths(self):
+        service, _ = _make_service()
         corpus = _build_corpus_outcomes(wins=3)
 
         result = service.update_pattern_analysis(
             corpus_outcomes=corpus,
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert len(result.recurring_strengths) > 0
@@ -345,16 +396,16 @@ class TestPatternAnalysisConfidence:
         ],
     )
     def test_confidence_level_scales_with_corpus_size(
-        self, tmp_path: Path, total_proposals: int, expected_confidence: str
+        self, total_proposals: int, expected_confidence: str
     ):
-        service = _make_service()
+        service, _ = _make_service()
         wins = total_proposals // 3
         losses = total_proposals - wins
         corpus = _build_corpus_outcomes(wins=wins, losses=losses)
 
         result = service.update_pattern_analysis(
             corpus_outcomes=corpus,
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert result.confidence_level == expected_confidence
@@ -366,18 +417,17 @@ class TestPatternAnalysisConfidence:
 
 
 class TestPatternAnalysisArtifact:
-    def test_writes_pattern_analysis_to_artifacts_dir(self, tmp_path: Path):
-        service = _make_service()
+    def test_writes_pattern_analysis_to_artifacts_dir(self):
+        service, writer = _make_service()
         corpus = _build_corpus_outcomes()
 
         result = service.update_pattern_analysis(
             corpus_outcomes=corpus,
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
-        written = Path(result.artifact_path)
-        assert written.exists()
-        assert str(written).startswith(str(tmp_path))
+        assert result.artifact_path in writer.written_json
+        assert "/artifacts" in result.artifact_path
 
 
 # ---------------------------------------------------------------------------
@@ -386,11 +436,11 @@ class TestPatternAnalysisArtifact:
 
 
 class TestLessonsLearnedCheckpoint:
-    def test_lessons_require_human_acknowledgment(self, tmp_path: Path):
-        service = _make_service()
+    def test_lessons_require_human_acknowledgment(self):
+        service, _ = _make_service()
 
         result = service.present_lessons_learned(
-            artifacts_dir=str(tmp_path),
+            artifacts_dir="/artifacts",
         )
 
         assert result.requires_human_acknowledgment is True

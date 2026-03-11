@@ -6,8 +6,7 @@ debrief skip recording, outcome archiving, and letter artifact persistence.
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
+import os
 
 from pes.domain.outcome import (
     DebriefLetterResult,
@@ -16,6 +15,8 @@ from pes.domain.outcome import (
     OutcomeRecord,
     PatternAnalysisResult,
 )
+from pes.ports.artifact_writer_port import ArtifactWriter
+from pes.ports.template_loader_port import TemplateLoader
 
 # Agency-to-template mapping
 _AGENCY_TEMPLATES: dict[str, str] = {
@@ -25,14 +26,18 @@ _AGENCY_TEMPLATES: dict[str, str] = {
     "NASA": "nasa-debrief.md",
 }
 
-# Resolve templates directory relative to project root
-_TEMPLATES_DIR = (
-    Path(__file__).resolve().parent.parent.parent.parent / "templates" / "debrief-request"
-)
-
 
 class OutcomeService:
     """Driving port: generates debrief request letters and records outcomes."""
+
+    def __init__(
+        self,
+        *,
+        template_loader: TemplateLoader,
+        artifact_writer: ArtifactWriter,
+    ) -> None:
+        self._template_loader = template_loader
+        self._artifact_writer = artifact_writer
 
     def generate_debrief_letter(
         self,
@@ -53,25 +58,22 @@ class OutcomeService:
             # Default to DoD template for unknown agencies
             template_name = "dod-far-15-505.md"
 
-        template_path = _TEMPLATES_DIR / template_name
-        template_content = template_path.read_text(encoding="utf-8")
+        template_content = self._template_loader.load_template(template_name)
 
         # Substitute placeholders
         content = template_content.replace("{topic_id}", topic_id)
         content = content.replace("{confirmation_number}", confirmation_number)
 
         # Write letter to artifacts directory
-        output_dir = Path(artifacts_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / f"debrief-request-{topic_id}.md"
-        output_file.write_text(content, encoding="utf-8")
+        output_file = os.path.join(artifacts_dir, f"debrief-request-{topic_id}.md")
+        self._artifact_writer.write_artifact(output_file, content)
 
         return DebriefLetterResult(
             topic_id=topic_id,
             agency=agency,
             confirmation_number=confirmation_number,
             content=content,
-            file_path=str(output_file),
+            file_path=output_file,
         )
 
     def skip_debrief_request(
@@ -105,9 +107,6 @@ class OutcomeService:
         For not_selected proposals: records outcome as valid terminal state,
         noting that debrief can be ingested later.
         """
-        output_dir = Path(artifacts_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         if outcome == "awarded":
             # Archive the winning proposal with outcome tag
             archive_data = {
@@ -115,8 +114,8 @@ class OutcomeService:
                 "outcome": "awarded",
                 "discriminators": [],
             }
-            archive_file = output_dir / f"outcome-{topic_id}.json"
-            archive_file.write_text(json.dumps(archive_data, indent=2), encoding="utf-8")
+            archive_file = os.path.join(artifacts_dir, f"outcome-{topic_id}.json")
+            self._artifact_writer.write_json(archive_file, archive_data)
 
             return OutcomeRecord(
                 topic_id=topic_id,
@@ -124,7 +123,7 @@ class OutcomeService:
                 archived=True,
                 discriminators=[],
                 debrief_artifacts_created=False,
-                archive_path=str(archive_file),
+                archive_path=archive_file,
                 message=f"Awarded proposal {topic_id} archived. Consider Phase II pre-planning.",
             )
 
@@ -165,23 +164,21 @@ class OutcomeService:
             confidence_level = "low"
 
         # Write pattern analysis artifact
-        output_dir = Path(artifacts_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
         analysis_data = {
             "corpus_size": corpus_size,
             "confidence_level": confidence_level,
             "recurring_weaknesses": recurring_weaknesses,
             "recurring_strengths": recurring_strengths,
         }
-        artifact_file = output_dir / "pattern-analysis.json"
-        artifact_file.write_text(json.dumps(analysis_data, indent=2), encoding="utf-8")
+        artifact_file = os.path.join(artifacts_dir, "pattern-analysis.json")
+        self._artifact_writer.write_json(artifact_file, analysis_data)
 
         return PatternAnalysisResult(
             recurring_weaknesses=recurring_weaknesses,
             recurring_strengths=recurring_strengths,
             confidence_level=confidence_level,
             corpus_size=corpus_size,
-            artifact_path=str(artifact_file),
+            artifact_path=artifact_file,
         )
 
     def present_lessons_learned(

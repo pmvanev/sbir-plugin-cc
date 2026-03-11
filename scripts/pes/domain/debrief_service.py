@@ -1,23 +1,24 @@
 """Debrief service -- driving port for debrief ingestion and critique mapping.
 
 Orchestrates: debrief parsing via DebriefParser port, critique-to-section mapping,
-known weakness flagging, and artifact persistence.
+known weakness flagging, and artifact persistence via ArtifactWriter port.
 """
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
+import os
 
 from pes.domain.debrief import CritiqueMapping, DebriefIngestionResult, DebriefParseResult
+from pes.ports.artifact_writer_port import ArtifactWriter
 from pes.ports.debrief_parser_port import DebriefParser
 
 
 class DebriefService:
     """Driving port: ingests debriefs and maps critiques to proposal sections."""
 
-    def __init__(self, *, parser: DebriefParser) -> None:
+    def __init__(self, *, parser: DebriefParser, artifact_writer: ArtifactWriter) -> None:
         self._parser = parser
+        self._artifact_writer = artifact_writer
 
     def ingest_debrief(
         self,
@@ -103,9 +104,6 @@ class DebriefService:
     ) -> str:
         """Write structured debrief data to artifacts directory."""
 
-        output_dir = Path(artifacts_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         artifact_data: dict[str, object] = {
             "parsing_confidence": parse_result.parsing_confidence,
             "is_structured": parse_result.is_structured,
@@ -129,7 +127,7 @@ class DebriefService:
         else:
             artifact_data["freeform_text"] = parse_result.freeform_text
 
-        output_file = output_dir / "debrief-analysis.json"
-        output_file.write_text(json.dumps(artifact_data, indent=2), encoding="utf-8")
+        output_file = os.path.join(artifacts_dir, "debrief-analysis.json")
+        self._artifact_writer.write_json(output_file, artifact_data)
 
-        return str(output_file)
+        return output_file

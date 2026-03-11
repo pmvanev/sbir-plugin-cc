@@ -2,7 +2,7 @@
 
 Test Budget: 8 behaviors x 2 = 16 unit tests max.
 Tests enter through driving port (SubmissionService).
-Driven port (PortalRulesLoader) faked at port boundary.
+Driven ports (PortalRulesLoader, ArchiveCreator) faked at port boundary.
 Domain objects (PackageFile, PortalRules, PackageResult) are real collaborators.
 
 Behaviors (step 05-01):
@@ -20,16 +20,15 @@ Behaviors (step 05-02):
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from pes.domain.submission import PackageFile, PortalRules
 from pes.domain.submission_service import SubmissionService, UnknownAgencyError
+from pes.ports.archive_port import ArchiveCreator
 from pes.ports.portal_rules_port import PortalRulesLoader
 
 # ---------------------------------------------------------------------------
-# Fake driven port (PortalRulesLoader) at port boundary
+# Fake driven ports at port boundary
 # ---------------------------------------------------------------------------
 
 
@@ -50,6 +49,16 @@ class FakePortalRulesLoader(PortalRulesLoader):
 
     def identify_portal(self, agency: str) -> str | None:
         return self._agency_map.get(agency)
+
+
+class FakeArchiveCreator(ArchiveCreator):
+    """Fake archive creator recording calls in memory."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def create_archive(self, source_dir: str, dest_dir: str) -> None:
+        self.calls.append((source_dir, dest_dir))
 
 
 # ---------------------------------------------------------------------------
@@ -79,10 +88,18 @@ def _make_loader(*, rules: PortalRules | None = None) -> FakePortalRulesLoader:
     return loader
 
 
-def _make_service(loader: FakePortalRulesLoader | None = None) -> SubmissionService:
+def _make_service(
+    loader: FakePortalRulesLoader | None = None,
+    archive_creator: FakeArchiveCreator | None = None,
+) -> tuple[SubmissionService, FakeArchiveCreator]:
     if loader is None:
         loader = _make_loader()
-    return SubmissionService(portal_rules_loader=loader)
+    archiver = archive_creator or FakeArchiveCreator()
+    service = SubmissionService(
+        portal_rules_loader=loader,
+        archive_creator=archiver,
+    )
+    return service, archiver
 
 
 def _make_files(*, include_all: bool = True) -> list[PackageFile]:
@@ -117,7 +134,7 @@ def _make_files(*, include_all: bool = True) -> list[PackageFile]:
 
 class TestPortalIdentification:
     def test_identifies_dsip_for_air_force(self):
-        service = _make_service()
+        service, _ = _make_service()
         files = _make_files()
 
         result = service.prepare_package(agency="Air Force", files=files)
@@ -125,7 +142,7 @@ class TestPortalIdentification:
         assert result.portal_id == "DSIP"
 
     def test_raises_error_for_unknown_agency(self):
-        service = _make_service()
+        service, _ = _make_service()
         files = _make_files()
 
         with pytest.raises(UnknownAgencyError) as exc_info:
@@ -141,7 +158,7 @@ class TestPortalIdentification:
 
 class TestFileNaming:
     def test_applies_portal_naming_to_all_files(self):
-        service = _make_service()
+        service, _ = _make_service()
         files = _make_files()
 
         result = service.prepare_package(agency="Air Force", files=files)
@@ -153,7 +170,7 @@ class TestFileNaming:
             assert pf.category in pf.portal_name
 
     def test_portal_name_includes_pdf_extension(self):
-        service = _make_service()
+        service, _ = _make_service()
         files = _make_files()
 
         result = service.prepare_package(agency="Air Force", files=files)
@@ -186,7 +203,7 @@ class TestFileSizeVerification:
             guidance={},
         )
         loader = _make_loader(rules=rules)
-        service = _make_service(loader)
+        service, _ = _make_service(loader)
         files = [
             PackageFile(
                 original_name="Technical_Volume.pdf",
@@ -207,7 +224,7 @@ class TestFileSizeVerification:
 
 class TestMissingFilesBlocking:
     def test_missing_file_blocks_submission(self):
-        service = _make_service()
+        service, _ = _make_service()
         # Exclude firm_certification
         files = _make_files(include_all=False)
 
@@ -217,7 +234,7 @@ class TestMissingFilesBlocking:
         assert "firm_certification" in result.missing_files
 
     def test_missing_file_includes_guidance(self):
-        service = _make_service()
+        service, _ = _make_service()
         files = _make_files(include_all=False)
 
         result = service.prepare_package(agency="Air Force", files=files)
@@ -234,7 +251,7 @@ class TestMissingFilesBlocking:
 
 class TestSubmissionConfirmation:
     def test_confirm_submission_requires_explicit_confirmation(self):
-        service = _make_service()
+        service, _ = _make_service()
 
         prompt = service.confirm_submission()
 
@@ -242,7 +259,7 @@ class TestSubmissionConfirmation:
         assert len(prompt.message) > 0
 
     def test_confirm_submission_message_warns_irreversible(self):
-        service = _make_service()
+        service, _ = _make_service()
 
         prompt = service.confirm_submission()
 
@@ -256,36 +273,27 @@ class TestSubmissionConfirmation:
 
 
 class TestSubmissionRecording:
-    def test_records_confirmation_number_and_timestamp(self, tmp_path):
-        service = _make_service()
-        package_dir = tmp_path / "package"
-        package_dir.mkdir()
-        (package_dir / "test.pdf").write_text("content")
-        archive_dir = tmp_path / "archive"
-        archive_dir.mkdir()
+    def test_records_confirmation_number_and_timestamp(self):
+        service, _ = _make_service()
 
         record = service.record_submission(
             confirmation_number="DSIP-2026-AF243-001-7842",
-            package_dir=str(package_dir),
-            archive_dir=str(archive_dir),
+            package_dir="/package",
+            archive_dir="/archive",
         )
 
         assert record.confirmation_number == "DSIP-2026-AF243-001-7842"
         assert record.submitted_at is not None
         assert len(record.submitted_at) > 0  # ISO timestamp string
 
-    def test_rejects_empty_confirmation_number(self, tmp_path):
-        service = _make_service()
-        package_dir = tmp_path / "package"
-        package_dir.mkdir()
-        archive_dir = tmp_path / "archive"
-        archive_dir.mkdir()
+    def test_rejects_empty_confirmation_number(self):
+        service, _ = _make_service()
 
         with pytest.raises(ValueError, match="confirmation number"):
             service.record_submission(
                 confirmation_number="",
-                package_dir=str(package_dir),
-                archive_dir=str(archive_dir),
+                package_dir="/package",
+                archive_dir="/archive",
             )
 
 
@@ -295,25 +303,17 @@ class TestSubmissionRecording:
 
 
 class TestSubmissionArchive:
-    def test_creates_archive_with_package_files(self, tmp_path):
-        service = _make_service()
-        package_dir = tmp_path / "package"
-        package_dir.mkdir()
-        (package_dir / "Technical_Volume.pdf").write_text("technical content")
-        (package_dir / "Cost_Volume.pdf").write_text("cost content")
-        archive_dir = tmp_path / "archive"
-        archive_dir.mkdir()
+    def test_creates_archive_from_package_directory(self):
+        service, archiver = _make_service()
 
-        record = service.record_submission(
+        service.record_submission(
             confirmation_number="DSIP-2026-001",
-            package_dir=str(package_dir),
-            archive_dir=str(archive_dir),
+            package_dir="/package",
+            archive_dir="/archive",
         )
 
-        archive_path = Path(record.archive_path)
-        assert archive_path.exists()
-        archived_files = list(archive_path.iterdir())
-        assert len(archived_files) == 2
+        assert len(archiver.calls) == 1
+        assert archiver.calls[0] == ("/package", "/archive")
 
 
 # ---------------------------------------------------------------------------
@@ -322,18 +322,13 @@ class TestSubmissionArchive:
 
 
 class TestSubmissionImmutableFlag:
-    def test_submission_record_sets_immutable_true(self, tmp_path):
-        service = _make_service()
-        package_dir = tmp_path / "package"
-        package_dir.mkdir()
-        (package_dir / "file.pdf").write_text("content")
-        archive_dir = tmp_path / "archive"
-        archive_dir.mkdir()
+    def test_submission_record_sets_immutable_true(self):
+        service, _ = _make_service()
 
         record = service.record_submission(
             confirmation_number="DSIP-2026-001",
-            package_dir=str(package_dir),
-            archive_dir=str(archive_dir),
+            package_dir="/package",
+            archive_dir="/archive",
         )
 
         assert record.immutable is True
