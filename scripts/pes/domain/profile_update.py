@@ -14,15 +14,6 @@ import copy
 from typing import Any
 
 
-# Fields whose values are lists and support append semantics.
-_ARRAY_FIELDS = frozenset({
-    "capabilities",
-    "key_personnel",
-    "past_performance",
-    "research_institution_partners",
-})
-
-
 def apply_section_update(
     profile: dict[str, Any],
     update: dict[str, Any],
