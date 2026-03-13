@@ -68,8 +68,12 @@ class ProfileValidationService:
             ))
 
         # Business rules beyond JSON Schema
+        errors.extend(self._validate_company_name(profile))
+        errors.extend(self._validate_capabilities(profile))
         errors.extend(self._validate_cage_code(profile))
+        errors.extend(self._validate_uei(profile))
         errors.extend(self._validate_employee_count(profile))
+        errors.extend(self._validate_socioeconomic(profile))
 
         return ValidationResult(
             valid=len(errors) == 0,
@@ -101,6 +105,53 @@ class ProfileValidationService:
 
         return errors
 
+    def _validate_company_name(self, profile: dict[str, Any]) -> list[ValidationError]:
+        """Validate company name is non-empty."""
+        errors: list[ValidationError] = []
+        name = profile.get("company_name", "")
+
+        if isinstance(name, str) and not name.strip():
+            errors.append(ValidationError(
+                field="company_name",
+                message="Company name is required and must not be empty",
+                expected="non-empty string",
+            ))
+
+        return errors
+
+    def _validate_capabilities(self, profile: dict[str, Any]) -> list[ValidationError]:
+        """Validate capabilities list has at least one entry."""
+        errors: list[ValidationError] = []
+        caps = profile.get("capabilities")
+
+        if isinstance(caps, list) and len(caps) == 0:
+            errors.append(ValidationError(
+                field="capabilities",
+                message="At least one capability is required",
+                expected="non-empty array",
+            ))
+
+        return errors
+
+    def _validate_uei(self, profile: dict[str, Any]) -> list[ValidationError]:
+        """Validate UEI is present when SAM.gov is active."""
+        errors: list[ValidationError] = []
+        certs = profile.get("certifications", {})
+        sam = certs.get("sam_gov", {})
+
+        if not sam.get("active", False):
+            return errors
+
+        uei = sam.get("uei", "")
+        if not uei:
+            errors.append(ValidationError(
+                field="certifications.sam_gov.uei",
+                message="UEI is required when SAM.gov registration is active",
+                expected="non-empty UEI string",
+            ))
+
+        return errors
+
     def _validate_employee_count(self, profile: dict[str, Any]) -> list[ValidationError]:
         """Validate employee count is positive."""
         errors: list[ValidationError] = []
@@ -112,5 +163,29 @@ class ProfileValidationService:
                 message="Employee count must be a positive integer greater than 0",
                 expected="positive integer",
             ))
+
+        return errors
+
+    _VALID_SOCIOECONOMIC = frozenset({
+        "8(a)", "HUBZone", "SDVOSB", "WOSB", "EDWOSB", "SDB",
+    })
+
+    def _validate_socioeconomic(self, profile: dict[str, Any]) -> list[ValidationError]:
+        """Validate socioeconomic certifications against allowed values."""
+        errors: list[ValidationError] = []
+        certs = profile.get("certifications", {})
+        socio = certs.get("socioeconomic", [])
+
+        if not isinstance(socio, list):
+            return errors
+
+        for cert in socio:
+            if cert not in self._VALID_SOCIOECONOMIC:
+                errors.append(ValidationError(
+                    field="certifications.socioeconomic",
+                    message=f"Invalid socioeconomic certification '{cert}'. "
+                            f"Allowed values: {sorted(self._VALID_SOCIOECONOMIC)}",
+                    expected=f"one of {sorted(self._VALID_SOCIOECONOMIC)}",
+                ))
 
         return errors

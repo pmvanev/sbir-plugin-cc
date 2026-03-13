@@ -94,43 +94,52 @@ def save_profile(profile_draft, profile_path, profile_dir):
 
     Invokes through ProfilePort driving port.
     """
-    # TODO: Replace with actual adapter invocation.
-    # from pes.adapters.json_profile_adapter import JsonProfileAdapter
-    # adapter = JsonProfileAdapter(str(profile_dir))
-    # adapter.save(profile_draft)
-    pytest.skip("Profile adapter not yet implemented")
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+
+    adapter = JsonProfileAdapter(str(profile_dir))
+    adapter.write(profile_draft)
 
 
 @when(parsers.parse('a new profile for "{company}" is saved'))
 def save_new_profile(valid_profile_data, profile_path, profile_dir, company):
     """Save a new profile, potentially overwriting existing."""
-    # TODO: Replace with actual adapter invocation.
-    pytest.skip("Profile adapter not yet implemented")
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+
+    profile = valid_profile_data.copy()
+    profile["company_name"] = company
+    adapter = JsonProfileAdapter(str(profile_dir))
+    adapter.write(profile)
 
 
 @when("a valid profile is saved")
 def save_valid_profile(minimal_valid_profile, profile_dir):
     """Save a minimal valid profile."""
-    # TODO: Replace with actual adapter invocation.
-    pytest.skip("Profile adapter not yet implemented")
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+
+    adapter = JsonProfileAdapter(str(profile_dir))
+    adapter.write(minimal_valid_profile)
 
 
 @when("the system checks for an existing profile")
 def check_existing(profile_dir, profile_context):
     """Check for existing profile metadata through adapter."""
-    # TODO: Replace with actual adapter invocation.
-    # from pes.adapters.json_profile_adapter import JsonProfileAdapter
-    # adapter = JsonProfileAdapter(str(profile_dir))
-    # metadata = adapter.get_metadata()
-    # profile_context["metadata"] = metadata
-    pytest.skip("Profile adapter not yet implemented")
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+
+    adapter = JsonProfileAdapter(str(profile_dir))
+    profile_context["metadata"] = adapter.metadata()
 
 
 @when("the system attempts to load the profile")
 def attempt_load(profile_dir, profile_context):
     """Attempt to load profile through adapter."""
-    # TODO: Replace with actual adapter invocation.
-    pytest.skip("Profile adapter not yet implemented")
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+
+    adapter = JsonProfileAdapter(str(profile_dir))
+    result = adapter.read()
+    if result is None:
+        profile_context["not_found"] = True
+    else:
+        profile_context["loaded"] = result
 
 
 # --- Then steps ---

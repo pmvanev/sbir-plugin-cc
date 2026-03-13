@@ -37,6 +37,27 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-03-13T02:53:26Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED_ACCEPTANCE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-13T03:05:07Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED_UNIT",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: BDD acceptance tests serve as port-to-port unit tests through ProfileValidationService driving port",
+      "t": "2026-03-13T03:05:20Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-13T03:06:38Z"
     }
   ]
 }

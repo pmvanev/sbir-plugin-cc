@@ -16,6 +16,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from tests.acceptance.company_profile_builder.conftest import build_profile_from_table
 from tests.acceptance.company_profile_builder.steps.profile_common_steps import *  # noqa: F403
+from tests.acceptance.company_profile_builder.steps.profile_persistence_steps import *  # noqa: F403
 
 # Link to feature files
 scenarios("../walking-skeleton.feature")
@@ -219,8 +220,12 @@ def validate_only(profile_draft, validation_result):
 @when("the profile is saved and then loaded")
 def roundtrip_save_load(profile_draft, profile_context, profile_path):
     """Save profile then load it back -- property test for roundtrip."""
-    # TODO: Replace with actual adapter invocation.
-    pytest.skip("Profile adapter not yet implemented")
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+
+    adapter = JsonProfileAdapter(str(profile_path.parent))
+    profile_context["original"] = profile_draft.copy()
+    adapter.write(profile_draft)
+    profile_context["loaded"] = adapter.read()
 
 
 # --- Then steps ---
