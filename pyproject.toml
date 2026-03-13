@@ -47,6 +47,7 @@ ignore = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["scripts"]
+python_files = ["test_*.py", "*_steps.py"]
 
 [tool.mypy]
 python_version = "3.12"
