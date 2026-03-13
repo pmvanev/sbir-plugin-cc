@@ -1,0 +1,187 @@
+{
+  "roadmap": {
+    "project_id": "company-profile-builder",
+    "created_at": "2026-03-13T02:42:03Z",
+    "total_steps": 6,
+    "phases": 3
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Foundation: Schema, Port, Adapter, Validation",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Profile schema template, port, and JSON file adapter",
+          "description": "JSON Schema template for company profile validation. Profile port (abstract interface for read/write/exists/metadata). JSON file adapter implementing atomic writes (tmp -> bak -> rename), directory creation, file existence detection, and metadata reading.",
+          "criteria": [
+            "JSON Schema template at templates/company-profile-schema.json validates known-good profiles (all required fields, correct types)",
+            "JSON Schema template rejects known-bad profiles (missing required fields, wrong types, invalid nesting)",
+            "Profile port defines abstract methods: read, write, exists, metadata",
+            "JSON file adapter writes atomically: writes to .tmp, backs up existing to .bak, renames .tmp to target",
+            "Adapter creates ~/.sbir/ directory if absent",
+            "Adapter detects existing profile and returns metadata (company_name, last_modified)",
+            "Adapter returns None/empty when no profile exists"
+          ],
+          "files_to_modify": [
+            "templates/company-profile-schema.json",
+            "scripts/pes/ports/profile_port.py",
+            "scripts/pes/adapters/json_profile_adapter.py"
+          ],
+          "test_files": [
+            "tests/acceptance/company_profile_builder/walking-skeleton.feature",
+            "tests/acceptance/company_profile_builder/milestone-01-foundation.feature"
+          ],
+          "dependencies": [],
+          "estimated_hours": 3
+        },
+        {
+          "id": "01-02",
+          "name": "Profile validation service",
+          "description": "Pure domain service that validates a profile dict against the JSON Schema template plus custom business rules. Returns field-level errors with expected formats. Covers CAGE format (5 alphanumeric), clearance enum, employee count > 0, required fields, socioeconomic valid values, conditional requirements (CAGE/UEI required when SAM active).",
+          "criteria": [
+            "Valid complete profile passes validation with no errors",
+            "Invalid CAGE code (wrong length or non-alphanumeric) returns specific field error with expected format",
+            "Invalid security_clearance enum value returns allowed values list",
+            "Missing required top-level fields listed individually in errors",
+            "Employee count <= 0 rejected with specific error",
+            "Invalid socioeconomic values rejected with allowed values",
+            "CAGE code and UEI required when sam_gov.active is true; not required when false",
+            "Validation result includes valid boolean and list of ProfileFieldError objects"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/profile_validation.py"
+          ],
+          "test_files": [
+            "tests/acceptance/company_profile_builder/milestone-01-foundation.feature"
+          ],
+          "dependencies": ["01-01"],
+          "estimated_hours": 3
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Agent, Skill, and Commands",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Profile builder agent with interview flow and overwrite protection",
+          "description": "sbir-profile-builder markdown agent. Mode selection (documents/interview/both). Guided interview asking section-by-section with fit scoring impact explanations. Overwrite protection: detect existing profile, offer backup/update/cancel. Profile domain skill with field explanations and interview question templates.",
+          "criteria": [
+            "Agent file at agents/sbir-profile-builder.md follows plugin convention (YAML frontmatter, 200-400 lines)",
+            "Skill file at skills/profile-builder/profile-domain.md provides field-by-field fit scoring explanations",
+            "Agent handles mode selection: documents, interview, or both",
+            "Agent interviews section-by-section covering all schema fields",
+            "Agent explains why each field matters for fit scoring when asking",
+            "Agent detects existing profile before setup and offers: start fresh (backup), update existing, or cancel",
+            "Cancel at any point writes no file"
+          ],
+          "files_to_modify": [
+            "agents/sbir-profile-builder.md",
+            "skills/profile-builder/profile-domain.md"
+          ],
+          "test_files": [
+            "tests/acceptance/company_profile_builder/milestone-02-agent-commands.feature"
+          ],
+          "dependencies": ["01-01", "01-02"],
+          "estimated_hours": 4
+        },
+        {
+          "id": "02-02",
+          "name": "Profile commands with preview and validation gate",
+          "description": "Setup and update commands dispatching to agent. Preview displays all fields human-readable with validation result. Save blocked until validation passes. Edit-during-preview supported. Atomic write on confirmed save.",
+          "criteria": [
+            "Command at commands/sbir-proposal-profile-setup.md dispatches to @sbir-profile-builder with setup context",
+            "Command at commands/sbir-proposal-profile-update.md dispatches to @sbir-profile-builder with update context",
+            "Both commands follow plugin convention (YAML frontmatter with description and argument-hint)",
+            "Preview shows every profile field in human-readable format (not raw JSON)",
+            "Validation failures show field name, current value, and expected format",
+            "Save requires explicit user confirmation after validation passes",
+            "Save uses atomic write pattern via profile adapter"
+          ],
+          "files_to_modify": [
+            "commands/sbir-proposal-profile-setup.md",
+            "commands/sbir-proposal-profile-update.md"
+          ],
+          "test_files": [
+            "tests/acceptance/company_profile_builder/milestone-02-agent-commands.feature"
+          ],
+          "dependencies": ["02-01"],
+          "estimated_hours": 2
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Document Extraction and Selective Update",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Document extraction integration",
+          "description": "Agent reads PDFs, text files via Read tool and fetches URLs via Bash curl. Extracts profile fields via LLM interpretation. Reports extracted vs missing. Multiple documents are additive. Unsupported formats produce clear error with alternatives.",
+          "criteria": [
+            "Agent reads PDF and text files and extracts profile-relevant fields",
+            "Agent fetches URL content via curl and extracts SAM.gov entity data",
+            "Extracted fields displayed with values for user verification before entering draft",
+            "Missing fields explicitly listed to drive targeted interview for remaining gaps",
+            "Multiple documents merge additively without losing prior extractions",
+            "Unsupported file format produces actionable error with alternatives (export to PDF, copy to text, skip to interview)"
+          ],
+          "files_to_modify": [
+            "agents/sbir-profile-builder.md",
+            "skills/profile-builder/profile-domain.md"
+          ],
+          "test_files": [
+            "tests/acceptance/company_profile_builder/milestone-03-extraction-update.feature"
+          ],
+          "dependencies": ["02-01"],
+          "estimated_hours": 3
+        },
+        {
+          "id": "03-02",
+          "name": "Selective profile section update",
+          "description": "Update flow: load existing profile, show available sections, user selects one, display current values, accept modifications (append to arrays, replace scalars), validate complete updated profile, save atomically. Error when no profile exists.",
+          "criteria": [
+            "Update command shows available sections for modification",
+            "Selected section displays current values before modification",
+            "Array fields (capabilities, key_personnel, past_performance) append without removing existing entries",
+            "Scalar fields (employee_count, security_clearance) replace the value",
+            "Unselected sections remain unchanged in saved file",
+            "Complete updated profile passes validation before save",
+            "No-profile-exists produces error suggesting /sbir:proposal profile setup"
+          ],
+          "files_to_modify": [
+            "agents/sbir-profile-builder.md"
+          ],
+          "test_files": [
+            "tests/acceptance/company_profile_builder/milestone-03-extraction-update.feature"
+          ],
+          "dependencies": ["02-01", "01-01", "01-02"],
+          "estimated_hours": 3
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/",
+      "agents/",
+      "commands/",
+      "skills/profile-builder/",
+      "templates/"
+    ],
+    "test_directories": [
+      "tests/acceptance/company_profile_builder/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "TODO",
+    "approved_at": "TODO"
+  }
+}

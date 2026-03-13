@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Company Profile",
+  "description": "Schema for SBIR/STTR company profile validation",
+  "type": "object",
+  "required": [
+    "company_name",
+    "capabilities",
+    "certifications",
+    "employee_count",
+    "key_personnel",
+    "past_performance",
+    "research_institution_partners"
+  ],
+  "properties": {
+    "company_name": {
+      "type": "string"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "certifications": {
+      "type": "object",
+      "required": ["sam_gov", "socioeconomic", "security_clearance", "itar_registered"],
+      "properties": {
+        "sam_gov": {
+          "type": "object",
+          "required": ["active"],
+          "properties": {
+            "active": { "type": "boolean" },
+            "cage_code": { "type": "string" },
+            "uei": { "type": "string" }
+          }
+        },
+        "socioeconomic": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "security_clearance": {
+          "type": "string",
+          "enum": ["none", "confidential", "secret", "top_secret"]
+        },
+        "itar_registered": { "type": "boolean" }
+      }
+    },
+    "employee_count": {
+      "type": "integer"
+    },
+    "key_personnel": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "role", "expertise"],
+        "properties": {
+          "name": { "type": "string" },
+          "role": { "type": "string" },
+          "expertise": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "past_performance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["agency", "topic_area", "outcome"],
+        "properties": {
+          "agency": { "type": "string" },
+          "topic_area": { "type": "string" },
+          "outcome": { "type": "string" }
+        }
+      }
+    },
+    "research_institution_partners": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

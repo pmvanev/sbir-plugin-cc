@@ -180,17 +180,12 @@ def any_valid_profile(valid_profile_data):
 
 @when("the profile is validated")
 def validate_profile(profile_draft, validation_result):
-    """Invoke profile validation through the validation service.
+    """Invoke profile validation through the validation service."""
+    from pes.domain.profile_validation import ProfileValidationService
 
-    This step delegates to the ProfileValidationService driving port.
-    The actual service will be implemented in scripts/pes/domain/profile_validation.py.
-    """
-    # TODO: Replace with actual validation service invocation when implemented.
-    # from pes.domain.profile_validation import ProfileValidationService
-    # service = ProfileValidationService()
-    # result = service.validate(profile_draft)
-    # validation_result["result"] = result
-    pytest.skip("Validation service not yet implemented")
+    service = ProfileValidationService()
+    result = service.validate(profile_draft)
+    validation_result["result"] = result
 
 
 @when("Rafael submits the profile for validation and saving")
@@ -199,27 +194,26 @@ def validate_and_save(profile_draft, validation_result, profile_path):
 
     Invokes through both driving ports: validation service then profile adapter.
     """
-    # TODO: Replace with actual service invocations.
-    # from pes.domain.profile_validation import ProfileValidationService
-    # from pes.adapters.json_profile_adapter import JsonProfileAdapter
-    # service = ProfileValidationService()
-    # result = service.validate(profile_draft)
-    # validation_result["result"] = result
-    # if result.valid:
-    #     adapter = JsonProfileAdapter(str(profile_path.parent))
-    #     adapter.save(profile_draft)
-    #     validation_result["saved"] = True
-    pytest.skip("Validation service and profile adapter not yet implemented")
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+    from pes.domain.profile_validation import ProfileValidationService
+
+    service = ProfileValidationService()
+    result = service.validate(profile_draft)
+    validation_result["result"] = result
+    if result.valid:
+        adapter = JsonProfileAdapter(str(profile_path.parent))
+        adapter.write(profile_draft)
+        validation_result["saved"] = True
 
 
 @when("Rafael submits the profile for validation")
 def validate_only(profile_draft, validation_result):
-    """Validate profile without saving.
+    """Validate profile without saving."""
+    from pes.domain.profile_validation import ProfileValidationService
 
-    Invokes through validation service driving port only.
-    """
-    # TODO: Replace with actual validation service invocation.
-    pytest.skip("Validation service not yet implemented")
+    service = ProfileValidationService()
+    result = service.validate(profile_draft)
+    validation_result["result"] = result
 
 
 @when("the profile is saved and then loaded")
