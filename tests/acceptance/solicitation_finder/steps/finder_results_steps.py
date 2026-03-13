@@ -3,6 +3,7 @@
 Invokes through:
 - FinderResultsPort (driven port -- results persistence)
 - FinderService (orchestrator for results display)
+- TopicPursueService (driving port for topic pursuit and handoff)
 
 Does NOT import JSON file adapter or file system internals directly.
 """
@@ -14,6 +15,11 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from pes.domain.topic_pursue_service import (
+    TopicExpiredError,
+    TopicNotFoundError,
+    TopicPursueService,
+)
 from tests.acceptance.solicitation_finder.steps.finder_common_steps import *  # noqa: F403
 
 # Link to feature files
@@ -303,13 +309,20 @@ def save_and_load_results(
 
 
 @when(parsers.parse('Phil chooses to pursue topic "{topic_id}"'))
-def pursue_topic(topic_id: str, finder_context: dict[str, Any]):
-    """Phil selects a topic for pursuit.
-
-    TODO: Wire to pursue flow.
-    """
+def pursue_topic(
+    topic_id: str,
+    finder_context: dict[str, Any],
+    finder_results_port,
+):
+    """Phil selects a topic for pursuit via TopicPursueService."""
     finder_context["action"] = "pursue"
     finder_context["pursue_topic_id"] = topic_id
+    service = TopicPursueService(results_port=finder_results_port)
+    try:
+        result = service.pursue(topic_id)
+        finder_context["pursue_result"] = result
+    except (TopicNotFoundError, TopicExpiredError) as exc:
+        finder_context["pursue_error"] = str(exc)
 
 
 @when("Phil confirms the selection")
@@ -499,9 +512,12 @@ def results_match_original(finder_context: dict[str, Any]):
 
 @then(parsers.parse('the proposal workflow begins with topic "{topic_id}" pre-loaded'))
 def proposal_begins(topic_id: str, finder_context: dict[str, Any]):
-    """Verify proposal workflow started with topic."""
-    # TODO: Assert TopicInfo handoff
-    pass
+    """Verify proposal workflow started with topic via PursueResult."""
+    result = finder_context.get("pursue_result")
+    assert result is not None, "No pursue result -- pursue step must run first"
+    assert result.topic_id == topic_id, (
+        f"Expected topic {topic_id}, got {result.topic_id}"
+    )
 
 
 @then(
@@ -512,16 +528,27 @@ def proposal_begins(topic_id: str, finder_context: dict[str, Any]):
 def proposal_has_metadata(
     agency: str, phase: str, deadline: str, finder_context: dict[str, Any]
 ):
-    """Verify proposal metadata from topic."""
-    # TODO: Assert TopicInfo fields
-    pass
+    """Verify proposal metadata from TopicInfo (PursueResult)."""
+    result = finder_context.get("pursue_result")
+    assert result is not None, "No pursue result available"
+    assert result.agency == agency, f"Expected agency {agency}, got {result.agency}"
+    assert result.phase == phase, f"Expected phase {phase}, got {result.phase}"
+    assert result.deadline == deadline, (
+        f"Expected deadline {deadline}, got {result.deadline}"
+    )
 
 
 @then("Phil does not need to re-enter any topic metadata")
 def no_reenter_metadata(finder_context: dict[str, Any]):
-    """Verify all metadata pre-loaded."""
-    # TODO: Assert no manual entry needed
-    pass
+    """Verify all metadata pre-loaded in PursueResult."""
+    result = finder_context.get("pursue_result")
+    assert result is not None, "No pursue result available"
+    # All required fields populated (not None or empty)
+    assert result.topic_id, "topic_id missing"
+    assert result.title, "title missing"
+    assert result.agency, "agency missing"
+    assert result.phase, "phase missing"
+    assert result.deadline, "deadline missing"
 
 
 @then(parsers.parse('Phil sees "{message}"'))
