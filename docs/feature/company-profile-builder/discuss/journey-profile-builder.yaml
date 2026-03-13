@@ -1,0 +1,302 @@
+journey:
+  name: "Company Profile Builder"
+  goal: "Create a validated company profile from documents and conversation so fit scoring is fully operational"
+  persona: "Rafael Medina -- small business technical founder, SBIR veteran, CLI-native"
+
+  emotional_arc:
+    start: "Frustrated/blocked -- scoring degraded, unfamiliar schema, administrative detour"
+    middle: "Productive/engaged -- documents extracted, questions are targeted, progress visible"
+    end: "Confident/relieved -- validated profile saved, ready to score topics"
+
+  triggers:
+    - "User runs /sbir:proposal profile setup directly"
+    - "User is prompted after 'Company profile not found' warning from topic scout"
+    - "User wants to update an existing profile after company changes"
+
+steps:
+  - id: 1
+    name: "Start Profile Builder"
+    command: "/sbir:proposal profile setup"
+
+    tui_mockup: |
+      +-- Profile Setup ---------------------------------------------------+
+      |  Company Profile Builder                                            |
+      |                                                                     |
+      |  This will create your company profile at:                          |
+      |  ${profile_path}                                                    |
+      |                                                                     |
+      |  I can work from:                                                   |
+      |    1. Your existing documents (capability statement, SAM.gov, etc.) |
+      |    2. A conversational interview (I'll ask questions)               |
+      |    3. Both -- documents first, then fill gaps with questions        |
+      |                                                                     |
+      |  Which approach works best for you?                                 |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "profile_path"
+        source: "~/.sbir/company-profile.json (hardcoded default)"
+        displayed_as: "${profile_path}"
+        consumers: ["Step 1 display", "Step 5 save confirmation", "error messages"]
+
+    emotional_state:
+      entry: "Frustrated (scoring degraded) or curious (first-time setup)"
+      exit: "Hopeful -- path forward is clear and manageable"
+
+    integration_checkpoint: |
+      Verify ~/.sbir/ directory exists or can be created.
+      Check if existing profile exists (triggers overwrite protection flow).
+
+    gherkin: |
+      Scenario: Start profile builder with no existing profile
+        Given Rafael has no company profile at ~/.sbir/company-profile.json
+        When Rafael runs "/sbir:proposal profile setup"
+        Then the builder explains what the profile is for
+        And the builder offers three approaches (documents, interview, both)
+        And the profile path is displayed as ~/.sbir/company-profile.json
+
+  - id: 2
+    name: "Gather from Documents"
+    command: "Conversational -- user provides file paths or URLs"
+
+    tui_mockup: |
+      +-- Document Extraction ---------------------------------------------+
+      |  Share any of these and I'll extract what I can:                    |
+      |  - Capability statement (PDF, Word, or text)                        |
+      |  - SAM.gov entity page URL                                          |
+      |  - Past proposal cover pages or summaries                           |
+      |  - Team bios or org chart                                           |
+      |                                                                     |
+      |  From ${document_name} I found:                                     |
+      |                                                                     |
+      |  Company name:    ${company_name}                                   |
+      |  Capabilities:    ${capabilities_list}                              |
+      |  Employee count:  ${employee_count}                                 |
+      |  Key personnel:   ${personnel_count} people extracted               |
+      |  Past performance: ${past_perf_count} entries extracted             |
+      |                                                                     |
+      |  Not found in document:                                             |
+      |    ${missing_fields_list}                                           |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "company_name"
+        source: "Extracted from user document or interview"
+        displayed_as: "${company_name}"
+        consumers: ["Step 2 extraction", "Step 4 preview", "Step 5 saved file"]
+      - name: "capabilities_list"
+        source: "Extracted from user document or interview"
+        displayed_as: "${capabilities_list}"
+        consumers: ["Step 2 extraction", "Step 4 preview", "fit scoring SME dimension"]
+      - name: "missing_fields_list"
+        source: "Computed by comparing extracted data against schema"
+        displayed_as: "${missing_fields_list}"
+        consumers: ["Step 2 extraction summary", "Step 3 interview targeting"]
+
+    emotional_state:
+      entry: "Hopeful but skeptical (will it parse correctly?)"
+      exit: "Impressed/productive (most data extracted automatically)"
+
+    integration_checkpoint: |
+      Extracted data stored in working draft (in-memory or temp).
+      Missing fields enumerated and tracked for Step 3.
+      User confirms extracted data before proceeding.
+
+    gherkin: |
+      Scenario: Extract profile data from capability statement PDF
+        Given Rafael chose "documents first" approach
+        And Rafael provides "./docs/radiant-cap-statement.pdf"
+        When the builder reads the document
+        Then the builder extracts company name, capabilities, and personnel
+        And the builder lists fields not found in the document
+        And Rafael can confirm or correct each extracted field
+
+  - id: 3
+    name: "Interview for Remaining Gaps"
+    command: "Conversational -- agent asks targeted questions"
+
+    tui_mockup: |
+      +-- Filling Gaps ----------------------------------------------------+
+      |  A few things I couldn't find in your documents.                    |
+      |                                                                     |
+      |  SAM.gov Registration:                                              |
+      |  Is your SAM.gov registration active?                               |
+      |                                                                     |
+      |  Socioeconomic certifications -- do you hold any of these?          |
+      |  - 8(a)                                                             |
+      |  - HUBZone                                                          |
+      |  - WOSB / SDVOSB / VOSB                                            |
+      |  - None of the above                                                |
+      |                                                                     |
+      |  Security clearance -- highest facility level?                      |
+      |  - None / Confidential / Secret / Top Secret                        |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "certifications_data"
+        source: "User responses during interview"
+        displayed_as: "Inline in conversation"
+        consumers: ["Step 4 preview", "Step 5 saved file", "fit scoring cert dimension"]
+      - name: "profile_draft"
+        source: "Merged extraction + interview data"
+        displayed_as: "Internal working state"
+        consumers: ["Step 4 preview rendering"]
+
+    emotional_state:
+      entry: "Engaged -- questions are specific to what's missing, not redundant"
+      exit: "Almost done -- all fields populated"
+
+    integration_checkpoint: |
+      All schema fields now have values or explicit "not applicable" markers.
+      Working draft is complete and ready for validation.
+
+    gherkin: |
+      Scenario: Fill certification gaps through targeted questions
+        Given the builder extracted company name and capabilities from a document
+        And SAM.gov details were not found in the document
+        When the builder asks about SAM.gov registration
+        And Rafael provides CAGE code "7X2K9" and UEI "DKJF84NXLE73"
+        Then the builder records SAM.gov as active with the provided codes
+        And the builder moves to the next missing field
+
+  - id: 4
+    name: "Preview and Validate"
+    command: "Agent presents complete profile"
+
+    tui_mockup: |
+      +-- Profile Preview -------------------------------------------------+
+      |  Here's your complete company profile:                              |
+      |                                                                     |
+      |  Company:          ${company_name}                                  |
+      |  Employees:        ${employee_count}                                |
+      |                                                                     |
+      |  Capabilities:     ${capabilities_list}                             |
+      |                                                                     |
+      |  Certifications:                                                    |
+      |    SAM.gov:        ${sam_status} (CAGE: ${cage_code}, UEI: ${uei})  |
+      |    Socioeconomic:  ${socioeconomic_list}                            |
+      |    Clearance:      ${clearance_level}                               |
+      |    ITAR:           ${itar_status}                                   |
+      |                                                                     |
+      |  Key Personnel:    ${personnel_count} people                        |
+      |  Past Performance: ${past_perf_count} entries                       |
+      |  Research Partners: ${partners_count} institutions                  |
+      |                                                                     |
+      |  Validation: ${validation_status}                                   |
+      |                                                                     |
+      |  Does this look correct? (yes / edit / cancel)                      |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "validation_status"
+        source: "Schema validation against company-profile.json schema"
+        displayed_as: "${validation_status}"
+        consumers: ["Step 4 preview", "Step 5 gate (must be PASSED to save)"]
+
+    emotional_state:
+      entry: "Expectant -- reviewing the final result"
+      exit: "Confident -- data looks right, ready to save"
+
+    integration_checkpoint: |
+      Schema validation passes: all required fields present, correct types.
+      CAGE code format validated (5 alphanumeric characters).
+      Employee count is positive integer.
+      Security clearance is one of allowed enum values.
+      User explicitly confirms before proceeding to save.
+
+    gherkin: |
+      Scenario: Preview shows complete validated profile
+        Given all profile fields have been populated
+        And schema validation passes
+        When the builder displays the profile preview
+        Then all fields are shown in a readable format
+        And validation status shows "PASSED"
+        And Rafael is asked to confirm, edit, or cancel
+
+  - id: 5
+    name: "Confirm and Save"
+    command: "User confirms, agent writes file"
+
+    tui_mockup: |
+      +-- Profile Saved ---------------------------------------------------+
+      |  Company profile saved to:                                          |
+      |  ${profile_path}                                                    |
+      |                                                                     |
+      |  Your fit scoring is now fully operational.                         |
+      |  Run /sbir:proposal new to evaluate a solicitation.                 |
+      |                                                                     |
+      |  To update your profile later:                                      |
+      |  /sbir:proposal profile update                                      |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "profile_path"
+        source: "~/.sbir/company-profile.json (hardcoded default)"
+        displayed_as: "${profile_path}"
+        consumers: ["Step 1 display", "Step 5 save confirmation"]
+      - name: "saved_profile_json"
+        source: "Written file at ~/.sbir/company-profile.json"
+        displayed_as: "File on disk"
+        consumers: ["sbir-topic-scout Phase 3 SCORE", "fit scoring engine"]
+
+    emotional_state:
+      entry: "Ready to commit"
+      exit: "Relieved and accomplished -- setup done, ready for real work"
+
+    integration_checkpoint: |
+      File written using atomic write pattern (write .tmp, backup .bak, rename).
+      Written file is valid JSON and matches schema.
+      sbir-topic-scout can read the file in Phase 3 SCORE.
+
+    gherkin: |
+      Scenario: Save profile after confirmation
+        Given Rafael has reviewed the profile preview
+        And validation status is "PASSED"
+        When Rafael confirms with "yes"
+        Then the profile is saved to ~/.sbir/company-profile.json
+        And the builder confirms the file location
+        And the builder suggests running /sbir:proposal new as next step
+
+error_paths:
+  - id: "E1"
+    name: "Document cannot be read"
+    trigger: "User provides unsupported file format or unreadable file"
+    recovery: "Suggest PDF export, text copy, or skip to interview-only mode"
+
+  - id: "E2"
+    name: "Existing profile would be overwritten"
+    trigger: "~/.sbir/company-profile.json already exists when setup starts"
+    recovery: "Offer: start fresh (with backup), update existing, or cancel"
+
+  - id: "E3"
+    name: "Validation failure"
+    trigger: "Profile draft fails schema validation"
+    recovery: "Show specific field errors with correction prompts, allow retry"
+
+  - id: "E4"
+    name: "File system permission error"
+    trigger: "Cannot write to ~/.sbir/ directory"
+    recovery: "Suggest checking permissions, creating directory, or alternate output path"
+
+  - id: "E5"
+    name: "No data extracted from document"
+    trigger: "Document provided but no profile-relevant data found"
+    recovery: "Report what was searched for, suggest different document, fall back to interview"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "profile_path"
+      must_match_across: [1, 5]
+      failure_message: "Profile path shown in Step 1 must match the actual save location in Step 5"
+
+    - artifact: "company_name"
+      must_match_across: [2, 4, 5]
+      failure_message: "Company name extracted in Step 2 must appear unchanged in preview (Step 4) and saved file (Step 5)"
+
+    - artifact: "validation_status"
+      must_match_across: [4, 5]
+      failure_message: "Step 5 save must not proceed unless Step 4 validation is PASSED"
+
+    - artifact: "saved_profile_json"
+      must_match_across: [5]
+      failure_message: "Saved file must match the schema expected by sbir-topic-scout (skills/topic-scout/fit-scoring-methodology.md)"

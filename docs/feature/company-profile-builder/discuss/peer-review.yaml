@@ -1,0 +1,68 @@
+review_id: "req_rev_20260312_001"
+reviewer: "product-owner (review mode)"
+artifact: "docs/feature/company-profile-builder/discuss/user-stories.md"
+iteration: 1
+
+strengths:
+  - "All 5 stories use real persona (Rafael Medina) with specific company context (Radiant Defense Systems, 23 employees, CAGE 7X2K9)"
+  - "Stories trace to JTBD analysis with explicit job story references and opportunity scores"
+  - "Concrete domain examples use realistic SBIR data: agency names (Air Force, NASA, DARPA), CAGE codes, UEI numbers, clearance levels"
+  - "Error paths are well-covered: invalid CAGE code, missing SAM.gov, no existing profile, permission failures, unsupported document formats"
+  - "Emotional journey is coherent: frustrated/blocked -> guided/productive -> confident/relieved across the 5-step flow"
+  - "Cross-agent integration explicitly documented: sbir-topic-scout schema dependency, FitScoring dataclass mapping"
+  - "Atomic write pattern consistently applied across all stories that modify files"
+
+issues_identified:
+  confirmation_bias:
+    - issue: "Assumption that PDF text extraction will work reliably for capability statements"
+      severity: "medium"
+      location: "US-CPB-003"
+      recommendation: "Add a domain example or scenario where extraction is partial -- builder gets company name but misses capabilities due to formatting. This is the most likely real-world outcome. Already partially addressed by the extract-then-confirm pattern but a specific partial extraction scenario would strengthen it."
+      resolution: "RESOLVED -- added 'Partial extraction from poorly formatted document' scenario to US-CPB-003"
+
+  completeness_gaps:
+    - issue: "No non-functional requirement for profile data privacy"
+      severity: "medium"
+      location: "All stories"
+      recommendation: "Company profile contains sensitive data (CAGE code, UEI, clearance level, ITAR status). Add a technical note about file permissions (e.g., chmod 600 on Unix) or at minimum note that the file should not be committed to version control."
+      resolution: "RESOLVED -- added file permissions and .gitignore technical note to US-CPB-001"
+    - issue: "No scenario for concurrent profile access"
+      severity: "low"
+      location: "US-CPB-004"
+      recommendation: "Technical note mentions concurrent modification risk but no scenario covers it. Given CLI single-user context, this is low severity -- the technical note is sufficient."
+      resolution: "ACCEPTED -- low severity, technical note is sufficient for single-user CLI context"
+
+  clarity_issues: []
+
+  testability_concerns: []
+
+  priority_validation:
+    q1_largest_bottleneck: "YES"
+    q2_simple_alternatives: "ADEQUATE"
+    q3_constraint_prioritization: "CORRECT"
+    q4_data_justified: "JUSTIFIED"
+    verdict: "PASS"
+
+approval_status: "approved"
+critical_issues_count: 0
+high_issues_count: 0
+
+---
+# Iteration 2
+
+review_id: "req_rev_20260312_002"
+reviewer: "product-owner (review mode)"
+artifact: "docs/feature/company-profile-builder/discuss/user-stories.md"
+iteration: 2
+
+resolution_summary:
+  - "US-CPB-003: Added partial extraction scenario covering poorly formatted documents where only some fields are extracted"
+  - "US-CPB-001: Added file permissions technical note covering restrictive permissions and .gitignore guidance"
+  - "US-CPB-004: Accepted concurrent access as low-severity -- technical note sufficient"
+
+remaining_issues: []
+
+approval_status: "approved"
+critical_issues_count: 0
+high_issues_count: 0
+medium_issues_count: 0
