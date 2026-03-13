@@ -1,0 +1,112 @@
+{
+  "roadmap": {
+    "project_id": "solution-shaper",
+    "created_at": "2026-03-13T12:00:00Z",
+    "total_steps": 4,
+    "phases": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Agent, Skill, and Command",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Solution-shaper agent with 5-phase approach selection workflow",
+          "description": "Markdown agent implementing DEEP READ, APPROACH GENERATION, APPROACH SCORING, CONVERGENCE, and CHECKPOINT phases. Reads solicitation file, company profile, and proposal state. Produces approach-brief.md.",
+          "criteria": [
+            "Agent file at agents/sbir-solution-shaper.md follows plugin convention (YAML frontmatter, 200-400 lines)",
+            "Agent reads solicitation from topic.solicitation_file path and extracts objectives, eval criteria, constraints",
+            "Agent generates 3-5 technically distinct approaches using forward mapping, reverse mapping, and prior art",
+            "Agent scores each approach across 5 dimensions with 0.00-1.00 scores referencing company profile data",
+            "Checkpoint presents approve/revise/explore/restart/quit options following existing checkpoint pattern"
+          ],
+          "files_to_modify": [
+            "agents/sbir-solution-shaper.md"
+          ],
+          "test_files": [],
+          "dependencies": [],
+          "stories": ["US-SS-001"],
+          "estimated_hours": 4
+        },
+        {
+          "id": "01-02",
+          "name": "Approach-evaluation skill with scoring rubrics and brief schema",
+          "description": "Domain knowledge skill covering: scoring dimension definitions with default weights, approach generation patterns (forward/reverse/prior-art), commercialization quick-assessment framework, and approach-brief.md schema.",
+          "criteria": [
+            "Skill file at skills/solution-shaper/approach-evaluation.md within 150-300 lines",
+            "Defines 5 scoring dimensions with default weights, score ranges, and scoring guidance",
+            "Documents 3 generation methods (forward mapping, reverse mapping, prior art awareness)",
+            "Includes approach-brief.md section schema for agent reference",
+            "Commercialization quick-assessment covers pathway types, dual-use criteria, market relevance levels"
+          ],
+          "files_to_modify": [
+            "skills/solution-shaper/approach-evaluation.md"
+          ],
+          "test_files": [],
+          "dependencies": [],
+          "stories": ["US-SS-001"],
+          "estimated_hours": 2
+        },
+        {
+          "id": "01-03",
+          "name": "Shape command with revise flag and agent dispatch",
+          "description": "Command file dispatching to sbir-solution-shaper. Handles initial invocation and --revise flag for approach revision. Documents prerequisites and usage.",
+          "criteria": [
+            "Command at commands/sbir-proposal-shape.md follows plugin convention (YAML frontmatter with description and argument-hint)",
+            "Default invocation dispatches to @sbir-solution-shaper for initial approach selection",
+            "--revise flag dispatches with revision context (re-read company profile, accept user notes)",
+            "Prerequisites documented: Go decision required, company profile required"
+          ],
+          "files_to_modify": [
+            "commands/sbir-proposal-shape.md"
+          ],
+          "test_files": [],
+          "dependencies": ["01-01"],
+          "stories": ["US-SS-001", "US-SS-002"],
+          "estimated_hours": 1
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Integration and Orchestration",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Wave-agent-mapping update and strategist integration",
+          "description": "Update wave-agent-mapping skill to include solution-shaper in Wave 0 routing and approach-selection checkpoint. Update strategist agent to read approach-brief.md in Phase 1 GATHER (backward-compatible: no-op if missing).",
+          "criteria": [
+            "Wave-agent-mapping includes solution-shaper in Wave 0 agents and command routing table",
+            "Approach Selection checkpoint added to checkpoint definitions (Wave 0, approve/revise/explore/restart/quit)",
+            "Strategist agent Phase 1 GATHER reads approach-brief.md when available",
+            "Strategist proceeds without approach brief for existing proposals (backward compatible)",
+            "Proposal-state.json approach_selection section documented in state schema references"
+          ],
+          "files_to_modify": [
+            "skills/orchestrator/wave-agent-mapping.md",
+            "agents/sbir-strategist.md"
+          ],
+          "test_files": [],
+          "dependencies": ["01-01", "01-02", "01-03"],
+          "stories": ["US-SS-001", "US-SS-002"],
+          "estimated_hours": 2
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "agents/",
+      "commands/",
+      "skills/solution-shaper/"
+    ],
+    "test_directories": [],
+    "excluded_patterns": []
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "TODO",
+    "approved_at": "TODO"
+  }
+}
