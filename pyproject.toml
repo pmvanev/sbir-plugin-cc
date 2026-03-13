@@ -5,6 +5,7 @@ description = "PES enforcement system for the SBIR Proposal Plugin"
 requires-python = ">=3.12"
 dependencies = [
     "jsonschema>=4.0",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -58,6 +59,10 @@ mypy_path = "scripts"
 
 [[tool.mypy.overrides]]
 module = "jsonschema.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "httpx.*"
 ignore_missing_imports = true
 
 [tool.coverage.run]

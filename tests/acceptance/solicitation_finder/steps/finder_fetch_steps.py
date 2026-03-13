@@ -1,9 +1,8 @@
 """Step definitions for topic fetching and keyword pre-filter scenarios.
 
 Invokes through:
-- TopicFetchPort (driven port -- topic source abstraction)
-- KeywordPreFilter (pure domain logic -- no I/O)
-- FinderService (application orchestrator)
+- FinderService (application orchestrator -- driving port)
+- TopicFetchPort via InMemoryTopicFetchAdapter (driven port fake)
 
 Does NOT import DSIP API adapter or HTTP client internals directly.
 """
@@ -15,6 +14,8 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from pes.domain.finder_service import FinderService
+from tests.acceptance.solicitation_finder.fakes import InMemoryTopicFetchAdapter
 from tests.acceptance.solicitation_finder.steps.finder_common_steps import *  # noqa: F403
 
 # Link to feature files
@@ -288,31 +289,48 @@ def topic_with_title(
     finder_context["fetched_topics"] = [topic]
 
 
+# --- Helper: build FinderService from context ---
+
+
+def _build_finder_service(finder_context: dict[str, Any]) -> FinderService:
+    """Construct a FinderService from the current test context."""
+    topic_source = finder_context.get("topic_source", {})
+    adapter = InMemoryTopicFetchAdapter(
+        topics=topic_source.get("topics", []),
+        available=topic_source.get("available", True),
+        rate_limit_after=topic_source.get("rate_limit_after"),
+    )
+    profile = finder_context.get("profile")
+    return FinderService(topic_fetch=adapter, profile=profile)
+
+
 # --- When steps ---
 
 
 @when("Phil searches for matching solicitation topics")
 def phil_searches_topics(finder_context: dict[str, Any]):
-    """Phil invokes the solicitation finder with no filters.
-
-    TODO: Wire to FinderService.search() through the driving port
-    once production code is implemented.
-    """
-    finder_context["action"] = "search"
-    finder_context["filters"] = finder_context.get("filters", {})
+    """Phil invokes the solicitation finder with no filters."""
+    service = _build_finder_service(finder_context)
+    filters = finder_context.get("filters", {}) or None
+    result = service.search(filters=filters)
+    finder_context["search_result"] = result
 
 
 @when("Phil searches for Air Force Phase I topics")
 def phil_searches_filtered(finder_context: dict[str, Any]):
     """Phil invokes the finder with agency and phase filters."""
-    finder_context["action"] = "search"
     finder_context["filters"] = {"agency": "Air Force", "phase": "I"}
+    service = _build_finder_service(finder_context)
+    result = service.search(filters={"agency": "Air Force", "phase": "I"})
+    finder_context["search_result"] = result
 
 
 @when("Phil searches for topics using the solicitation document")
 def phil_searches_with_document(finder_context: dict[str, Any]):
     """Phil invokes the finder with a --file flag."""
+    # Document-based search is a future step; store intent
     finder_context["action"] = "search_document"
+    finder_context["search_result"] = None
 
 
 @when("the keyword pre-filter runs")
@@ -320,7 +338,7 @@ def keyword_prefilter_runs(finder_context: dict[str, Any]):
     """Run the keyword pre-filter against fetched topics.
 
     TODO: Wire to KeywordPreFilter.filter() once production code
-    is implemented.
+    is implemented in a later step.
     """
     finder_context["action"] = "prefilter"
 
@@ -331,22 +349,22 @@ def keyword_prefilter_runs(finder_context: dict[str, Any]):
 @then(parsers.parse('the tool displays "{company}" as the active company'))
 def displays_company_name(company: str, finder_context: dict[str, Any]):
     """Verify the company name is displayed."""
-    # TODO: Assert against FinderService output
-    pass
+    result = finder_context["search_result"]
+    assert result.company_name == company
 
 
 @then(parsers.parse("the tool retrieves {count:d} topics"))
 def retrieves_n_topics(count: int, finder_context: dict[str, Any]):
     """Verify topic count retrieved."""
-    # TODO: Assert against FinderService.search() result
-    pass
+    result = finder_context["search_result"]
+    assert len(result.topics) == count
 
 
 @then("the tool displays a progress indicator during fetching")
 def displays_progress(finder_context: dict[str, Any]):
     """Verify progress reporting during fetch."""
-    # TODO: Assert progress callback invoked
-    pass
+    result = finder_context["search_result"]
+    assert result.progress_reported is True
 
 
 @then(
@@ -356,35 +374,37 @@ def active_filters_displayed(
     agency: str, phase: str, finder_context: dict[str, Any]
 ):
     """Verify active filter display."""
-    # TODO: Assert against FinderService output
-    pass
+    result = finder_context["search_result"]
+    assert result.filters_applied.get("agency") == agency
+    assert result.filters_applied.get("phase") == phase
 
 
 @then("the tool suggests providing a solicitation document as a file")
 def suggests_file_fallback(finder_context: dict[str, Any]):
     """Verify fallback suggestion."""
-    # TODO: Assert against error output
-    pass
+    result = finder_context["search_result"]
+    assert any("solicitation document" in m.lower() for m in result.messages)
 
 
 @then("the tool displays the download location for solicitation documents")
 def displays_download_url(finder_context: dict[str, Any]):
     """Verify download URL is shown."""
-    # TODO: Assert against error output
-    pass
+    result = finder_context["search_result"]
+    assert any("dodsbirsttr.mil" in m for m in result.messages)
 
 
 @then(parsers.parse("{count:d} topics are extracted from the document"))
 def topics_extracted_from_document(count: int, finder_context: dict[str, Any]):
     """Verify topic extraction from document."""
-    # TODO: Assert against BaaPdfAdapter result
-    pass
+    # Document extraction is a future step
+    doc_topics = finder_context.get("document_topics", [])
+    assert len(doc_topics) == count
 
 
 @then(parsers.parse("{count:d} candidate topics are identified"))
 def n_candidates_identified(count: int, finder_context: dict[str, Any]):
     """Verify candidate count after pre-filter."""
-    # TODO: Assert against KeywordPreFilter result
+    # Pre-filter is a future step; placeholder
     pass
 
 
@@ -397,43 +417,43 @@ def n_candidates_from_total(
     count: int, total: int, finder_context: dict[str, Any]
 ):
     """Verify candidate/total counts."""
-    # TODO: Assert against FinderService statistics
+    # Pre-filter is a future step; placeholder
     pass
 
 
 @then(parsers.parse("{count:d} topics are eliminated"))
 def n_topics_eliminated(count: int, finder_context: dict[str, Any]):
     """Verify elimination count."""
-    # TODO: Assert against KeywordPreFilter statistics
+    # Pre-filter is a future step; placeholder
     pass
 
 
 @then("the topic is included as a candidate")
 def topic_is_candidate(finder_context: dict[str, Any]):
     """Verify the topic passed the pre-filter."""
-    # TODO: Assert topic in candidate list
+    # Pre-filter is a future step; placeholder
     pass
 
 
 @then("zero candidates are identified")
 def zero_candidates(finder_context: dict[str, Any]):
     """Verify no candidates matched."""
-    # TODO: Assert empty candidate list
+    # Pre-filter is a future step; placeholder
     pass
 
 
 @then(parsers.parse("all {count:d} topics pass the pre-filter"))
 def all_topics_pass(count: int, finder_context: dict[str, Any]):
     """Verify all topics passed (empty capabilities)."""
-    # TODO: Assert candidate count equals input count
+    # Pre-filter is a future step; placeholder
     pass
 
 
 @then("the tool offers to score partial results or retry later")
 def offers_partial_options(finder_context: dict[str, Any]):
     """Verify partial result options offered."""
-    # TODO: Assert against error output options
-    pass
+    result = finder_context["search_result"]
+    assert any("partial results" in m.lower() or "retry" in m.lower() for m in result.messages)
 
 
 @then(
@@ -442,47 +462,47 @@ def offers_partial_options(finder_context: dict[str, Any]):
 )
 def explains_profile_value(finder_context: dict[str, Any]):
     """Verify profile explanation is shown."""
-    # TODO: Assert against error output
-    pass
+    result = finder_context["search_result"]
+    assert any("matching" in m and "eligibility" in m for m in result.messages)
 
 
 @then("the tool suggests creating a profile first")
 def suggests_profile_setup(finder_context: dict[str, Any]):
     """Verify profile setup suggestion."""
-    # TODO: Assert suggestion message
-    pass
+    result = finder_context["search_result"]
+    assert any("profile" in m.lower() and "create" in m.lower() for m in result.messages)
 
 
 @then(parsers.parse("{count:d} topics are listed without five-dimension scoring"))
 def topics_listed_no_scoring(count: int, finder_context: dict[str, Any]):
     """Verify degraded mode: topics listed but not scored."""
-    # TODO: Assert topic list without scores
+    # Degraded mode is a future step; placeholder
     pass
 
 
 @then("the tool warns about each missing profile section")
 def warns_missing_sections(finder_context: dict[str, Any]):
     """Verify per-section warnings."""
-    # TODO: Assert warnings for missing sections
+    # Profile section warnings are a future step; placeholder
     pass
 
 
 @then("scoring proceeds with defaults for missing dimensions")
 def scoring_with_defaults(finder_context: dict[str, Any]):
     """Verify default scoring for missing dimensions."""
-    # TODO: Assert default scores applied
+    # Scoring defaults are a future step; placeholder
     pass
 
 
 @then("recommendations cap at EVALUATE for dimensions with missing data")
 def recommendations_capped(finder_context: dict[str, Any]):
     """Verify recommendation capping."""
-    # TODO: Assert EVALUATE cap
+    # Recommendation capping is a future step; placeholder
     pass
 
 
 @then("the tool suggests reviewing the profile or broadening filters")
 def suggests_review_or_broaden(finder_context: dict[str, Any]):
     """Verify suggestion to review profile or broaden filters."""
-    # TODO: Assert against output
+    # Pre-filter suggestions are a future step; placeholder
     pass

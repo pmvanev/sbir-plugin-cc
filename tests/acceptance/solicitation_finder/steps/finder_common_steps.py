@@ -60,12 +60,20 @@ def no_company_profile(profile_path, finder_context: dict[str, Any]):
 @then(parsers.parse('the tool displays "{message}"'))
 def displays_message(message: str, finder_context: dict[str, Any]):
     """Verify a specific message is displayed."""
-    # TODO: Assert against service output messages
-    pass
+    result = finder_context.get("search_result")
+    if result is not None:
+        all_messages = " | ".join(result.messages)
+        assert message.lower() in all_messages.lower(), (
+            f"Expected message '{message}' not found in: {result.messages}"
+        )
 
 
 @then(parsers.parse('the tool warns "{message}"'))
 def tool_warns_message(message: str, finder_context: dict[str, Any]):
     """Verify a specific warning message."""
-    # TODO: Assert against warning output
-    pass
+    result = finder_context.get("search_result")
+    if result is not None:
+        all_messages = " | ".join(result.messages)
+        assert message.lower() in all_messages.lower(), (
+            f"Expected warning '{message}' not found in: {result.messages}"
+        )

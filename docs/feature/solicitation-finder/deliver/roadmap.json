@@ -1,0 +1,151 @@
+{
+  "feature_id": "solicitation-finder",
+  "title": "Solicitation Finder",
+  "phases": 3,
+  "steps": [
+    {
+      "step_id": "01-01",
+      "title": "Topic fetch port and DSIP API adapter",
+      "description": "TopicFetchPort driven port and DsipApiAdapter with pagination, retry, rate limiting, and timeout handling.",
+      "stories": ["US-SF-001"],
+      "acceptance_criteria": [
+        "Adapter fetches topic listings from DSIP API with configurable filters",
+        "Pagination retrieves all matching topics across multiple pages",
+        "Rate limiting delays 1-2 seconds between page requests",
+        "Timeout after 30 seconds per request with 3 retries",
+        "API failure returns partial results with error context"
+      ],
+      "test_file": "tests/acceptance/solicitation_finder/milestone-01-fetch-and-filter.feature",
+      "files_to_modify": [
+        "scripts/pes/ports/topic_fetch_port.py",
+        "scripts/pes/adapters/dsip_api_adapter.py",
+        "tests/acceptance/solicitation_finder/steps/finder_fetch_steps.py",
+        "pyproject.toml"
+      ],
+      "dependencies": [],
+      "estimated_hours": 4
+    },
+    {
+      "step_id": "01-02",
+      "title": "Keyword pre-filter and profile integration",
+      "description": "Pure domain logic matching topic metadata against company profile capabilities. No I/O dependencies.",
+      "stories": ["US-SF-001", "US-SF-002", "US-SF-005"],
+      "acceptance_criteria": [
+        "Pre-filter matches topic titles and codes against profile capability keywords",
+        "Returns candidate topics with matched keywords annotated",
+        "Empty profile capabilities returns all topics with warning",
+        "Case-insensitive matching with basic stemming"
+      ],
+      "test_file": "tests/acceptance/solicitation_finder/milestone-01-fetch-and-filter.feature",
+      "files_to_modify": [
+        "scripts/pes/domain/keyword_prefilter.py",
+        "tests/acceptance/solicitation_finder/steps/finder_fetch_steps.py"
+      ],
+      "dependencies": ["01-01"],
+      "estimated_hours": 3
+    },
+    {
+      "step_id": "01-03",
+      "title": "Finder results port and JSON adapter",
+      "description": "FinderResultsPort and JsonFinderResultsAdapter for persisting scored results with atomic writes.",
+      "stories": ["US-SF-003"],
+      "acceptance_criteria": [
+        "Results written atomically to .sbir/finder-results.json",
+        "Schema version field present for future migration",
+        "Read returns full results including all dimension scores",
+        "Missing results file returns None (not error)"
+      ],
+      "test_file": "tests/acceptance/solicitation_finder/milestone-01-results.feature",
+      "files_to_modify": [
+        "scripts/pes/ports/finder_results_port.py",
+        "scripts/pes/adapters/json_finder_results_adapter.py",
+        "tests/acceptance/solicitation_finder/steps/finder_results_steps.py"
+      ],
+      "dependencies": [],
+      "estimated_hours": 3
+    },
+    {
+      "step_id": "01-04",
+      "title": "BAA PDF fallback adapter and profile-missing handling",
+      "description": "BaaPdfAdapter implements TopicFetchPort for user-provided BAA PDFs. FinderService handles missing/incomplete profile.",
+      "stories": ["US-SF-001", "US-SF-005"],
+      "acceptance_criteria": [
+        "Adapter extracts topic metadata from BAA PDF content",
+        "Missing profile produces clear error with setup guidance",
+        "Missing profile + --file flag enables degraded mode",
+        "Incomplete profile warns per missing section"
+      ],
+      "test_file": "tests/acceptance/solicitation_finder/milestone-01-fetch-and-filter.feature",
+      "files_to_modify": [
+        "scripts/pes/adapters/baa_pdf_adapter.py",
+        "tests/acceptance/solicitation_finder/steps/finder_fetch_steps.py"
+      ],
+      "dependencies": ["01-01"],
+      "estimated_hours": 3
+    },
+    {
+      "step_id": "02-01",
+      "title": "Finder orchestration service",
+      "description": "FinderService coordinates fetch, pre-filter, and results persistence. Prepares candidate list for LLM scoring.",
+      "stories": ["US-SF-001", "US-SF-002"],
+      "acceptance_criteria": [
+        "Service fetches topics via TopicFetchPort with caller-provided filters",
+        "Service applies KeywordPreFilter using profile capabilities",
+        "Service returns candidate count and pre-filter statistics",
+        "Service persists results via FinderResultsPort after scoring",
+        "Progress reporting via callback for fetch and filter phases"
+      ],
+      "test_file": "tests/acceptance/solicitation_finder/milestone-01-fetch-and-filter.feature",
+      "files_to_modify": [
+        "scripts/pes/domain/finder_service.py",
+        "tests/acceptance/solicitation_finder/steps/finder_fetch_steps.py",
+        "tests/acceptance/solicitation_finder/steps/finder_scoring_steps.py"
+      ],
+      "dependencies": ["01-01", "01-02", "01-03"],
+      "estimated_hours": 4
+    },
+    {
+      "step_id": "02-02",
+      "title": "Agent batch scoring and results display",
+      "description": "Extend sbir-topic-scout with batch LLM scoring, ranked table display, and per-topic detail drilldown.",
+      "stories": ["US-SF-002", "US-SF-003"],
+      "acceptance_criteria": [
+        "Agent scores each candidate topic with five-dimension fit model",
+        "Results displayed as ranked table",
+        "Disqualified topics shown separately with reasons",
+        "Details command shows per-dimension breakdown"
+      ],
+      "test_file": "tests/acceptance/solicitation_finder/milestone-01-scoring.feature",
+      "files_to_modify": [
+        "agents/sbir-topic-scout.md",
+        "skills/topic-scout/finder-batch-scoring.md",
+        "tests/acceptance/solicitation_finder/steps/finder_scoring_steps.py",
+        "tests/acceptance/solicitation_finder/steps/finder_results_steps.py"
+      ],
+      "dependencies": ["02-01"],
+      "estimated_hours": 4
+    },
+    {
+      "step_id": "03-01",
+      "title": "Solicitation find command and topic selection flow",
+      "description": "CLI command with flags. Pursue command maps selected topic to /sbir:proposal new.",
+      "stories": ["US-SF-003", "US-SF-004"],
+      "acceptance_criteria": [
+        "Command dispatches to sbir-topic-scout with parsed flags",
+        "Pursue shows confirmation with topic metadata and score",
+        "Confirmed pursue transitions to /sbir:proposal new with TopicInfo pre-loaded",
+        "Cancelled pursue returns to results list",
+        "Expired topic cannot be pursued",
+        "Results persisted for later reference across sessions"
+      ],
+      "test_file": "tests/acceptance/solicitation_finder/milestone-02-agent-commands.feature",
+      "files_to_modify": [
+        "commands/sbir-solicitation-find.md",
+        "tests/acceptance/solicitation_finder/steps/finder_results_steps.py"
+      ],
+      "dependencies": ["02-01", "02-02"],
+      "estimated_hours": 3
+    }
+  ],
+  "validation": "APPROVED"
+}
