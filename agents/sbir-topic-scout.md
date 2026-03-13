@@ -7,6 +7,7 @@ maxTurns: 30
 skills:
   - solicitation-intelligence
   - fit-scoring-methodology
+  - finder-batch-scoring
   - proposal-archive-reader
   - win-loss-analyzer
 ---
@@ -43,6 +44,7 @@ You MUST load your skill files before beginning any work. Skills encode solicita
 | 1 INGEST | `solicitation-intelligence` | Always -- source identification, scraping patterns, format parsing |
 | 2 PARSE | `solicitation-intelligence` | Already loaded in Phase 1 |
 | 3 SCORE | `fit-scoring-methodology` | Always -- five-dimension scoring, company profile integration |
+| 3 SCORE | `finder-batch-scoring` | Always -- batch scoring workflow, disqualifiers, ranked output |
 | 3 SCORE | `proposal-archive-reader` | When corpus exists -- Wave 0 retrieval strategy for exemplars |
 | 3 SCORE | `win-loss-analyzer` | When corpus has outcome data -- agency win rates for scoring |
 | 4 RANK | `fit-scoring-methodology` | Already loaded in Phase 3 |
@@ -80,6 +82,7 @@ Gate: At least one topic parsed into structured `TopicInfo`. Unparseable topics 
 
 ### Phase 3: SCORE
 Load: `fit-scoring-methodology` -- read it NOW before proceeding.
+Load: `finder-batch-scoring` -- read it NOW for batch workflow, disqualifiers, and output format.
 Load: `proposal-archive-reader` from `skills/corpus-librarian/` -- read it NOW if corpus exists.
 Load: `win-loss-analyzer` from `skills/corpus-librarian/` -- read it NOW if corpus has outcome data.
 
@@ -97,6 +100,12 @@ Score each parsed topic against the company capability profile:
 5. Compute composite score: weighted average (subject_matter=0.35, past_performance=0.25, certifications=0.15, eligibility=0.15, sttr=0.10)
 6. Generate recommendation per topic: "go" (composite >= 0.6 with no zero-score dimensions) | "evaluate" (composite 0.3-0.6 or any dimension at 0.0) | "no-go" (composite < 0.3 or disqualifying eligibility issue)
 
+**Batch scoring mode**: Use `TopicScoringService` from `scripts/pes/domain/topic_scoring.py`:
+- `score_batch(topics, profile)` scores all candidates and returns sorted by composite descending
+- Disqualifiers (TS clearance gap, STTR without partner) produce immediate NO-GO
+- Missing past performance caps recommendations at EVALUATE (never false NO-GO from data absence)
+- Each `ScoredTopic` includes `key_personnel_match` for detail drilldown
+
 Gate: All parsed topics scored. Each score includes per-dimension breakdown.
 
 ### Phase 4: RANK AND PRESENT
@@ -106,15 +115,29 @@ Rank scored topics by composite fit score (descending), then deadline proximity 
 2. For top-fit topics (recommendation = "go" or "evaluate"): include relevant corpus exemplars with relevance scores
 3. Flag risks: approaching deadlines, missing company profile data, sparse corpus
 4. Present the ranked shortlist for human review
+5. Separate disqualified topics (NO-GO with disqualifiers) into a distinct section below the ranked table
 
-Output format:
+**Ranked table format** (qualified topics):
+```
+Rank | Topic ID    | Agency    | Title                              | Score | Rec      | Deadline
+   1 | AF263-042   | Air Force | Compact Directed Energy for C-UAS  | 0.84  | GO       | 2026-05-15
+```
+
+**Detail drilldown** (per-topic view):
 ```
 Topic: {topic_id} -- {title}
 Agency: {agency} | Phase: {phase} | Deadline: {deadline} ({days} days)
 Fit Score: {composite} (SME: {sme} | PP: {pp} | Cert: {cert} | Elig: {elig} | STTR: {sttr})
 Recommendation: {go|evaluate|no-go}
+Key Personnel Match: {names from company profile with matching expertise}
 Rationale: {1-2 sentences explaining the recommendation}
 Corpus Exemplars: {count} related past proposals found
+```
+
+**Disqualified topics section**:
+```
+Topic ID    | Agency    | Title                        | Disqualification Reason
+AF263-099   | Air Force | Classified Sensor Fusion     | Requires TS clearance (profile: Secret)
 ```
 
 Gate: Ranked shortlist presented. Human checkpoint reached: Select topic(s) to pursue > Go/No-Go decision.
