@@ -56,7 +56,6 @@ Feature: Company Profile Extraction and Update
   # --- US-CPB-004: Selective Section Update ---
 
   # Happy path: add past performance entry
-  @skip
   Scenario: Adding a past performance entry to an existing profile
     Given Rafael has a saved profile with 2 past performance entries
     When Rafael adds a past performance entry for agency "NASA" with topic "Lunar Surface Power" and outcome "awarded"
@@ -66,7 +65,6 @@ Feature: Company Profile Extraction and Update
     And the previous 2 entries are unchanged
 
   # Happy path: add key personnel
-  @skip
   Scenario: Adding a team member preserves existing personnel
     Given Rafael has a saved profile with 2 key personnel
     When Rafael adds key personnel "Dr. James Chen" as "Senior RF Engineer" with expertise "signal processing, antenna design"
@@ -75,7 +73,6 @@ Feature: Company Profile Extraction and Update
     And the original 2 personnel entries are unchanged
 
   # Happy path: update scalar field
-  @skip
   Scenario: Updating employee count replaces the value
     Given Rafael has a saved profile with employee count 23
     When Rafael updates the employee count to 28
@@ -83,7 +80,6 @@ Feature: Company Profile Extraction and Update
     Then the profile shows employee count 28
 
   # Error: update when no profile exists
-  @skip
   Scenario: Updating a profile that does not exist reports the absence
     Given no company profile exists
     When Rafael attempts to update a profile section
@@ -91,7 +87,6 @@ Feature: Company Profile Extraction and Update
     And suggests creating a profile first
 
   # Edge: update preserves all unmodified sections
-  @skip
   Scenario: Updating one section leaves all other sections intact
     Given Rafael has a saved profile with:
       | section              | entry_count |
@@ -107,7 +102,6 @@ Feature: Company Profile Extraction and Update
     And research partners still has 1 entry
 
   # Error: update with invalid data is rejected
-  @skip
   Scenario: Update that introduces invalid data is rejected
     Given Rafael has a saved profile with valid CAGE code "7X2K9"
     When Rafael attempts to update the CAGE code to "AB"
@@ -116,7 +110,6 @@ Feature: Company Profile Extraction and Update
     And the original profile is not modified
 
   # Edge: update SAM.gov from inactive to active
-  @skip
   Scenario: Activating SAM.gov registration requires CAGE and UEI
     Given Rafael has a saved profile with SAM.gov inactive
     When Rafael updates SAM.gov to active with CAGE "7X2K9" and UEI "DKJF84NXLE73"
@@ -124,7 +117,6 @@ Feature: Company Profile Extraction and Update
     Then the profile shows SAM.gov active with CAGE "7X2K9"
 
   @property
-  @skip
   Scenario: Updating a section never changes unrelated sections
     Given any valid existing profile and any valid section update
     When the update is applied to the selected section

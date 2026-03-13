@@ -29,7 +29,6 @@ Feature: Company Profile Builder Walking Skeleton
   # Walking Skeleton 3: Update preserves existing data
   # Validates: existing profile -> section update -> re-validate -> save with preservation
   @walking_skeleton
-  @skip
   Scenario: Founder updates one section and all other sections are preserved
     Given Rafael has a saved company profile with 5 capabilities and 2 past performance entries
     When Rafael adds a past performance entry for agency "NASA" with topic "Lunar Surface Power" and outcome "awarded"

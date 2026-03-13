@@ -367,3 +367,62 @@ def retrieved_capabilities_count(profile_path, count):
 def roundtrip_matches(profile_context):
     """Assert roundtrip preserves all data (property test)."""
     assert profile_context["loaded"] == profile_context["original"]
+
+
+# --- WS-3 steps (walking skeleton: update one section, preserve others) ---
+
+
+@when(
+    parsers.parse(
+        'Rafael adds a past performance entry for agency "{agency}" '
+        'with topic "{topic}" and outcome "{outcome}"'
+    ),
+)
+def ws3_add_past_performance(profile_path, profile_context, agency, topic, outcome):
+    """Add a past performance entry to existing profile (WS-3)."""
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+
+    adapter = JsonProfileAdapter(str(profile_path.parent))
+    profile = adapter.read()
+    profile_context["updated_profile"] = profile
+    new_entry = {"agency": agency, "topic_area": topic, "outcome": outcome}
+    profile_context["section_update"] = {
+        "section": "past_performance",
+        "action": "append",
+        "value": new_entry,
+    }
+
+
+@when("the updated profile is validated and saved")
+def ws3_validate_and_save_update(profile_context, profile_path, validation_result):
+    """Validate and save the updated profile (WS-3)."""
+    from pes.adapters.json_profile_adapter import JsonProfileAdapter
+    from pes.domain.profile_update import apply_section_update
+    from pes.domain.profile_validation import ProfileValidationService
+
+    profile = profile_context["updated_profile"]
+    update = profile_context["section_update"]
+    updated = apply_section_update(profile, update)
+    service = ProfileValidationService()
+    result = service.validate(updated)
+    validation_result["result"] = result
+    if result.valid:
+        adapter = JsonProfileAdapter(str(profile_path.parent))
+        adapter.write(updated)
+    profile_context["updated_profile"] = updated
+
+
+@then(parsers.parse("the profile now has {count:d} past performance entries"))
+def ws3_now_has_pp_count(profile_path, count):
+    """Assert updated past performance count (WS-3)."""
+    import json
+    data = json.loads(profile_path.read_text())
+    assert len(data["past_performance"]) == count
+
+
+@then(parsers.parse("the capabilities list still contains {count:d} entries"))
+def ws3_capabilities_list_count(profile_path, count):
+    """Assert capabilities count preserved after update (WS-3)."""
+    import json
+    data = json.loads(profile_path.read_text())
+    assert len(data["capabilities"]) == count
