@@ -165,6 +165,43 @@ The profile is validated by `pes.domain.profile_validation.validate_profile()` b
 10. `past_performance` entries must have agency, topic_area, and outcome (WIN/LOSS/ONGOING)
 11. `research_institution_partners` entries must have name and valid type
 
+## Document Extraction Guidance
+
+### Extraction Strategy
+
+When processing documents, extract fields that map to the profile schema. Not every document contains every field -- extractions are partial by design. The merge logic combines multiple partial extractions into a complete draft.
+
+### Field Extraction by Document Type
+
+**Capability Statements / Corporate Brochures**: company_name, capabilities (from technical competency descriptions), key_personnel (from team/leadership sections), past_performance (from contract/award history sections).
+
+**SAM.gov Entity Pages / Registration Data**: company_name, certifications.sam_gov.active, certifications.sam_gov.cage_code, certifications.sam_gov.uei, certifications.socioeconomic (from socioeconomic indicators), employee_count (if listed).
+
+**Research Partnership Documents**: research_institution_partners (names and types of partner institutions).
+
+**Resumes / CV**: key_personnel entries (name, role inferred from title, expertise from skills/publications).
+
+### Extraction Merge Rules
+
+- Multiple documents are additive -- each new extraction merges into the existing draft
+- Nested dicts (certifications) are deep-merged
+- Lists (capabilities, key_personnel) are concatenated with deduplication
+- Scalars (company_name, employee_count) from later documents overwrite earlier values
+- The merge service is at `pes.domain.profile_merge` (assemble_draft, merge_extractions, check_completeness)
+
+### Post-Extraction Verification
+
+After extraction, always:
+1. Display all extracted fields with their values for user verification
+2. Run completeness check to identify missing sections
+3. Present missing sections as a targeted list to drive interview for remaining gaps
+4. Let the user confirm, correct, or reject extracted values before entering draft state
+
+### Unsupported Formats
+
+If the user provides a file in an unsupported format (.xlsx, .pptx, images, etc.), respond with:
+"Unsupported file format. Supported: PDF (.pdf), text (.txt), Word (.doc/.docx), or URL. Try converting to PDF or pasting the text content directly."
+
 ## Overwrite Protection Protocol
 
 Before any write operation:

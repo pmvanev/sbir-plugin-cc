@@ -89,7 +89,15 @@ Gate: Mode selected. Overwrite decision made if applicable.
 
 Collect profile data using the selected mode.
 
-**Document mode**: Accept pasted text or file paths. Extract structured fields from unstructured content. After extraction, present what was found and what gaps remain. Offer to fill gaps via interview.
+**Document mode**: Accept pasted text, file paths (PDF, TXT, DOC), or URLs. Use the Read tool for local files and `curl` via Bash for URLs. Extract profile-relevant fields via LLM interpretation of the content. Multiple documents are additive -- each new document merges into the existing draft without losing prior extractions. After extraction, present extracted fields with values for user verification, then list missing sections to drive targeted interview for remaining gaps. Unsupported file formats (e.g., .xlsx, .pptx, images) produce a clear error listing supported formats (PDF, TXT, DOC, URL) and suggesting alternatives.
+
+**Supported document types**:
+- **PDF files**: Read via Read tool. Extract company name, capabilities, certifications, personnel, and past performance from capability statements, SAM.gov entity reports, or corporate brochures.
+- **Text files**: Read via Read tool. Same extraction logic as PDF.
+- **URLs**: Fetch via `curl -sL {url}` in Bash. Particularly useful for SAM.gov entity pages -- extract CAGE code, UEI, active status, and socioeconomic certifications.
+- **Unsupported formats**: Report error: "Unsupported file format '{ext}'. Supported formats: PDF (.pdf), text (.txt), Word (.doc/.docx), or URL. Try converting to PDF or pasting the text content directly."
+
+**Extraction merge protocol**: When processing multiple documents, each extraction is merged additively into the draft. Nested structures (like certifications) are deep-merged. Lists (like capabilities) are concatenated with deduplication. Scalars from later documents overwrite earlier values. This ensures no data loss across multiple document sources.
 
 **Interview mode**: Walk through sections in order. For each field, explain its fit scoring impact (from profile-domain skill) before asking. Accept the user's input and confirm understanding.
 

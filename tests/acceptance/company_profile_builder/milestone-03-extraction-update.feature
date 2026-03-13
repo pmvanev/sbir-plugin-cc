@@ -12,7 +12,6 @@ Feature: Company Profile Extraction and Update
   # merge logic, gap identification, and validation of extracted data.
 
   # Happy path: extracted data merges into profile draft
-  @skip
   Scenario: Extracted fields from a document populate the profile draft
     Given a document extraction produced company name "Radiant Defense Systems, LLC"
     And the extraction produced capabilities "directed energy, RF systems"
@@ -23,7 +22,6 @@ Feature: Company Profile Extraction and Update
     And the draft contains employee count 23
 
   # Happy path: multiple extractions merge additively
-  @skip
   Scenario: Data from multiple documents combines into a single profile
     Given a first extraction produced company name and capabilities
     And a second extraction produced SAM.gov details with CAGE "7X2K9" and UEI "DKJF84NXLE73"
@@ -32,7 +30,6 @@ Feature: Company Profile Extraction and Update
     And the SAM.gov section shows active with CAGE "7X2K9"
 
   # Edge: partial extraction leaves gaps
-  @skip
   Scenario: Partially extracted profile identifies missing fields
     Given a document extraction produced only company name and employee count
     When the draft is checked for completeness
@@ -45,14 +42,12 @@ Feature: Company Profile Extraction and Update
       | research_institution_partners |
 
   # Error: no extractable data produces empty draft
-  @skip
   Scenario: Extraction with no profile data leaves the draft empty
     Given a document extraction found no profile-relevant fields
     When the extracted data is assembled into a profile draft
     Then the draft has no populated fields
 
   # Error: extracted data fails validation
-  @skip
   Scenario: Extracted data with invalid values is caught during validation
     Given a document extraction produced CAGE code "AB" and employee count 0
     When the extracted profile draft is validated

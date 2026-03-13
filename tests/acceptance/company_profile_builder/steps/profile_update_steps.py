@@ -165,10 +165,13 @@ def partial_extraction(profile_context):
     }
 
 
-@given("a document extraction found no profile-relevant fields")
-def empty_extraction(profile_context):
+@given(
+    "a document extraction found no profile-relevant fields",
+    target_fixture="extraction_data",
+)
+def empty_extraction():
     """Simulate empty extraction."""
-    profile_context["extraction"] = {}
+    return {}
 
 
 @given(
@@ -279,29 +282,40 @@ def update_sam_gov(profile_path, profile_context, cage, uei):
 @when("the extracted data is assembled into a profile draft")
 def assemble_extraction(extraction_data, profile_context):
     """Assemble extracted data into a profile draft."""
-    # TODO: Replace with actual merge logic.
-    pytest.skip("Profile merge logic not yet implemented")
+    from pes.domain.profile_merge import assemble_draft
+
+    profile_context["draft"] = assemble_draft(extraction_data)
 
 
 @when("both extractions are merged into the profile draft")
-def merge_extractions(profile_context):
+def merge_both_extractions(profile_context):
     """Merge multiple extractions into a single draft."""
-    # TODO: Replace with actual merge logic.
-    pytest.skip("Profile merge logic not yet implemented")
+    from pes.domain.profile_merge import merge_extractions
+
+    ext1 = profile_context["extraction_1"]
+    ext2 = profile_context["extraction_2"]
+    profile_context["draft"] = merge_extractions(ext1, ext2)
 
 
 @when("the draft is checked for completeness")
-def check_completeness(profile_context):
+def check_draft_completeness(profile_context):
     """Check which profile sections are populated."""
-    # TODO: Replace with actual completeness check.
-    pytest.skip("Completeness check not yet implemented")
+    from pes.domain.profile_merge import assemble_draft, check_completeness
+
+    draft = assemble_draft(profile_context["extraction"])
+    profile_context["draft"] = draft
+    profile_context["missing"] = check_completeness(draft)
 
 
 @when("the extracted profile draft is validated")
 def validate_extraction(extraction_data, validation_result):
     """Validate profile assembled from extraction."""
-    # TODO: Replace with actual validation invocation.
-    pytest.skip("Validation service not yet implemented")
+    from pes.domain.profile_merge import assemble_draft
+    from pes.domain.profile_validation import ProfileValidationService
+
+    draft = assemble_draft(extraction_data)
+    service = ProfileValidationService()
+    validation_result["result"] = service.validate(draft)
 
 
 @when("the update is applied to the selected section")
@@ -466,10 +480,13 @@ def sam_section_active(profile_context, cage):
     assert sam["cage_code"] == cage
 
 
-@then(parsers.parse("the following sections are identified as missing:\n{table}"))
-def missing_sections(profile_context, table):
+@then("the following sections are identified as missing:")
+def missing_sections(profile_context, datatable):
     """Assert missing sections are identified."""
     assert "missing" in profile_context
+    # Extract expected missing sections from the datatable (skip header row)
+    expected = [row[0] for row in datatable[1:]]
+    assert sorted(profile_context["missing"]) == sorted(expected)
 
 
 @then("the draft has no populated fields")
