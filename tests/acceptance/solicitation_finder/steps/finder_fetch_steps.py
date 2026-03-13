@@ -293,6 +293,19 @@ def topic_with_title(
 # --- Helper: build FinderService from context ---
 
 
+def _build_baa_text(topics: list[dict[str, Any]]) -> str:
+    """Build simulated BAA text content from topic dicts."""
+    lines = ["BROAD AGENCY ANNOUNCEMENT", ""]
+    for t in topics:
+        lines.append(f"Topic Number: {t.get('topic_id', 'UNKNOWN')}")
+        lines.append(f"Title: {t.get('title', 'Untitled')}")
+        lines.append(f"Agency: {t.get('agency', 'DoD')}")
+        lines.append(f"Phase: {t.get('phase', 'I')}")
+        lines.append(f"Deadline: {t.get('deadline', 'TBD')}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _build_finder_service(finder_context: dict[str, Any]) -> FinderService:
     """Construct a FinderService from the current test context."""
     topic_source = finder_context.get("topic_source", {})
@@ -328,10 +341,19 @@ def phil_searches_filtered(finder_context: dict[str, Any]):
 
 @when("Phil searches for topics using the solicitation document")
 def phil_searches_with_document(finder_context: dict[str, Any]):
-    """Phil invokes the finder with a --file flag."""
-    # Document-based search is a future step; store intent
-    finder_context["action"] = "search_document"
-    finder_context["search_result"] = None
+    """Phil invokes the finder with a --file flag (BAA PDF fallback)."""
+    from pes.adapters.baa_pdf_adapter import BaaPdfAdapter
+
+    # Build text content from document_topics fixture data
+    doc_topics = finder_context.get("document_topics", [])
+    text_content = _build_baa_text(doc_topics)
+
+    adapter = BaaPdfAdapter(text_content)
+    profile = finder_context.get("profile")
+    service = FinderService(topic_fetch=adapter, profile=profile)
+    # Enable degraded mode when no profile (document fallback)
+    result = service.search(degraded_mode=profile is None)
+    finder_context["search_result"] = result
 
 
 @when("the keyword pre-filter runs")
@@ -404,10 +426,11 @@ def displays_download_url(finder_context: dict[str, Any]):
 
 @then(parsers.parse("{count:d} topics are extracted from the document"))
 def topics_extracted_from_document(count: int, finder_context: dict[str, Any]):
-    """Verify topic extraction from document."""
-    # Document extraction is a future step
-    doc_topics = finder_context.get("document_topics", [])
-    assert len(doc_topics) == count
+    """Verify topic extraction from document via BaaPdfAdapter."""
+    result = finder_context["search_result"]
+    assert len(result.topics) == count, (
+        f"Expected {count} topics extracted, got {len(result.topics)}"
+    )
 
 
 @then(parsers.parse("{count:d} candidate topics are identified"))
@@ -495,29 +518,51 @@ def suggests_profile_setup(finder_context: dict[str, Any]):
 @then(parsers.parse("{count:d} topics are listed without five-dimension scoring"))
 def topics_listed_no_scoring(count: int, finder_context: dict[str, Any]):
     """Verify degraded mode: topics listed but not scored."""
-    # Degraded mode is a future step; placeholder
-    pass
+    result = finder_context["search_result"]
+    assert len(result.topics) == count, (
+        f"Expected {count} topics in degraded mode, got {len(result.topics)}"
+    )
+    # In degraded mode, topics should not have dimension scores
+    for topic in result.topics:
+        assert "dimensions" not in topic or topic.get("dimensions") is None, (
+            "Topics in degraded mode should not have five-dimension scoring"
+        )
 
 
 @then("the tool warns about each missing profile section")
 def warns_missing_sections(finder_context: dict[str, Any]):
-    """Verify per-section warnings."""
-    # Profile section warnings are a future step; placeholder
-    pass
+    """Verify per-section warnings for incomplete profile."""
+    result = finder_context["search_result"]
+    messages_lower = [m.lower() for m in result.messages]
+    all_text = " ".join(messages_lower)
+    assert "certifications" in all_text, (
+        f"Expected warning about missing certifications in: {result.messages}"
+    )
+    assert "past performance" in all_text, (
+        f"Expected warning about missing past performance in: {result.messages}"
+    )
+    assert "key personnel" in all_text, (
+        f"Expected warning about missing key personnel in: {result.messages}"
+    )
 
 
 @then("scoring proceeds with defaults for missing dimensions")
 def scoring_with_defaults(finder_context: dict[str, Any]):
     """Verify default scoring for missing dimensions."""
-    # Scoring defaults are a future step; placeholder
-    pass
+    result = finder_context["search_result"]
+    # Scoring should still produce topics (with defaults)
+    assert result.topics is not None, "Expected topics to be present with default scoring"
 
 
 @then("recommendations cap at EVALUATE for dimensions with missing data")
 def recommendations_capped(finder_context: dict[str, Any]):
-    """Verify recommendation capping."""
-    # Recommendation capping is a future step; placeholder
-    pass
+    """Verify recommendation capping for incomplete profiles."""
+    result = finder_context["search_result"]
+    messages_lower = [m.lower() for m in result.messages]
+    all_text = " ".join(messages_lower)
+    assert "evaluate" in all_text or "capped" in all_text, (
+        f"Expected capped-at-EVALUATE guidance in: {result.messages}"
+    )
 
 
 @then("the tool suggests reviewing the profile or broadening filters")

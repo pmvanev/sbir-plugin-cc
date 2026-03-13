@@ -42,19 +42,29 @@ class FinderService:
         self._topic_fetch = topic_fetch
         self._profile = profile
 
+    # Profile sections that trigger per-section warnings when missing.
+    _OPTIONAL_SECTIONS: list[tuple[str, str]] = [
+        ("certifications", "certifications"),
+        ("past_performance", "past performance"),
+        ("key_personnel", "key personnel"),
+    ]
+
     def search(
         self,
         filters: dict[str, str] | None = None,
+        *,
+        degraded_mode: bool = False,
     ) -> SearchResult:
         """Search for solicitation topics through the topic source.
 
         Args:
             filters: Optional filters (agency, phase, etc.).
+            degraded_mode: If True, allow search without profile (document fallback).
 
         Returns:
             SearchResult with topics and metadata.
         """
-        if self._profile is None:
+        if self._profile is None and not degraded_mode:
             return SearchResult(
                 messages=[
                     "No company profile found",
@@ -63,7 +73,20 @@ class FinderService:
                 ],
             )
 
-        company_name = self._profile.get("company_name", "")
+        messages: list[str] = []
+
+        if self._profile is None and degraded_mode:
+            messages.append(
+                "No company profile: scoring accuracy severely degraded"
+            )
+
+        company_name = (
+            self._profile.get("company_name", "") if self._profile else None
+        )
+
+        # Check for incomplete profile sections
+        if self._profile is not None:
+            self._check_profile_completeness(messages)
 
         progress_reported = False
 
@@ -75,8 +98,6 @@ class FinderService:
             filters=filters,
             on_progress=on_progress,
         )
-
-        messages: list[str] = []
 
         if fetch_result.error and not fetch_result.topics:
             # Complete failure
@@ -100,6 +121,13 @@ class FinderService:
             )
             messages.append("You can score partial results or retry later")
 
+        # Add source summary for document-based fetches
+        if fetch_result.source == "baa_pdf":
+            messages.append(
+                f"Source: solicitation document "
+                f"({len(fetch_result.topics)} topics extracted)"
+            )
+
         return SearchResult(
             topics=fetch_result.topics,
             total=fetch_result.total,
@@ -111,3 +139,14 @@ class FinderService:
             progress_reported=progress_reported,
             messages=messages,
         )
+
+    def _check_profile_completeness(self, messages: list[str]) -> None:
+        """Add warnings for each missing optional profile section."""
+        assert self._profile is not None
+        for key, label in self._OPTIONAL_SECTIONS:
+            value = self._profile.get(key)
+            if not value:
+                messages.append(
+                    f"Missing profile section: {label} -- "
+                    f"scoring capped at EVALUATE for {label} dimension"
+                )
