@@ -1,0 +1,263 @@
+journey:
+  name: "Solicitation Finder"
+  goal: "Find best-fit SBIR/STTR topics from a solicitation cycle and transition the selected topic into proposal creation"
+  persona: "Phil Santos -- solo SBIR proposal writer, 1-person shop, CLI-native, 2-5 proposals/year"
+
+  emotional_arc:
+    start: "Overwhelmed -- 300+ topics in a new cycle, limited time"
+    middle: "Relieved and impressed -- ranked shortlist with clear scoring rationale"
+    end: "Empowered with momentum -- informed decision flows seamlessly into proposal creation"
+
+steps:
+  - id: 1
+    name: "Invoke Finder"
+    command: "/sbir:solicitation find [--agency <name>] [--phase <I|II>] [--solicitation <id>] [--file <path>]"
+
+    tui_mockup: |
+      Solicitation Finder
+      Company: ${company_name}
+      Profile: ${profile_path} (loaded, ${capability_count} capabilities)
+      Filters: ${active_filters}
+
+      Fetching open topics from DoD SBIR/STTR...
+      [============================] ${topic_count} topics retrieved
+
+    shared_artifacts:
+      - name: "company_name"
+        source: "~/.sbir/company-profile.json -> company_name"
+        displayed_as: "${company_name}"
+        consumers: ["Step 1 header", "Step 3 results header", "finder-results.json"]
+      - name: "profile_path"
+        source: "~/.sbir/company-profile.json (path)"
+        displayed_as: "${profile_path}"
+        consumers: ["Step 1 header"]
+      - name: "capability_count"
+        source: "~/.sbir/company-profile.json -> capabilities.length"
+        displayed_as: "${capability_count}"
+        consumers: ["Step 1 header"]
+
+    emotional_state:
+      entry: "Overwhelmed by volume of topics"
+      exit: "Hopeful that automated help is working"
+
+    integration_checkpoint: |
+      Company profile exists and is readable.
+      API connection succeeds OR user provides --file fallback.
+      Profile has at least one capability keyword for matching.
+
+    gherkin: |
+      Scenario: Invoke finder with default settings
+        Given Phil Santos has a company profile at ~/.sbir/company-profile.json
+        And the DSIP API has 347 open topics for the current cycle
+        When Phil runs "/sbir:solicitation find"
+        Then the tool displays "Radiant Defense Systems, LLC" as the company name
+        And the tool displays "347 topics retrieved"
+
+      Scenario: Invoke finder with agency and phase filters
+        Given Phil Santos has a company profile
+        And the DSIP API has 89 open Air Force Phase I topics
+        When Phil runs "/sbir:solicitation find --agency 'Air Force' --phase I"
+        Then the tool displays "89 topics retrieved (filtered)"
+        And the tool displays "agency=Air Force, phase=I" as active filters
+
+  - id: 2
+    name: "Pre-Filter and Enrich"
+    command: "(automatic -- part of find execution)"
+
+    tui_mockup: |
+      Pre-filtering ${topic_count} topics against company capabilities...
+      [====================] ${topic_count}/${topic_count}
+
+      Keyword match: ${candidate_count} candidate topics (${eliminated_count} eliminated)
+      Downloading topic details for candidates...
+      [====================] ${candidate_count}/${candidate_count} topic PDFs retrieved
+
+      Scoring ${candidate_count} candidates against company profile...
+      [=========           ] ${scored_count}/${candidate_count}  Scoring topic ${current_topic}...
+
+    shared_artifacts:
+      - name: "candidate_count"
+        source: "keyword pre-filter output"
+        displayed_as: "${candidate_count}"
+        consumers: ["Step 2 progress", "Step 3 results header"]
+      - name: "topic_count"
+        source: "DSIP API response -> total (or BAA parse count)"
+        displayed_as: "${topic_count}"
+        consumers: ["Step 1 progress", "Step 2 progress", "Step 3 results header"]
+
+    emotional_state:
+      entry: "Hopeful"
+      exit: "Relieved -- heavy lifting is done"
+
+    integration_checkpoint: |
+      Keyword pre-filter produces at least 1 candidate (or zero-result path triggers).
+      Topic PDF downloads succeed for all candidates (or graceful degradation with metadata-only scoring).
+      Progress indication updates at least every 5 seconds.
+
+    gherkin: |
+      Scenario: Pre-filter reduces topic set
+        Given the DSIP API returned 347 open topics
+        And the company profile has capabilities including "directed energy" and "RF power systems"
+        When the keyword pre-filter runs
+        Then at least 5 candidate topics are identified
+        And the eliminated count is displayed
+
+  - id: 3
+    name: "Review Ranked Results"
+    command: "(automatic display after scoring completes)"
+
+    tui_mockup: |
+      === Solicitation Finder Results ===
+      Company: ${company_name}
+      Source: ${source_description} (${topic_count} topics parsed, ${candidate_count} candidates scored)
+      Date: ${run_date}
+
+      Rank | Topic ID    | Agency    | Title                    | Score | Rec      | Deadline
+      -----|-------------|-----------|--------------------------|-------|----------|----------
+        1  | ${topic_id} | ${agency} | ${title}                 | ${score} | ${rec} | ${deadline}
+        ...
+
+      --- Disqualified (${disqualified_count} topics) ---
+        -  | ${topic_id} | ${agency} | ${title}                 | NO-GO
+           | Reason: ${disqualification_reason}
+
+      Results saved to .sbir/finder-results.json
+
+    shared_artifacts:
+      - name: "finder_results"
+        source: ".sbir/finder-results.json"
+        displayed_as: "ranked table"
+        consumers: ["Step 3 display", "Step 4 detail view", "Step 5 topic selection", "/sbir:proposal new"]
+      - name: "run_date"
+        source: "system clock at scoring time"
+        displayed_as: "${run_date}"
+        consumers: ["Step 3 results header", "finder-results.json"]
+
+    emotional_state:
+      entry: "Relieved"
+      exit: "Impressed -- clear ranking with transparent rationale"
+
+    integration_checkpoint: |
+      Results table renders correctly for 0, 1-5, and 5+ results.
+      Disqualified topics shown separately with explicit reasons.
+      Results persisted to .sbir/finder-results.json.
+      Deadline column shows days remaining, flags expired topics.
+
+    gherkin: |
+      Scenario: Display ranked results with recommendations
+        Given scoring has completed for 42 candidate topics
+        And 5 topics scored above the GO threshold
+        And 3 topics have disqualifying factors
+        When the results are displayed
+        Then topics are ranked by composite score descending
+        And each topic shows ID, agency, title, score, recommendation, and deadline
+        And disqualified topics are listed separately with reasons
+        And results are saved to .sbir/finder-results.json
+
+  - id: 4
+    name: "Drill Down into Topic Detail"
+    command: "details <topic-id>"
+
+    tui_mockup: |
+      === ${topic_id}: ${title} ===
+      Agency: ${agency} | Phase: ${phase} | Deadline: ${deadline} (${days_remaining} days)
+      Program: ${program} | Solicitation: ${solicitation_id}
+
+      Scoring Breakdown:
+        Subject Matter Expertise:  ${sme_score}  (${sme_rationale})
+        Past Performance:          ${pp_score}   (${pp_rationale})
+        Certifications:            ${cert_score} (${cert_rationale})
+        Phase Eligibility:         ${elig_score} (${elig_rationale})
+        STTR Institution:          ${sttr_score} (${sttr_rationale})
+        ------------------------------------------------
+        Composite Score:           ${composite}  --> Recommendation: ${rec}
+
+      Rationale:
+        ${overall_rationale}
+
+      Key Personnel Match:
+        ${personnel_matches}
+
+      Actions:
+        pursue ${topic_id}    Start proposal for this topic
+        back                  Return to results list
+
+    shared_artifacts:
+      - name: "topic_detail"
+        source: ".sbir/finder-results.json -> results[topic_id]"
+        displayed_as: "detail view"
+        consumers: ["Step 4 display", "Step 5 confirmation"]
+
+    emotional_state:
+      entry: "Impressed but wants more detail"
+      exit: "Empowered -- understands exactly why this topic is a good fit"
+
+    integration_checkpoint: |
+      Detail view reads from finder-results.json (not re-scoring).
+      All five dimension scores are shown with human-readable rationale.
+      Key personnel match shows names and relevant expertise from company profile.
+      Days-remaining computed from current date and topic deadline.
+
+    gherkin: |
+      Scenario: View detailed scoring breakdown for a topic
+        Given finder results include topic AF263-042 with composite score 0.82
+        When Phil types "details AF263-042"
+        Then the tool displays the five-dimension scoring breakdown
+        And the tool displays the overall rationale
+        And the tool displays matching key personnel
+        And the tool shows "61 days" remaining to the deadline
+
+  - id: 5
+    name: "Select Topic and Begin Proposal"
+    command: "pursue <topic-id>"
+
+    tui_mockup: |
+      Selected: ${topic_id} -- ${title}
+      Agency: ${agency} | Phase ${phase} | Deadline: ${deadline} (${days_remaining} days)
+      Composite Score: ${composite} | Recommendation: ${rec}
+
+      Proceed to create proposal? (y/n): y
+
+      Starting /sbir:proposal new with topic ${topic_id}...
+      Topic data pre-loaded from finder results.
+
+    shared_artifacts:
+      - name: "selected_topic"
+        source: ".sbir/finder-results.json -> results[topic_id]"
+        displayed_as: "confirmation summary"
+        consumers: ["/sbir:proposal new (TopicInfo input)"]
+
+    emotional_state:
+      entry: "Empowered and decided"
+      exit: "Momentum -- decision flows directly into action"
+
+    integration_checkpoint: |
+      Selected topic data maps to TopicInfo(topic_id, agency, phase, deadline, title).
+      Confirmation prompt prevents accidental selection.
+      /sbir:proposal new receives pre-loaded topic data without re-entry.
+      finder-results.json updated with selection timestamp.
+
+    gherkin: |
+      Scenario: Select topic and transition to proposal creation
+        Given Phil is viewing finder results
+        And topic AF263-042 has recommendation GO
+        When Phil types "pursue AF263-042"
+        And Phil confirms with "y"
+        Then the tool transitions to /sbir:proposal new
+        And topic AF263-042 data is pre-loaded (ID, agency, phase, deadline, title)
+        And Phil does not need to re-enter any topic metadata
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "company_name"
+      must_match_across: [1, 3]
+      failure_message: "Company name in results header must match company profile"
+    - artifact: "topic_count"
+      must_match_across: [1, 2, 3]
+      failure_message: "Total topics count must be consistent across progress and results display"
+    - artifact: "finder_results"
+      must_match_across: [3, 4, 5]
+      failure_message: "Detail view and selection must read from same persisted results"
+    - artifact: "selected_topic"
+      must_match_across: [5]
+      failure_message: "TopicInfo passed to /sbir:proposal new must match finder-results.json entry"
