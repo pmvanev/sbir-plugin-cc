@@ -1,6 +1,6 @@
 """Unit tests for FinderService -- driving port for topic discovery.
 
-Test Budget: 5 behaviors x 2 = 10 max unit tests.
+Test Budget: 8 behaviors x 2 = 16 max unit tests.
 Tests invoke through FinderService (driving port) with InMemoryTopicFetchAdapter
 (fake driven port). No mocks inside the hexagon.
 
@@ -10,6 +10,9 @@ Behaviors tested:
 3. API unavailable returns error context with guidance
 4. Partial results from rate limiting
 5. Missing profile returns guidance messages
+6. Search-and-filter orchestration returns candidates with statistics
+7. Persist scored results via FinderResultsPort
+8. Progress callback reports fetch and filter phases
 """
 
 from __future__ import annotations
@@ -18,7 +21,10 @@ from typing import Any
 
 from pes.domain.finder_service import FinderService
 from tests.acceptance.solicitation_finder.conftest import make_topic
-from tests.acceptance.solicitation_finder.fakes import InMemoryTopicFetchAdapter
+from tests.acceptance.solicitation_finder.fakes import (
+    InMemoryFinderResultsAdapter,
+    InMemoryTopicFetchAdapter,
+)
 
 
 def _make_topics(count: int, **overrides: str) -> list[dict[str, Any]]:
@@ -137,3 +143,116 @@ class TestFinderServiceNoProfile:
         # No topics returned, source was not called
         assert result.source == ""
         assert result.total == 0
+
+
+def _make_de_topics(count: int) -> list[dict[str, Any]]:
+    """Generate directed-energy topics that match 'directed energy' keyword."""
+    return [
+        make_topic(
+            topic_id=f"DE-{i:03d}",
+            topic_code=f"DE-{i:03d}",
+            title=f"Directed Energy System #{i}",
+        )
+        for i in range(1, count + 1)
+    ]
+
+
+def _make_bio_topics(count: int) -> list[dict[str, Any]]:
+    """Generate non-matching biodefense topics."""
+    return [
+        make_topic(
+            topic_id=f"BIO-{i:03d}",
+            topic_code=f"BIO-{i:03d}",
+            title=f"Biodefense Research #{i}",
+        )
+        for i in range(1, count + 1)
+    ]
+
+
+class TestFinderServiceSearchAndFilter:
+    """Behavior 6: Search-and-filter orchestration returns candidates with statistics."""
+
+    def test_search_and_filter_returns_candidates_with_statistics(self) -> None:
+        topics = _make_de_topics(10) + _make_bio_topics(40)
+        adapter = InMemoryTopicFetchAdapter(topics=topics)
+        profile = {
+            "company_name": "Test Corp",
+            "capabilities": ["directed energy"],
+        }
+        service = FinderService(topic_fetch=adapter, profile=profile)
+
+        result = service.search_and_filter()
+
+        assert result.total_fetched == 50
+        assert result.candidates_count == 10
+        assert result.eliminated_count == 40
+        assert len(result.topics) == 10
+
+    def test_search_and_filter_includes_prefilter_messages(self) -> None:
+        topics = _make_de_topics(5) + _make_bio_topics(15)
+        adapter = InMemoryTopicFetchAdapter(topics=topics)
+        profile = {
+            "company_name": "Test Corp",
+            "capabilities": ["directed energy"],
+        }
+        service = FinderService(topic_fetch=adapter, profile=profile)
+
+        result = service.search_and_filter()
+
+        assert any("keyword match" in m.lower() for m in result.messages)
+        assert any("5 candidate" in m.lower() for m in result.messages)
+
+
+class TestFinderServicePersistResults:
+    """Behavior 7: Persist scored results via FinderResultsPort."""
+
+    def test_persist_results_writes_to_results_port(self) -> None:
+        adapter = InMemoryTopicFetchAdapter(topics=[])
+        results_port = InMemoryFinderResultsAdapter()
+        profile = _make_profile()
+        service = FinderService(
+            topic_fetch=adapter,
+            profile=profile,
+            results_port=results_port,
+        )
+        scored_data = {
+            "results": [{"topic_id": "T-001", "score": 0.85}],
+            "topics_scored": 1,
+        }
+
+        service.persist_results(scored_data)
+
+        stored = results_port.read()
+        assert stored is not None
+        assert stored["topics_scored"] == 1
+
+    def test_persist_results_without_port_raises(self) -> None:
+        adapter = InMemoryTopicFetchAdapter(topics=[])
+        service = FinderService(topic_fetch=adapter, profile=_make_profile())
+
+        import pytest
+
+        with pytest.raises(ValueError, match="results port"):
+            service.persist_results({"results": []})
+
+
+class TestFinderServiceProgress:
+    """Behavior 8: Progress callback reports fetch and filter phases."""
+
+    def test_progress_callback_receives_fetch_and_filter_events(self) -> None:
+        topics = _make_de_topics(5) + _make_bio_topics(10)
+        adapter = InMemoryTopicFetchAdapter(topics=topics)
+        profile = {
+            "company_name": "Test Corp",
+            "capabilities": ["directed energy"],
+        }
+        service = FinderService(topic_fetch=adapter, profile=profile)
+        progress_events: list[dict[str, Any]] = []
+
+        result = service.search_and_filter(
+            on_progress=lambda info: progress_events.append(info),
+        )
+
+        phases_reported = [e.get("phase") for e in progress_events]
+        assert "fetch" in phases_reported
+        assert "filter" in phases_reported

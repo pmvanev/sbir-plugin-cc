@@ -8,7 +8,30 @@ from __future__ import annotations
 
 from typing import Any
 
+from pes.ports.finder_results_port import FinderResultsPort
 from pes.ports.topic_fetch_port import FetchResult, TopicFetchPort
+
+
+class InMemoryFinderResultsAdapter(FinderResultsPort):
+    """In-memory fake for FinderResultsPort.
+
+    Stores results in memory for fast isolated testing.
+    """
+
+    def __init__(self) -> None:
+        self._data: dict[str, Any] | None = None
+
+    def read(self) -> dict[str, Any] | None:
+        """Read stored results."""
+        return self._data
+
+    def write(self, results: dict[str, Any]) -> None:
+        """Write results to memory."""
+        self._data = results
+
+    def exists(self) -> bool:
+        """Check if results exist."""
+        return self._data is not None
 
 
 class InMemoryTopicFetchAdapter(TopicFetchPort):
