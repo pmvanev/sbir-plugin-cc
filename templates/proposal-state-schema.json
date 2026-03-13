@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Proposal State",
+  "description": "Schema for .sbir/proposal-state.json -- tracks proposal lifecycle state, wave progress, and all intermediate artifacts",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "topic",
+    "current_wave",
+    "go_no_go",
+    "waves",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "State schema version. Current: 2.0.0"
+    },
+    "proposal_id": {
+      "type": "string",
+      "description": "Unique proposal identifier, e.g., proposal-af243-001"
+    },
+    "topic": {
+      "type": "object",
+      "description": "Solicitation topic metadata from Wave 0 parsing",
+      "required": ["id", "agency", "title"],
+      "properties": {
+        "id": { "type": "string", "description": "Topic ID, e.g., AF243-001" },
+        "agency": { "type": "string", "description": "Sponsoring agency, e.g., Air Force" },
+        "title": { "type": "string", "description": "Topic title verbatim from solicitation" },
+        "solicitation_url": { "type": ["string", "null"], "description": "URL to solicitation page" },
+        "solicitation_file": { "type": ["string", "null"], "description": "Local path to solicitation document" },
+        "deadline": { "type": ["string", "null"], "description": "Submission deadline (ISO 8601)" },
+        "phase": { "type": ["string", "null"], "description": "SBIR phase: I, II, or Direct-to-Phase-II" }
+      }
+    },
+    "current_wave": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9,
+      "description": "Currently active wave number (0-9)"
+    },
+    "go_no_go": {
+      "type": "string",
+      "enum": ["pending", "go", "no-go", "deferred"],
+      "description": "Wave 0 Go/No-Go decision"
+    },
+    "approach_selection": {
+      "type": "object",
+      "description": "Solution shaper output (Wave 0 post-Go). Optional -- absent for proposals that skip approach selection.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "skipped"],
+          "description": "Approach selection checkpoint status"
+        },
+        "approach_name": { "type": ["string", "null"], "description": "Selected approach name" },
+        "composite_score": { "type": ["number", "null"], "description": "Composite score of selected approach (0.00-1.00)" },
+        "revision_count": { "type": "integer", "description": "Number of approach revisions" }
+      }
+    },
+    "writing_style": {
+      "type": ["string", "null"],
+      "description": "Optional prose style for writer/reviewer. Maps to a skill file at skills/writer/{value}.md. Examples: 'elements' (Strunk & White), null (standard). Set before Wave 4 drafting."
+    },
+    "waves": {
+      "type": "object",
+      "description": "Per-wave status tracking. Keys are wave numbers as strings (0-9).",
+      "patternProperties": {
+        "^[0-9]$": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["not_started", "active", "completed", "skipped"]
+            },
+            "completed_at": { "type": ["string", "null"], "description": "ISO 8601 completion timestamp" }
+          }
+        }
+      }
+    },
+    "corpus": {
+      "type": "object",
+      "description": "Past proposal corpus tracking",
+      "properties": {
+        "directories_ingested": { "type": "array", "items": { "type": "string" } },
+        "document_count": { "type": "integer" },
+        "file_hashes": { "type": "object" }
+      }
+    },
+    "compliance_matrix": {
+      "type": "object",
+      "description": "Compliance matrix metadata (Wave 1)",
+      "properties": {
+        "path": { "type": ["string", "null"] },
+        "item_count": { "type": "integer" },
+        "generated_at": { "type": ["string", "null"] }
+      }
+    },
+    "tpoc": {
+      "type": "object",
+      "description": "TPOC (Technical Point of Contact) call tracking (Wave 1)",
+      "properties": {
+        "status": { "type": "string", "enum": ["not_started", "questions_generated", "answers_ingested"] },
+        "questions_path": { "type": ["string", "null"] },
+        "qa_log_path": { "type": ["string", "null"] },
+        "questions_generated_at": { "type": ["string", "null"] },
+        "answers_ingested_at": { "type": ["string", "null"] }
+      }
+    },
+    "strategy_brief": {
+      "type": "object",
+      "description": "Strategy brief tracking (Wave 1)",
+      "properties": {
+        "path": { "type": ["string", "null"] },
+        "status": { "type": "string", "enum": ["not_started", "draft", "approved", "skipped"] },
+        "approved_at": { "type": ["string", "null"] }
+      }
+    },
+    "fit_scoring": {
+      "type": "object",
+      "description": "Company fit scores from Wave 0",
+      "properties": {
+        "subject_matter": { "type": ["number", "null"] },
+        "past_performance": { "type": ["number", "null"] },
+        "certifications": { "type": ["number", "null"] },
+        "recommendation": { "type": ["string", "null"] }
+      }
+    },
+    "research_summary": {
+      "type": "object",
+      "description": "Wave 2 research findings",
+      "properties": {
+        "findings": { "type": "array" }
+      }
+    },
+    "discrimination_table": {
+      "type": "object",
+      "description": "Wave 3 discrimination table items",
+      "properties": {
+        "items": { "type": "array" }
+      }
+    },
+    "volumes": {
+      "type": "object",
+      "description": "Per-volume draft tracking (Wave 4+)",
+      "properties": {
+        "technical": { "$ref": "#/$defs/volume_status" },
+        "management": { "$ref": "#/$defs/volume_status" },
+        "cost": { "$ref": "#/$defs/volume_status" }
+      }
+    },
+    "open_review_items": {
+      "type": "array",
+      "description": "Unresolved review findings from Wave 4/7"
+    },
+    "archived": {
+      "type": "boolean",
+      "description": "True if proposal was archived (no-go or withdrawn)"
+    },
+    "created_at": { "type": "string", "description": "ISO 8601 creation timestamp" },
+    "updated_at": { "type": "string", "description": "ISO 8601 last update timestamp" }
+  },
+  "$defs": {
+    "volume_status": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["not_started", "drafting", "in_review", "approved"]
+        },
+        "current_draft": { "type": ["string", "null"], "description": "Path to current draft file" },
+        "review_comments": { "type": "array", "items": { "type": "string" } },
+        "iterations": { "type": "integer", "description": "Number of review iterations" }
+      }
+    }
+  }
+}
