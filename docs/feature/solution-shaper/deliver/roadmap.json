@@ -105,8 +105,8 @@
     "excluded_patterns": []
   },
   "validation": {
-    "status": "pending",
-    "reviewer": "TODO",
-    "approved_at": "TODO"
+    "status": "approved",
+    "reviewer": "self",
+    "approved_at": "2026-03-13T18:00:00Z"
   }
 }

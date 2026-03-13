@@ -48,12 +48,15 @@ You MUST load your skill files before beginning work. Skills encode SBIR domain 
 Load: `sbir-strategy-knowledge` -- read it NOW before proceeding.
 
 1. Read compliance matrix from `.sbir/compliance-matrix.json`
-2. Read TPOC ingestion results from `.sbir/tpoc-answers.json` if available
-3. Read company profile from `~/.sbir/company-profile.json` if available
-4. Read solicitation text and evaluation criteria from corpus
-5. If compliance matrix is missing, return error: "Compliance matrix required before strategy brief generation. Run compliance extraction first."
+2. Read approach brief from `./artifacts/wave-0-intelligence/approach-brief.md` if available. The approach brief provides the selected technical approach, discrimination angles, Phase III quick assessment, and risks -- use these as strategic inputs rather than asking the user to re-explain.
+3. Read TPOC ingestion results from `.sbir/tpoc-answers.json` if available
+4. Read company profile from `~/.sbir/company-profile.json` if available
+5. Read solicitation text and evaluation criteria from corpus
+6. If compliance matrix is missing, return error: "Compliance matrix required before strategy brief generation. Run compliance extraction first."
 
-Gate: Compliance matrix loaded. TPOC availability determined. Source materials cataloged.
+Note: If no approach brief exists, proceed without it (backward compatible). The user may not have run approach selection.
+
+Gate: Compliance matrix loaded. TPOC availability determined. Approach brief availability determined. Source materials cataloged.
 
 ### Phase 2: SYNTHESIZE
 Load: `trl-assessor` and `budget-scaffolder` -- read them NOW before proceeding.

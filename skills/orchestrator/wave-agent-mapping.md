@@ -9,7 +9,7 @@ description: Wave definitions, agent routing table, and checkpoint gates for the
 
 | Wave | Name | Primary Agents | Exit Gate |
 |------|------|---------------|-----------|
-| 0 | Intelligence & Fit | corpus-librarian | Go/No-Go human checkpoint |
+| 0 | Intelligence & Fit | corpus-librarian, solution-shaper | Go/No-Go human checkpoint, Approach Selection checkpoint |
 | 1 | Requirements & Strategy | compliance-sheriff, tpoc-analyst, strategist | Strategy alignment checkpoint |
 | 2 | Research | researcher, strategist | Research completeness review |
 | 3 | Discrimination & Outline | writer, reviewer | Discrimination table + outline approval |
@@ -25,6 +25,7 @@ description: Wave definitions, agent routing table, and checkpoint gates for the
 | Command | Dispatches To | Wave Context |
 |---------|--------------|-------------|
 | `proposal new` | corpus-librarian (+ topic-scout, fit-scorer in C2) | Wave 0 |
+| `proposal shape` | sbir-solution-shaper | Wave 0 (post-Go) |
 | `proposal corpus add <path>` | sbir-corpus-librarian | Any wave |
 | `proposal corpus list` | sbir-corpus-librarian | Any wave |
 | `proposal compliance check` | sbir-compliance-sheriff | Wave 1+ |
@@ -79,6 +80,7 @@ TPOC calls are async external events. Valid states:
 | Checkpoint | Wave | Trigger | Decision Options |
 |-----------|------|---------|-----------------|
 | Go/No-Go | 0 | After fit scoring | go, no-go, defer |
+| Approach Selection | 0 | After approach scoring (post-Go) | approve, revise, explore, restart, quit |
 | Strategy Alignment | 1 | After strategy brief | approve, revise, skip |
 | Research Completeness | 2 | After research synthesis | approve, revise, skip |
 | Discrimination Table | 3 | After discrimination table | approve, revise, skip |
