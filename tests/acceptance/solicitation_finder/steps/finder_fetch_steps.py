@@ -14,7 +14,8 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from pes.domain.finder_service import FinderService
+from pes.domain.finder_service import FinderService, SearchResult
+from pes.domain.keyword_prefilter import KeywordPreFilter
 from tests.acceptance.solicitation_finder.fakes import InMemoryTopicFetchAdapter
 from tests.acceptance.solicitation_finder.steps.finder_common_steps import *  # noqa: F403
 
@@ -168,8 +169,8 @@ def phil_profile_with_capabilities(
 
 
 @given(
-    parsers.parse(
-        'the company profile has capabilities "{cap1}", "{cap2}", "{cap3}"'
+    parsers.re(
+        r'the company profile has capabilities "(?P<cap1>[^"]+)", "(?P<cap2>[^"]+)", "(?P<cap3>[^"]+)"'
     ),
 )
 def profile_has_capabilities(
@@ -187,7 +188,7 @@ def profile_has_capabilities(
     finder_context["profile"] = profile
 
 
-@given(parsers.parse('the company profile has capabilities "{caps}"'))
+@given(parsers.re(r'the company profile has capabilities "(?P<caps>[^"]+)"$'))
 def profile_has_single_capability(
     caps: str,
     radiant_profile: dict[str, Any],
@@ -335,12 +336,20 @@ def phil_searches_with_document(finder_context: dict[str, Any]):
 
 @when("the keyword pre-filter runs")
 def keyword_prefilter_runs(finder_context: dict[str, Any]):
-    """Run the keyword pre-filter against fetched topics.
-
-    TODO: Wire to KeywordPreFilter.filter() once production code
-    is implemented in a later step.
-    """
+    """Run the keyword pre-filter against fetched topics."""
+    prefilter = KeywordPreFilter()
+    topics = finder_context["fetched_topics"]
+    profile = finder_context.get("profile", {})
+    capabilities = profile.get("capabilities", [])
+    result = prefilter.filter(topics, capabilities)
+    finder_context["prefilter_result"] = result
     finder_context["action"] = "prefilter"
+    # Make prefilter messages accessible to common display/warn steps
+    finder_context["search_result"] = SearchResult(
+        topics=result.candidates,
+        total=len(topics),
+        messages=result.warnings,
+    )
 
 
 # --- Then steps ---
@@ -404,8 +413,10 @@ def topics_extracted_from_document(count: int, finder_context: dict[str, Any]):
 @then(parsers.parse("{count:d} candidate topics are identified"))
 def n_candidates_identified(count: int, finder_context: dict[str, Any]):
     """Verify candidate count after pre-filter."""
-    # Pre-filter is a future step; placeholder
-    pass
+    result = finder_context["prefilter_result"]
+    assert len(result.candidates) == count, (
+        f"Expected {count} candidates, got {len(result.candidates)}"
+    )
 
 
 @then(
@@ -424,29 +435,37 @@ def n_candidates_from_total(
 @then(parsers.parse("{count:d} topics are eliminated"))
 def n_topics_eliminated(count: int, finder_context: dict[str, Any]):
     """Verify elimination count."""
-    # Pre-filter is a future step; placeholder
-    pass
+    result = finder_context["prefilter_result"]
+    assert result.eliminated_count == count, (
+        f"Expected {count} eliminated, got {result.eliminated_count}"
+    )
 
 
 @then("the topic is included as a candidate")
 def topic_is_candidate(finder_context: dict[str, Any]):
     """Verify the topic passed the pre-filter."""
-    # Pre-filter is a future step; placeholder
-    pass
+    result = finder_context["prefilter_result"]
+    assert len(result.candidates) == 1, (
+        f"Expected 1 candidate, got {len(result.candidates)}"
+    )
 
 
 @then("zero candidates are identified")
 def zero_candidates(finder_context: dict[str, Any]):
     """Verify no candidates matched."""
-    # Pre-filter is a future step; placeholder
-    pass
+    result = finder_context["prefilter_result"]
+    assert len(result.candidates) == 0, (
+        f"Expected 0 candidates, got {len(result.candidates)}"
+    )
 
 
 @then(parsers.parse("all {count:d} topics pass the pre-filter"))
 def all_topics_pass(count: int, finder_context: dict[str, Any]):
     """Verify all topics passed (empty capabilities)."""
-    # Pre-filter is a future step; placeholder
-    pass
+    result = finder_context["prefilter_result"]
+    assert len(result.candidates) == count, (
+        f"Expected {count} topics to pass, got {len(result.candidates)}"
+    )
 
 
 @then("the tool offers to score partial results or retry later")
@@ -504,5 +523,9 @@ def recommendations_capped(finder_context: dict[str, Any]):
 @then("the tool suggests reviewing the profile or broadening filters")
 def suggests_review_or_broaden(finder_context: dict[str, Any]):
     """Verify suggestion to review profile or broaden filters."""
-    # Pre-filter suggestions are a future step; placeholder
-    pass
+    result = finder_context["prefilter_result"]
+    assert len(result.warnings) > 0, "Expected warnings with suggestions"
+    all_warnings = " ".join(result.warnings).lower()
+    assert "profile" in all_warnings or "broaden" in all_warnings, (
+        f"Expected profile/broaden suggestion in warnings: {result.warnings}"
+    )
