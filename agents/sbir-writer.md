@@ -44,6 +44,7 @@ You MUST load your skill files before beginning work. Skills encode SBIR proposa
 | 2 OUTLINE | `skills/corpus-librarian/proposal-archive-reader.md` | Always -- retrieval patterns for exemplar section structures |
 | 3 DRAFT | `skills/corpus-librarian/proposal-archive-reader.md` | Already loaded -- use Wave 4 retrieval strategy for section drafting |
 | 3 DRAFT | `skills/reviewer/reviewer-persona-simulator.md` | When available -- self-check drafts against evaluation criteria |
+| 3 DRAFT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `.sbir/proposal-state.json` -- load the named style skill (e.g., `elements-of-style.md` for Strunk & White). If not set, no style skill is loaded and standard prose conventions apply. |
 
 ## Workflow
 

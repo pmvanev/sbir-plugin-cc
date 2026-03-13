@@ -39,8 +39,9 @@ You MUST load your skill files before beginning work. Skills encode government e
 | Phase | Load | Trigger |
 |-------|------|---------|
 | 1 ORIENT | `skills/reviewer/reviewer-persona-simulator.md` | Always -- scoring rubrics, persona construction, finding format |
+| 1 ORIENT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `.sbir/proposal-state.json` -- load the named style skill so review evaluates against the same prose standard the writer used. If not set, reviewer uses default clarity checks only. |
 | 2 SECTION REVIEW | `skills/corpus-librarian/win-loss-analyzer.md` | Always -- known weakness profile and debrief patterns |
-| 3 FULL REVIEW | Both skills already loaded | Use for full proposal evaluation |
+| 3 FULL REVIEW | All skills already loaded | Use for full proposal evaluation |
 
 ## Workflow
 
