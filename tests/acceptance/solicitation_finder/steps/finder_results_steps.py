@@ -269,26 +269,36 @@ def view_topic_details(topic_id: str, finder_context: dict[str, Any]):
 
 
 @when("the results are persisted")
-def persist_results(finder_context: dict[str, Any]):
-    """Persist scored results to finder results file.
-
-    TODO: Wire to FinderResultsPort.write().
-    """
+def persist_results(
+    finder_context: dict[str, Any],
+    finder_results_port,
+):
+    """Persist scored results via FinderResultsPort.write()."""
+    results = finder_context["scored_results"]
+    finder_results_port.write(results)
     finder_context["action"] = "persist"
 
 
 @when("Phil attempts to view topic details")
-def attempt_view_details(finder_context: dict[str, Any]):
-    """Phil tries to view details without results."""
+def attempt_view_details(
+    finder_context: dict[str, Any],
+    finder_results_port,
+):
+    """Phil tries to view details without results -- read returns None."""
+    finder_context["read_result"] = finder_results_port.read()
     finder_context["action"] = "view_details_missing"
 
 
 @when("the results are saved and then loaded")
-def save_and_load_results(finder_context: dict[str, Any]):
-    """Save then load results for roundtrip test.
-
-    TODO: Wire to FinderResultsPort write/read cycle.
-    """
+def save_and_load_results(
+    finder_context: dict[str, Any],
+    finder_results_port,
+    scored_results: dict[str, Any],
+):
+    """Save then load results via FinderResultsPort write/read cycle."""
+    finder_results_port.write(scored_results)
+    finder_context["loaded_results"] = finder_results_port.read()
+    finder_context["original_results"] = scored_results
     finder_context["action"] = "roundtrip"
 
 
@@ -434,40 +444,57 @@ def dq_topic_with_reason(
 
 
 @then("results are saved to the finder results file")
-def results_saved(finder_context: dict[str, Any]):
-    """Verify results persistence."""
-    # TODO: Assert file written
-    pass
+def results_saved(finder_context: dict[str, Any], finder_results_port):
+    """Verify results persistence -- file exists after write."""
+    assert finder_results_port.exists(), "Finder results file should exist after persist"
 
 
 @then("the file includes all scored topics with dimension breakdowns")
-def file_includes_scores(finder_context: dict[str, Any]):
-    """Verify file content completeness."""
-    # TODO: Assert file content
-    pass
+def file_includes_scores(finder_context: dict[str, Any], finder_results_port):
+    """Verify file content completeness -- all topics with dimensions present."""
+    loaded = finder_results_port.read()
+    assert loaded is not None, "Results should be readable after persist"
+    results = loaded["results"]
+    original = finder_context["scored_results"]["results"]
+    assert len(results) == len(original), (
+        f"Expected {len(original)} topics, got {len(results)}"
+    )
+    for entry in results:
+        assert "dimensions" in entry, f"Topic {entry['topic_id']} missing dimensions"
+        assert len(entry["dimensions"]) == 5, (
+            f"Topic {entry['topic_id']} should have 5 dimensions"
+        )
 
 
 @then(
     "the file includes run metadata with date, source, and company name",
 )
-def file_includes_metadata(finder_context: dict[str, Any]):
-    """Verify metadata in persisted file."""
-    # TODO: Assert metadata
-    pass
+def file_includes_metadata(finder_context: dict[str, Any], finder_results_port):
+    """Verify metadata in persisted file -- run_date, source, company_profile_used."""
+    loaded = finder_results_port.read()
+    assert loaded is not None, "Results should be readable after persist"
+    assert "run_date" in loaded, "Missing run_date in persisted results"
+    assert "source" in loaded, "Missing source in persisted results"
+    assert "company_profile_used" in loaded, "Missing company_profile_used"
+    assert "schema_version" in loaded, "Missing schema_version field"
 
 
 @then("the tool suggests running the solicitation finder first")
 def suggests_running_finder(finder_context: dict[str, Any]):
-    """Verify suggestion to run finder."""
-    # TODO: Assert suggestion
-    pass
+    """Verify read returned None when no results exist."""
+    assert finder_context.get("read_result") is None, (
+        "Reading missing results should return None"
+    )
 
 
 @then("the loaded results match the original scores exactly")
 def results_match_original(finder_context: dict[str, Any]):
-    """Property assertion: roundtrip preserves data."""
-    # TODO: Property-based test assertion
-    pass
+    """Roundtrip preserves data -- loaded results equal original."""
+    loaded = finder_context["loaded_results"]
+    original = finder_context["original_results"]
+    assert loaded == original, (
+        "Roundtrip mismatch: loaded results differ from original"
+    )
 
 
 @then(parsers.parse('the proposal workflow begins with topic "{topic_id}" pre-loaded'))

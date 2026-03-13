@@ -20,6 +20,9 @@ from typing import Any
 
 import pytest
 
+from pes.adapters.json_finder_results_adapter import JsonFinderResultsAdapter
+from pes.ports.finder_results_port import FinderResultsPort
+
 
 # ---------------------------------------------------------------------------
 # Directory Fixtures
@@ -375,6 +378,17 @@ def scored_results() -> dict[str, Any]:
             ),
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# FinderResultsPort Fixture
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def finder_results_port(sbir_dir: Path) -> FinderResultsPort:
+    """FinderResultsPort backed by JsonFinderResultsAdapter in temp directory."""
+    return JsonFinderResultsAdapter(str(sbir_dir))
 
 
 # ---------------------------------------------------------------------------
