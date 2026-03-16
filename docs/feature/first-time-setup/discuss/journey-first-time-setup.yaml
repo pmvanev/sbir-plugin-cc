@@ -1,0 +1,327 @@
+journey:
+  name: "First-Time Setup"
+  goal: "Guide user from plugin installation to fully configured system ready to search solicitations"
+  persona: "Dr. Elena Vasquez -- First-time PI at 25-person defense tech startup"
+
+  emotional_arc:
+    start: "Curious but anxious -- will this be complicated?"
+    middle: "Engaged and building confidence -- each step completes, progress visible"
+    end: "Confident and empowered -- everything configured, clear next steps"
+
+  triggers:
+    - "User has just installed the SBIR proposal plugin"
+    - "User wants to start searching for solicitations"
+    - "User runs /sbir:setup for the first time"
+    - "User runs /sbir:setup again to update or verify configuration"
+
+steps:
+  - id: 1
+    name: "Welcome and Prerequisites Check"
+    command: "/sbir:setup"
+    description: "Display welcome message with time estimate. Check Python 3.12+, Git, and Claude Code authentication."
+
+    tui_mockup: |
+      +-- First-Time Setup -------------------------------------------+
+      |  Welcome to the SBIR Proposal Plugin setup.                    |
+      |  Estimated time: 10-15 minutes                                 |
+      |                                                                |
+      |  Checking prerequisites...                                     |
+      |                                                                |
+      |  [ok]  Python ${python_version}                                |
+      |  [ok]  Git ${git_version}                                      |
+      |  [ok]  Claude Code authenticated                               |
+      |                                                                |
+      |  All prerequisites met. Ready to continue.                     |
+      |                                                                |
+      |  (c) continue   (q) quit                                       |
+      +----------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "python_version"
+        source: "python3 --version runtime check"
+        displayed_as: "${python_version}"
+        consumers: ["Step 1 prereq display", "Step 5 validation summary"]
+      - name: "git_version"
+        source: "git --version runtime check"
+        displayed_as: "${git_version}"
+        consumers: ["Step 1 prereq display", "Step 5 validation summary"]
+      - name: "claude_code_status"
+        source: "claude code authentication check"
+        displayed_as: "${claude_code_status}"
+        consumers: ["Step 1 prereq display", "Step 5 validation summary"]
+
+    emotional_state:
+      entry: "Curious but slightly anxious"
+      exit: "Reassured -- foundation is solid"
+
+    error_paths:
+      - condition: "Python not found or version < 3.12"
+        display: "[!!] Python not found or version too old"
+        recovery: "Install Python 3.12+ from python.org, then re-run /sbir:setup"
+      - condition: "Git not found"
+        display: "[!!] Git not found"
+        recovery: "Install Git from git-scm.com/downloads, then re-run /sbir:setup"
+      - condition: "Claude Code not authenticated"
+        display: "[!!] Claude Code not authenticated"
+        recovery: "Run 'claude auth' to authenticate, then re-run /sbir:setup"
+
+    integration_checkpoint: |
+      All three prerequisites pass before proceeding to Step 2.
+      Any failure stops setup with actionable fix instructions.
+
+  - id: 2
+    name: "Company Profile Creation"
+    command: "Delegates to sbir-profile-builder agent"
+    description: "Check for existing profile. If none, invoke profile builder. If exists, offer keep/update/fresh options."
+
+    tui_mockup: |
+      +-- Company Profile -- No Existing Profile ----------------------+
+      |  No company profile found at ~/.sbir/company-profile.json      |
+      |                                                                |
+      |  How would you like to build your profile?                     |
+      |  (d) documents   (i) interview   (b) both                     |
+      +----------------------------------------------------------------+
+
+      --- profile builder runs (existing agent) ---
+
+      +-- Company Profile -- COMPLETE --------------------------------+
+      |  Profile saved: ${profile_path}                                |
+      |  Company: ${company_name}                                      |
+      |  Capabilities: ${capability_count} keywords                    |
+      |  Key Personnel: ${personnel_count} entries                     |
+      |  SAM.gov: ${sam_status} (CAGE: ${cage_code})                   |
+      |                                                                |
+      |  Continuing to corpus setup...                                 |
+      +----------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "profile_path"
+        source: "~/.sbir/company-profile.json"
+        displayed_as: "${profile_path}"
+        consumers: ["Step 2 profile display", "Step 5 validation summary"]
+      - name: "company_name"
+        source: "~/.sbir/company-profile.json -> company_name"
+        displayed_as: "${company_name}"
+        consumers: ["Step 2 profile display", "Step 5 validation summary", "Resume flow"]
+      - name: "profile_exists"
+        source: "JsonProfileAdapter.metadata().exists"
+        displayed_as: "${profile_exists}"
+        consumers: ["Step 2 branching logic", "Step 5 validation", "Resume flow"]
+      - name: "sam_status"
+        source: "~/.sbir/company-profile.json -> certifications.sam_gov.active"
+        displayed_as: "${sam_status}"
+        consumers: ["Step 2 profile display", "Step 5 validation warnings"]
+      - name: "cage_code"
+        source: "~/.sbir/company-profile.json -> certifications.sam_gov.cage_code"
+        displayed_as: "${cage_code}"
+        consumers: ["Step 2 profile display", "Step 5 validation summary"]
+
+    emotional_state:
+      entry: "Reassured -- prerequisites passed"
+      exit: "Engaged -- profile is complete, tangible progress"
+
+    error_paths:
+      - condition: "User cancels profile builder mid-interview"
+        display: "Profile creation cancelled."
+        recovery: "Setup pauses. User can resume /sbir:setup later; Step 2 will restart."
+      - condition: "Profile validation fails"
+        display: "Validation errors with field-level fix instructions"
+        recovery: "Profile builder handles retry loop internally"
+
+    integration_checkpoint: |
+      Profile exists at ~/.sbir/company-profile.json and passes schema validation.
+      If user kept existing profile, verify it still passes validation.
+
+  - id: 3
+    name: "Corpus Setup"
+    command: "Guided discovery + delegates to corpus ingestion"
+    description: "Ask if user has past documents. If yes, accept directory paths and run corpus ingestion. If no, skip with guidance."
+
+    tui_mockup: |
+      +-- Corpus Setup -----------------------------------------------+
+      |  Do you have past proposals or related documents?              |
+      |  (y) yes   (n) no / skip   (q) quit                           |
+      +----------------------------------------------------------------+
+
+      --- if yes ---
+
+      +-- Corpus Setup -----------------------------------------------+
+      |  Enter directory path(s):                                      |
+      |  > ~/Documents/sbir-proposals, ~/Downloads/debriefs            |
+      +----------------------------------------------------------------+
+
+      --- after ingestion ---
+
+      +-- Corpus Setup -- COMPLETE -----------------------------------+
+      |  Ingested: ${corpus_document_count} documents                  |
+      |    ${proposal_count} proposals                                 |
+      |    ${debrief_count} debriefs                                   |
+      |    ${other_doc_count} other documents                          |
+      |  Skipped: ${skipped_count} unsupported files                   |
+      +----------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "corpus_document_count"
+        source: ".sbir/corpus/ index after ingestion"
+        displayed_as: "${corpus_document_count}"
+        consumers: ["Step 3 results", "Step 5 validation summary"]
+      - name: "corpus_directories"
+        source: "User input during Step 3"
+        displayed_as: "${corpus_directories}"
+        consumers: ["Step 3 display", "Step 5 validation"]
+
+    emotional_state:
+      entry: "Engaged -- profile done, momentum building"
+      exit: "Productive -- years of past work now accessible"
+
+    error_paths:
+      - condition: "Directory path does not exist"
+        display: "Directory not found: ~/bad-path/"
+        recovery: "Check the path and try again. Use tab completion for accuracy."
+      - condition: "Directory is empty or has no supported files"
+        display: "No supported documents found. Supported: PDF, Word, text, Markdown."
+        recovery: "Try a different directory or skip corpus for now."
+      - condition: "Some files are corrupted or password-protected"
+        display: "Skipped N unreadable files (password-protected or corrupted)"
+        recovery: "Listed by name. User can unlock and re-run corpus add later."
+
+    integration_checkpoint: |
+      Corpus ingestion complete (or explicitly skipped).
+      If skipped, setup continues -- corpus is not a hard requirement.
+
+  - id: 4
+    name: "API Key Configuration (Optional)"
+    command: "Environment variable check and guidance"
+    description: "Check for GEMINI_API_KEY. If present, confirm. If absent, offer skip or configuration instructions."
+
+    tui_mockup: |
+      +-- Image Generation (Optional) --------------------------------+
+      |  GEMINI_API_KEY: ${gemini_api_key_status}                      |
+      |                                                                |
+      |  (s) skip   (c) configure -- show me how   (q) quit           |
+      +----------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "gemini_api_key_status"
+        source: "GEMINI_API_KEY environment variable"
+        displayed_as: "${gemini_api_key_status}"
+        consumers: ["Step 4 display", "Step 5 validation summary"]
+
+    emotional_state:
+      entry: "Productive -- core setup complete"
+      exit: "Informed -- knows what's optional, no pressure"
+
+    error_paths:
+      - condition: "API key present but appears malformed"
+        display: "GEMINI_API_KEY detected but may be invalid (unusual format)"
+        recovery: "The key will be validated when used in Wave 5. Continuing."
+
+    integration_checkpoint: |
+      Gemini API key status recorded. Not a blocker for any downstream step.
+
+  - id: 5
+    name: "Validation Summary"
+    command: "Automated verification of all steps"
+    description: "Re-check all configuration items. Display unified checklist with ok/warning/missing indicators. Report overall status."
+
+    tui_mockup: |
+      +-- Setup Validation -------------------------------------------+
+      |  Verifying your setup...                                       |
+      |                                                                |
+      |  Prerequisites                                                 |
+      |    [ok]  Python ${python_version}                              |
+      |    [ok]  Git ${git_version}                                    |
+      |    [ok]  Claude Code authenticated                             |
+      |                                                                |
+      |  Company Profile                                               |
+      |    [ok]  ${profile_path}                                       |
+      |    [ok]  SAM.gov ${sam_status} (CAGE: ${cage_code})            |
+      |    [ok]  ${capability_count} capabilities                      |
+      |                                                                |
+      |  Corpus                                                        |
+      |    [ok]  ${corpus_document_count} documents indexed            |
+      |                                                                |
+      |  Optional                                                      |
+      |    [${gemini_indicator}]  GEMINI_API_KEY ${gemini_api_key_status} |
+      |                                                                |
+      |  STATUS: ${setup_status}                                       |
+      +----------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "setup_status"
+        source: "Computed from all validation checks"
+        displayed_as: "${setup_status}"
+        consumers: ["Step 5 display", "Step 6 next steps conditional"]
+      - name: "warning_count"
+        source: "Count of non-blocking issues found"
+        displayed_as: "${warning_count}"
+        consumers: ["Step 5 warnings section"]
+
+    emotional_state:
+      entry: "Anticipation -- did everything work?"
+      exit: "Confident -- green checkmarks confirm proper setup"
+
+    error_paths:
+      - condition: "SAM.gov inactive (hard consequence for downstream)"
+        display: "[!!] SAM.gov not active -- all topics will be NO-GO"
+        recovery: "Update with: /sbir:proposal profile update"
+      - condition: "Empty corpus (soft warning)"
+        display: "[--] No documents indexed"
+        recovery: "Add documents: /sbir:proposal corpus add <directory>"
+
+    integration_checkpoint: |
+      All shared artifacts from Steps 1-4 verified for consistency.
+      Profile exists and validates. Corpus indexed (or explicitly skipped).
+      Status computed: READY, READY (with warnings), or INCOMPLETE.
+
+  - id: 6
+    name: "Next Steps Guidance"
+    command: "Guidance output"
+    description: "Display concrete next commands based on setup status. Inform user they can re-run /sbir:setup anytime."
+
+    tui_mockup: |
+      +-- Setup Complete ---------------------------------------------+
+      |  Your SBIR Proposal Plugin is ready.                           |
+      |                                                                |
+      |  What to do next:                                              |
+      |  1. /sbir:solicitation find                                    |
+      |  2. /sbir:solicitation find --agency "Air Force"               |
+      |  3. /sbir:proposal new <topic-id>                              |
+      |  4. /sbir:proposal status                                      |
+      |                                                                |
+      |  Run /sbir:setup again to update your configuration.           |
+      +----------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "next_commands"
+        source: "Static command reference"
+        displayed_as: "${next_commands}"
+        consumers: ["Step 6 display"]
+
+    emotional_state:
+      entry: "Confident -- setup verified"
+      exit: "Empowered -- clear path forward, no ambiguity"
+
+    integration_checkpoint: |
+      Journey complete. User has all information needed to proceed.
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "python_version"
+      must_match_across: [1, 5]
+      failure_message: "Python version in prereq check does not match validation summary"
+    - artifact: "company_name"
+      must_match_across: [2, 5]
+      failure_message: "Company name in profile step does not match validation summary"
+    - artifact: "profile_path"
+      must_match_across: [2, 5]
+      failure_message: "Profile path in profile step does not match validation summary"
+    - artifact: "corpus_document_count"
+      must_match_across: [3, 5]
+      failure_message: "Corpus count in corpus step does not match validation summary"
+    - artifact: "gemini_api_key_status"
+      must_match_across: [4, 5]
+      failure_message: "API key status in config step does not match validation summary"
+    - artifact: "sam_status"
+      must_match_across: [2, 5]
+      failure_message: "SAM.gov status in profile step does not match validation warnings"

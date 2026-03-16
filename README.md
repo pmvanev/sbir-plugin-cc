@@ -16,143 +16,77 @@ All interaction happens in the Claude Code CLI. State persists as local JSON fil
 claude plugin install github:pmvanev/sbir-plugin-cc
 ```
 
-## Getting Started (First Time)
+## Getting Started
 
-Before writing any proposals, you need to set up two things: your **company profile** and your **corpus** of past work.
-
-### Step 1: Gather Your Documents
-
-Collect these before running the plugin:
-
-| Document | Purpose | Required? |
-|----------|---------|-----------|
-| SAM.gov registration (CAGE code, UEI) | Federal contract eligibility | Yes |
-| Capability statement or corporate brochure | Extract technical keywords, personnel, capabilities | Recommended |
-| Past proposals (PDF/Word) | Corpus — informs fit scoring, strategy, and drafting | Recommended |
-| Past debriefs (PDF/Word) | Corpus — win/loss patterns, reviewer feedback | If available |
-| TPOC call notes from prior proposals | Corpus — agency interaction patterns | If available |
-
-Organize them in a directory you can point the plugin at:
-
-```
-~/sbir-corpus/
-  proposals/
-    AF241-087-phase-i.pdf        # Past proposal (winning)
-    N243-051-phase-i.pdf         # Past proposal (losing)
-  debriefs/
-    AF241-087-debrief.pdf        # Agency feedback
-    N243-051-debrief.pdf
-  company/
-    capability-statement.pdf     # Marketing/capability docs
-    sam-gov-registration.pdf     # SAM.gov entity page
-```
-
-The exact directory structure doesn't matter — the plugin indexes by content hash, not file path. But organizing by type helps you keep track of what you've ingested.
-
-### Step 2: Build Your Company Profile
+After installing, run the setup wizard:
 
 ```bash
 cd my-proposal-project
-/sbir:proposal profile setup
+/sbir:setup
 ```
 
-The profile builder agent will walk you through one of three modes:
+The wizard guides you through everything interactively:
 
-- **Documents** — paste or point to your capability statement and SAM.gov data; the agent extracts structured fields
-- **Interview** — guided Q&A covering each profile section
-- **Both** — extract from documents first, then fill gaps via interview
+1. **Prerequisites check** — verifies Python 3.12+, Git, and Claude Code with pass/fail indicators
+2. **Company profile** — builds your profile via document extraction, guided interview, or both (delegates to the profile builder agent)
+3. **Corpus ingestion** — helps you locate past proposals, debriefs, and capability documents, then ingests them
+4. **API key setup** (optional) — walks you through configuring Gemini for concept figure generation in Wave 5
+5. **Validation** — re-checks everything and displays a unified status summary
+6. **Next steps** — tells you exactly what command to run next
 
-What gets captured:
+Have your SAM.gov registration data (CAGE code, UEI) and any past proposals or capability statements handy. The wizard will tell you what it needs at each step.
 
-| Field | Example | Impact on Fit Scoring |
-|-------|---------|----------------------|
-| Technical capabilities | "directed energy", "RF engineering", "ML" | Subject matter expertise (35% weight) |
-| Key personnel | "Dr. Chen \| PI \| fiber laser technology" | Team alignment with topic requirements |
-| SAM.gov (CAGE, UEI) | CAGE: 1AB2C | Required — missing CAGE = auto NO-GO |
-| Socioeconomic certs | 8(a), HUBZone, WOSB, SDVOSB | Enables set-aside topics |
-| Security clearance | Secret, Top Secret, None | Gates classified topics |
-| ITAR status | Yes/No | Gates export-controlled topics |
-| Past performance | "Air Force \| Fiber Lasers \| WIN" | Past performance relevance (25% weight) |
-| Research partners | "MIT Lincoln Lab" | STTR eligibility (10% weight) |
+When setup completes, you'll see:
 
-The profile saves to `~/.sbir/company-profile.json` — a **global** file shared across all proposals. You create it once and update it as your company evolves.
+```
+  Prerequisites
+    [ok]  Python 3.12.4
+    [ok]  Git 2.44.0
+    [ok]  Claude Code authenticated
+
+  Company Profile
+    [ok]  ~/.sbir/company-profile.json
+    [ok]  SAM.gov active (CAGE: 7XY3Z)
+
+  Corpus
+    [ok]  14 documents indexed
+
+  Optional
+    [--]  GEMINI_API_KEY not configured (Wave 5 only)
+
+  STATUS: READY
+
+  Next: /sbir:solicitation find
+```
+
+### Find Solicitations
 
 ```bash
-# Later, when you hire someone or win an award:
-/sbir:proposal profile update
+/sbir:solicitation find                              # All open topics, ranked by fit
+/sbir:solicitation find --agency "Air Force" --phase I  # Filter by agency/phase
 ```
 
-### Step 3: Ingest Your Corpus
+The topic-scout scores every open topic against your company profile and returns a ranked shortlist with go/evaluate/no-go recommendations.
+
+### Start a Proposal
 
 ```bash
-/sbir:proposal corpus add ~/sbir-corpus/
+/sbir:proposal new AF263-042                  # From ranked results
+/sbir:proposal new ./solicitations/topic.pdf  # From a PDF you already have
 ```
-
-The corpus librarian indexes your documents by content hash (SHA-256) for deduplication. Supported formats: `.pdf`, `.docx`, `.doc`, `.txt`, `.md`.
-
-The corpus is stored in `.sbir/corpus/` and persists across proposals in the same project directory. Every proposal you complete feeds back into the corpus — debriefs, strategies, and lessons learned accumulate over time.
-
-### Step 4: Find Solicitations
-
-```bash
-# Search all open topics, ranked by company fit
-/sbir:solicitation find
-
-# Filter by agency or phase
-/sbir:solicitation find --agency "Air Force" --phase I
-
-# Search a specific solicitation cycle
-/sbir:solicitation find --solicitation "DOD_SBIR_2026_P1_C3"
-```
-
-The topic-scout agent queries public SBIR portals (DSIP, Grants.gov, NSPIRES), scores every open topic against your company profile across five dimensions, and returns a ranked shortlist:
-
-```
-Rank | Topic ID    | Agency    | Title                             | Score | Rec      | Deadline
-   1 | AF263-042   | Air Force | Compact Directed Energy for C-UAS | 0.84  | GO       | 2026-05-15
-   2 | N241-095    | Navy      | Underwater Navigation Systems     | 0.67  | EVALUATE | 2026-06-02
-   3 | AF263-099   | Air Force | Classified Sensor Fusion          | 0.00  | NO-GO    | 2026-05-15
-
-Disqualified: AF263-099 — requires TS clearance (profile: Secret)
-```
-
-### Step 5: Start a Proposal
-
-Select a topic from the ranked list, or provide a solicitation file directly:
-
-```bash
-# From the ranked results
-/sbir:proposal new AF263-042
-
-# Or from a PDF you already have
-/sbir:proposal new ./solicitations/AF263-042.pdf
-```
-
-The orchestrator parses the solicitation, searches your corpus for related past work, scores company fit, and presents a **Go/No-Go checkpoint**. If you confirm Go, the plugin creates `.sbir/proposal-state.json` and unlocks Wave 1.
 
 ## Returning Users (Second+ Proposal)
 
-If you already have a company profile and corpus from a previous proposal:
+Your company profile at `~/.sbir/company-profile.json` carries over automatically. Run `/sbir:setup` in your new project directory — it detects your existing profile and offers to keep, update, or start fresh. Corpus from previous projects can be re-ingested or pointed at the same directory.
 
 ```bash
 cd my-new-proposal-project
-
-# Your profile at ~/.sbir/company-profile.json carries over automatically.
-# Your corpus carries over if you're in the same project directory,
-# or you can re-ingest:
-/sbir:proposal corpus add ~/sbir-corpus/
-
-# Search for new topics — your corpus now includes past proposal outcomes
-/sbir:solicitation find --agency "Navy" --phase I
-
-# Start the new proposal
-/sbir:proposal new N261-095
-
-# Check where you are at any time
-/sbir:proposal status
+/sbir:setup                                    # Detects existing profile, sets up corpus
+/sbir:solicitation find --agency "Navy"         # Search with enriched corpus
+/sbir:proposal new N261-095                     # Start the new proposal
 ```
 
-Each completed proposal enriches the corpus. Fit scoring improves with more past performance data, the writer pulls better exemplars from winning sections, and the reviewer cross-references debrief patterns.
+Each completed proposal enriches the corpus. Fit scoring improves with more past performance data, the writer pulls better exemplars, and the reviewer cross-references debrief patterns.
 
 ## The 10-Wave Lifecycle
 
@@ -302,9 +236,10 @@ my-proposal-project/
 
 | Command | Wave | Purpose |
 |---------|------|---------|
-| `/sbir:proposal profile setup` | Pre | Create company profile |
+| `/sbir:setup` | Pre | Guided first-time setup (profile, corpus, API key, validation) |
+| `/sbir:proposal profile setup` | Pre | Create company profile (standalone) |
 | `/sbir:proposal profile update` | Pre | Update company profile |
-| `/sbir:proposal corpus add <dir>` | Pre | Ingest past proposals and documents |
+| `/sbir:proposal corpus add <dir>` | Pre | Ingest past proposals and documents (standalone) |
 | `/sbir:solicitation find` | 0 | Search and rank open topics by fit |
 | `/sbir:proposal new <topic-or-file>` | 0 | Start proposal with Go/No-Go checkpoint |
 | `/sbir:proposal shape` | 0 | Generate candidate technical approaches |
