@@ -1,0 +1,414 @@
+journey:
+  name: "Corpus Image Reuse"
+  goal: "Reuse visual assets from past proposals in new SBIR submissions"
+  persona: "Dr. Elena Vasquez (Primary), Marcus Chen (Secondary)"
+  feature_id: "corpus-image-reuse"
+
+  emotional_arc:
+    start: "Anticipation/Curiosity -- wondering what visual assets exist in past work"
+    middle: "Focused/Engaged -- evaluating candidate figures for fitness and quality"
+    end: "Confident/Satisfied -- reused a proven figure, saved hours, cross-references correct"
+
+steps:
+  - id: 1
+    name: "Image Extraction During Ingestion"
+    command: "corpus add <directory>"
+    description: >
+      Extends existing corpus add command. When ingesting PDF/DOCX files,
+      the system also extracts embedded images, classifies them by figure type,
+      assesses quality (DPI), and stores them with metadata sidecars.
+
+    tui_mockup: |
+      $ /sbir:proposal corpus add ~/proposals/2024-Q1/
+
+      Scanning ~/proposals/2024-Q1/ ...
+
+        Documents:
+          ${new_doc_count} new documents ingested (${type_summary})
+          ${dup_count} duplicates skipped
+
+        Images extracted:
+          ${image_count} images found across ${source_doc_count} documents
+          ├── ${system_diagram_count} system diagrams
+          ├── ${trl_roadmap_count} TRL roadmaps
+          ├── ${org_chart_count} org charts
+          └── ${other_count} other types
+
+          Quality: ${high_quality_count} high | ${med_quality_count} medium | ${low_quality_count} low
+          Sources: ${source_summary}
+
+        Image catalog: .sbir/corpus/images/
+        Metadata:      .sbir/corpus/image-registry.json
+
+    shared_artifacts:
+      - name: "image_registry"
+        source: ".sbir/corpus/image-registry.json"
+        displayed_as: "${image_count} images found"
+        consumers:
+          - "Step 2: corpus images list"
+          - "Step 3: corpus images search"
+          - "Step 4: corpus images show"
+
+      - name: "image_files"
+        source: ".sbir/corpus/images/"
+        displayed_as: "${image_file_path}"
+        consumers:
+          - "Step 4: image details display"
+          - "Step 5: file copy to artifacts"
+
+    emotional_state:
+      entry: "Anticipation -- wondering what figures are buried in old proposals"
+      exit: "Pleased/Organized -- images found and classified automatically"
+
+    integration_checkpoint: |
+      Image registry JSON created with entries for all extracted images.
+      Each entry has: id, source_proposal, page, section, caption, figure_type,
+      quality_assessment, file_path, content_hash.
+      Image files stored in .sbir/corpus/images/ with deterministic naming.
+
+    gherkin: |
+      Scenario: Extract images during corpus ingestion
+        Given Dr. Vasquez has a directory ~/proposals/2024-Q1/ with 4 PDFs containing embedded images
+        When she runs "corpus add ~/proposals/2024-Q1/"
+        Then the system ingests 4 documents as text entries in the corpus registry
+        And the system extracts 23 embedded images from the PDFs
+        And each image is classified by figure type
+        And each image has a quality assessment (DPI-based)
+        And the image registry at .sbir/corpus/image-registry.json contains 23 entries
+
+  - id: 2
+    name: "Browse Image Catalog"
+    command: "corpus images list [--type <type>] [--source <proposal-id>] [--outcome <win|loss>]"
+    description: >
+      Display the image catalog with filtering. Users can browse all extracted
+      images or filter by figure type, source proposal, outcome, or agency.
+
+    tui_mockup: |
+      $ /sbir:proposal corpus images list --type system-diagram --outcome win
+
+        Image Catalog: system diagrams from winning proposals
+
+        #    Source          Agency   Caption                           Quality  Page
+        ---  --------------  -------  --------------------------------  -------  ----
+        1    AF243-001       USAF     Fig 3: CDES System Architecture   high     7
+        2    AF243-001       USAF     Fig 5: Phased Array Block Diag    high     12
+        3    DARPA-HR-22     DARPA    Fig 2: Multi-Agent Architecture   high     5
+
+        ${result_count} images found. Filter: type=${filter_type}, outcome=${filter_outcome}
+
+    shared_artifacts:
+      - name: "image_registry"
+        source: ".sbir/corpus/image-registry.json"
+        displayed_as: "tabular listing of images"
+        consumers:
+          - "Step 3: search results draw from same registry"
+          - "Step 4: show command references same entries"
+
+    emotional_state:
+      entry: "Curious -- what system diagrams do I have from wins?"
+      exit: "Organized/Empowered -- clear view of available assets"
+
+    integration_checkpoint: |
+      List output draws from the same image-registry.json written in Step 1.
+      Filtering works correctly on figure_type, source_proposal, and outcome fields.
+      Outcome data comes from the existing corpus win/loss tracking.
+
+    gherkin: |
+      Scenario: List images filtered by type and outcome
+        Given the image registry contains 23 images from 3 proposals
+        And proposal AF243-001 has outcome WIN with 8 images
+        And proposal N244-012 has outcome LOSS with 6 images
+        When Dr. Vasquez runs "corpus images list --type system-diagram --outcome win"
+        Then the system displays only system-diagram images from winning proposals
+        And each result shows source proposal, agency, caption, quality, and page number
+
+  - id: 3
+    name: "Search for Relevant Images"
+    command: "corpus images search \"<query>\" [--type <type>] [--agency <agency>] [--limit <n>]"
+    description: >
+      Semantic search over the image catalog. Matches against caption text,
+      surrounding text context, figure type, and proposal metadata. Ranks
+      by relevance score combining text match, agency match, outcome preference,
+      and recency.
+
+    tui_mockup: |
+      $ /sbir:proposal corpus images search "directed energy system architecture" --agency USAF
+
+        Searching image catalog...
+
+        Matches (ranked by relevance):
+
+        #  Score  Source        Type              Caption                         Outcome  Age
+        -- -----  ------------  ----------------  ------------------------------  -------  ----
+        1  0.92   AF243-001     system-diagram    Fig 3: CDES System Arch          WIN     8mo
+        2  0.71   AF243-001     block-diagram     Fig 5: Phased Array Block Diag   WIN     8mo
+        3  0.45   DARPA-HR-22   system-diagram    Fig 2: Multi-Agent Arch          WIN     14mo
+
+        Use 'corpus images show <#>' for full details.
+        Use 'corpus images use <#>' to select for current proposal.
+
+    shared_artifacts:
+      - name: "image_registry"
+        source: ".sbir/corpus/image-registry.json"
+        displayed_as: "ranked search results"
+        consumers:
+          - "Step 4: show command for selected result"
+          - "Step 5: use command for selected result"
+
+      - name: "current_proposal_context"
+        source: ".sbir/proposal-state.json"
+        displayed_as: "agency match scoring"
+        consumers:
+          - "Relevance scoring uses current proposal agency/topic"
+
+    emotional_state:
+      entry: "Hopeful -- betting on finding something from a past win"
+      exit: "Excited/Focused -- high relevance score on a matching image"
+
+    integration_checkpoint: |
+      Search uses current proposal context from proposal-state.json for agency matching.
+      Relevance scoring weights: caption text match, agency match, WIN outcome boost, recency.
+      Results reference same image IDs as list command.
+
+    gherkin: |
+      Scenario: Search images with relevance ranking
+        Given Dr. Vasquez has an active proposal for a USAF directed energy topic
+        And the image registry contains system diagrams from AF243-001 (USAF, WIN)
+        And the image registry contains system diagrams from DARPA-HR-22 (DARPA, WIN)
+        When she searches "directed energy system architecture" with --agency USAF
+        Then AF243-001 images rank higher than DARPA-HR-22 images
+        And each result shows a relevance score between 0 and 1
+        And results are sorted by descending relevance score
+
+  - id: 4
+    name: "Assess Image Fitness"
+    command: "corpus images show <image-id>"
+    description: >
+      Display full details for a specific image including source provenance,
+      quality assessment, context (caption + surrounding text), fitness
+      evaluation for the current proposal, and attribution/compliance notes.
+
+    tui_mockup: |
+      $ /sbir:proposal corpus images show 1
+
+        Image Details: ${source_proposal} / Figure ${original_figure_number}
+
+        Source:
+          Proposal:   ${source_proposal} (${proposal_title})
+          Agency:     ${agency}
+          Outcome:    ${outcome}
+          Page:       ${page_number}
+
+        Image:
+          File:       ${image_file_path}
+          Type:       ${figure_type}
+          Resolution: ${resolution} (${dpi} DPI)
+          Quality:    ${quality_level}
+
+        Context:
+          Caption:    "${original_caption}"
+          Surround:   "${surrounding_text_excerpt}"
+
+        Fitness Assessment:
+          Quality:       ${quality_pass_fail}
+          Freshness:     ${freshness_status}
+          Agency match:  ${agency_match}
+          Domain match:  ${domain_match}
+
+          Warnings:
+            ${warning_list}
+
+        Attribution:
+          Origin:   ${origin_type}
+          Reuse:    ${reuse_status}
+
+    shared_artifacts:
+      - name: "image_registry"
+        source: ".sbir/corpus/image-registry.json"
+        displayed_as: "full detail view of single image"
+        consumers:
+          - "Step 5: use command copies this image"
+
+      - name: "current_proposal_context"
+        source: ".sbir/proposal-state.json"
+        displayed_as: "fitness assessment (agency match, domain match)"
+        consumers:
+          - "Fitness scoring compares against current proposal"
+
+    emotional_state:
+      entry: "Evaluative/Careful -- is this actually usable?"
+      exit: "Confident -- quality is high, warnings are clear, I know what to check"
+
+    integration_checkpoint: |
+      Fitness assessment combines image metadata with current proposal context.
+      Quality threshold: >= 300 DPI for PASS, 150-299 for WARN, < 150 for FAIL.
+      Freshness threshold: <= 12 months OK, 12-24 months WARN, > 24 months STALE.
+      Attribution tracking reads from image registry origin_type field.
+
+    gherkin: |
+      Scenario: Assess image fitness with quality and freshness checks
+        Given Dr. Vasquez is viewing image 1 from AF243-001
+        And the image has 300 DPI resolution
+        And the image was extracted from a proposal submitted 8 months ago
+        And the current proposal is for the same agency (USAF)
+        When she runs "corpus images show 1"
+        Then quality assessment shows "PASS (300 DPI)"
+        And freshness shows "OK (8 months old)"
+        And agency match shows "YES (same agency: USAF)"
+        And warnings include any label-specific concerns from the caption
+
+  - id: 5
+    name: "Adapt and Select for Reuse"
+    command: "corpus images use <image-id> --section <section> --figure-number <n>"
+    description: >
+      Select a corpus image for reuse in the current proposal. Copies the image
+      to the artifacts directory, generates an adapted caption (removing
+      proposal-specific references), flags elements needing manual editing,
+      and records the reuse in the figure log with full attribution.
+
+    tui_mockup: |
+      $ /sbir:proposal corpus images use 1 --section technical-approach --figure-number 3
+
+        Preparing image for reuse...
+
+        Adapted Figure:
+          Figure number:  Figure ${new_figure_number}
+          Section:        ${target_section}
+          File copied to: ./artifacts/wave-5-visuals/${figure_filename}
+
+        Caption (adapted):
+          Original: "${original_caption}"
+          Proposed: "${adapted_caption}"
+          ${caption_changes}
+
+        Manual Review Needed:
+          ${manual_review_items}
+
+        Tracking:
+          Source:       ${source_proposal}, Figure ${original_figure_number}
+          Method:       corpus-reuse
+          Attribution:  Recorded in figure-log.md
+          Review:       pending-manual-review
+
+    shared_artifacts:
+      - name: "figure_inventory"
+        source: "./artifacts/wave-5-visuals/figure-inventory.json"
+        displayed_as: "new entry with method: corpus-reuse"
+        consumers:
+          - "Step 6: formatter reads figure inventory"
+          - "Formatter cross-reference validation"
+
+      - name: "figure_log"
+        source: "./artifacts/wave-5-visuals/figure-log.md"
+        displayed_as: "attribution and reuse tracking"
+        consumers:
+          - "Wave 5 figure review checkpoint"
+          - "Wave 6 assembly compliance check"
+
+      - name: "image_file_copy"
+        source: "./artifacts/wave-5-visuals/${figure_filename}"
+        displayed_as: "copied image file"
+        consumers:
+          - "Formatter figure insertion (Wave 6)"
+          - "Human image editor for label updates"
+
+    emotional_state:
+      entry: "Decisive -- committing to this figure"
+      exit: "In control -- caption adapted, warnings clear, know exactly what to check"
+
+    integration_checkpoint: |
+      Image copied to artifacts directory.
+      Figure inventory updated with new entry (method: corpus-reuse, status: pending-manual-review).
+      Figure log updated with source attribution.
+      Adapted caption written; differences from original highlighted.
+      Manual review items listed for any embedded text in the image.
+
+    gherkin: |
+      Scenario: Select corpus image for reuse with adapted caption
+        Given Dr. Vasquez has selected image 1 (AF243-001 Fig 3: CDES System Architecture)
+        And her current proposal is for topic AF245-007 (Maritime Phased Array Defense)
+        When she runs "corpus images use 1 --section technical-approach --figure-number 3"
+        Then the image is copied to ./artifacts/wave-5-visuals/figure-3-system-architecture.png
+        And the caption is adapted to remove "CDES" reference
+        And the figure log records source attribution (AF243-001, Figure 3)
+        And the figure inventory adds an entry with method "corpus-reuse"
+        And the status is set to "pending-manual-review"
+
+  - id: 6
+    name: "Formatter Integration"
+    command: "Automatic -- formatter reads figure inventory during Wave 5"
+    description: >
+      When the formatter processes the figure inventory, figures with
+      method "corpus-reuse" are treated as pre-existing assets. The
+      review checkpoint still applies (approve/revise/replace). The
+      formatter does not attempt to regenerate these figures.
+
+    tui_mockup: |
+        Figure 3: System Architecture
+
+        Generation:
+          Method:   corpus-reuse (from AF243-001)
+          Status:   pending-manual-review
+          File:     ./artifacts/wave-5-visuals/figure-3-system-architecture.png
+          Quality:  300 DPI, 2048x1536
+
+        Review this figure:
+          [approve]  Image labels verified, ready for insertion
+          [revise]   Need to update image labels first
+          [replace]  Replace with a newly generated figure instead
+
+        Caption: "Figure 3: System Architecture showing phased
+                 array subsystem, beam control unit, and power
+                 management"
+
+    shared_artifacts:
+      - name: "figure_inventory"
+        source: "./artifacts/wave-5-visuals/figure-inventory.json"
+        displayed_as: "figure entry with corpus-reuse method"
+        consumers:
+          - "Formatter generation routing (skip generation for corpus-reuse)"
+          - "Cross-reference validation"
+
+      - name: "cross_reference_log"
+        source: "./artifacts/wave-5-visuals/cross-reference-log.json"
+        displayed_as: "validated figure-to-text references"
+        consumers:
+          - "Wave 6 assembly verification"
+
+    emotional_state:
+      entry: "Checking -- verifying the figure looks right in context"
+      exit: "Satisfied -- reused a proven figure, saved hours, everything cross-references"
+
+    integration_checkpoint: |
+      Formatter correctly routes corpus-reuse figures to review (not generation).
+      Cross-reference validation includes corpus-reused figures.
+      Figure log attribution preserved through to assembly.
+      All cross-references resolve after insertion.
+
+    gherkin: |
+      Scenario: Formatter handles corpus-reused figure
+        Given the figure inventory contains Figure 3 with method "corpus-reuse"
+        And Figure 3 has status "pending-manual-review"
+        When the formatter processes the figure inventory for Wave 5
+        Then the formatter does not attempt to generate Figure 3
+        And the formatter presents Figure 3 for human review with options approve/revise/replace
+        And if approved, the status changes to "approved"
+        And the cross-reference log includes Figure 3
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "image_registry"
+      must_match_across: [1, 2, 3, 4]
+      failure_message: "Image registry must be consistent across extraction, listing, search, and detail views"
+
+    - artifact: "figure_inventory"
+      must_match_across: [5, 6]
+      failure_message: "Figure inventory entry from use command must be readable by formatter"
+
+    - artifact: "current_proposal_context"
+      must_match_across: [3, 4]
+      failure_message: "Current proposal context used for search relevance and fitness assessment must come from same source"
+
+    - artifact: "image_file_copy"
+      must_match_across: [5, 6]
+      failure_message: "Image file path written by use command must match path formatter expects"
