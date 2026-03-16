@@ -47,9 +47,7 @@ class DocxImageExtractorAdapter(ImageExtractorPort):
             if rel.reltype == IMAGE_REL_TYPE
         }
 
-        position = 0
-        for rid, rel in image_rels.items():
-            position += 1
+        for position, (rid, rel) in enumerate(image_rels.items(), start=1):
             try:
                 part = rel.target_part
                 blob = part.blob

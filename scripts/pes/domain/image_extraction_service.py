@@ -15,7 +15,6 @@ from pes.domain.corpus_image import ImageEntry, QualityLevel
 from pes.ports.image_extractor_port import ImageExtractorPort
 from pes.ports.image_registry_port import ImageRegistryPort
 
-
 # Figure type classification heuristics -- caption keyword mapping
 _TYPE_INDICATORS: dict[str, list[str]] = {
     "system-diagram": ["system architecture", "block diagram", "system overview"],

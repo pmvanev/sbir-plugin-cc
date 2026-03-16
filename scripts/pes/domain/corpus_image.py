@@ -7,7 +7,7 @@ QualityLevel classifies image quality by DPI threshold.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 
