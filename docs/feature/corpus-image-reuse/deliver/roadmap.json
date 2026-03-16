@@ -1,0 +1,279 @@
+{
+  "roadmap": {
+    "project_id": "corpus-image-reuse",
+    "created_at": "2026-03-16T22:11:14Z",
+    "total_steps": 8,
+    "phases": 4
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Image Domain and Extraction",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Image domain model and registry port",
+          "description": "Domain value objects for image entries, extraction results, quality levels. Registry port for read/write. Filesystem registry adapter.",
+          "stories": ["US-CIR-001"],
+          "estimated_hours": 2,
+          "dependencies": [],
+          "criteria": [
+            "Image entry captures: source, page, caption, type, DPI, hash, compliance flag",
+            "Registry supports add, read-by-id, read-all, update-flag operations",
+            "Duplicate images (same hash) merge source proposals, not duplicate entries",
+            "Registry persists to .sbir/corpus/image-registry.json with atomic writes"
+          ],
+          "architectural_constraints": [
+            "Domain objects in scripts/pes/domain/corpus_image.py (separate from corpus.py)",
+            "Port in scripts/pes/ports/image_registry_port.py",
+            "Adapter in scripts/pes/adapters/filesystem_image_registry_adapter.py"
+          ],
+          "implementation_scope": {
+            "production_files": [
+              "scripts/pes/domain/corpus_image.py",
+              "scripts/pes/ports/image_registry_port.py",
+              "scripts/pes/adapters/filesystem_image_registry_adapter.py"
+            ],
+            "test_files": [
+              "tests/acceptance/corpus_image_reuse/walking-skeleton.feature"
+            ]
+          }
+        },
+        {
+          "id": "01-02",
+          "name": "PDF and DOCX image extraction",
+          "description": "ImageExtractor port with PDF adapter (PyMuPDF) and DOCX adapter (python-docx). Extract images with page/position metadata. Quality assessment via Pillow.",
+          "stories": ["US-CIR-001"],
+          "estimated_hours": 3,
+          "dependencies": ["01-01"],
+          "criteria": [
+            "PDF extraction returns images with page number, position, surrounding text",
+            "DOCX extraction returns embedded images with relationship metadata",
+            "Quality assessment records DPI and resolution; levels: high/medium/low",
+            "Unsupported encodings logged per-image without blocking other extractions",
+            "Images stored as-extracted (PNG, JPEG) -- no format conversion"
+          ],
+          "architectural_constraints": [
+            "Port in scripts/pes/ports/image_extractor_port.py",
+            "PDF adapter in scripts/pes/adapters/pdf_image_extractor_adapter.py",
+            "DOCX adapter in scripts/pes/adapters/docx_image_extractor_adapter.py"
+          ],
+          "implementation_scope": {
+            "production_files": [
+              "scripts/pes/ports/image_extractor_port.py",
+              "scripts/pes/adapters/pdf_image_extractor_adapter.py",
+              "scripts/pes/adapters/docx_image_extractor_adapter.py"
+            ],
+            "test_files": [
+              "tests/acceptance/corpus_image_reuse/milestone-01-extraction.feature"
+            ]
+          }
+        },
+        {
+          "id": "01-03",
+          "name": "Extraction service and corpus add integration",
+          "description": "ImageExtractionService orchestrates extraction, classification, dedup, and registry persistence. Integrated into corpus add flow alongside text ingestion.",
+          "stories": ["US-CIR-001"],
+          "estimated_hours": 3,
+          "dependencies": ["01-01", "01-02"],
+          "criteria": [
+            "corpus add extracts images alongside text ingestion",
+            "Images classified by figure type using caption/context heuristics",
+            "Extraction report includes image count by type and quality",
+            "Re-ingesting same directory does not duplicate existing images",
+            "Text-only documents report zero images without error"
+          ],
+          "architectural_constraints": [
+            "Service in scripts/pes/domain/image_extraction_service.py",
+            "CorpusIngestionService calls ImageExtractionService (composition, not inheritance)"
+          ],
+          "implementation_scope": {
+            "production_files": [
+              "scripts/pes/domain/image_extraction_service.py"
+            ],
+            "test_files": [
+              "tests/acceptance/corpus_image_reuse/milestone-01-extraction.feature"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Search, Browse, and Fitness",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Image search and browse",
+          "description": "ImageSearchService: list with filters (type, source, outcome, agency), relevance-ranked search combining caption match, agency match, outcome boost, recency.",
+          "stories": ["US-CIR-002"],
+          "estimated_hours": 2,
+          "dependencies": ["01-03"],
+          "criteria": [
+            "corpus images list displays all images or filtered subset",
+            "Filters: --type, --source, --outcome, --agency",
+            "corpus images search returns relevance-ranked results",
+            "Empty results include actionable guidance",
+            "Empty catalog includes onboarding guidance"
+          ],
+          "architectural_constraints": [
+            "Service in scripts/pes/domain/image_search_service.py",
+            "Reads proposal-state.json for current agency/topic context"
+          ],
+          "implementation_scope": {
+            "production_files": [
+              "scripts/pes/domain/image_search_service.py"
+            ],
+            "test_files": [
+              "tests/acceptance/corpus_image_reuse/milestone-02-search-and-fitness.feature"
+            ]
+          }
+        },
+        {
+          "id": "02-02",
+          "name": "Image fitness assessment and compliance flagging",
+          "description": "ImageFitnessService: quality/freshness/agency assessment. Show command. Flag/unflag commands for compliance review.",
+          "stories": ["US-CIR-003"],
+          "estimated_hours": 2,
+          "dependencies": ["02-01"],
+          "criteria": [
+            "corpus images show displays provenance, metadata, fitness, attribution",
+            "Quality: PASS (>=300 DPI), WARN (150-299), FAIL (<150)",
+            "Freshness: OK (<=12mo), WARNING (12-24mo), STALE (>24mo)",
+            "Caption analysis identifies proposal-specific terms as label warnings",
+            "corpus images flag records compliance concern in registry",
+            "Flagged images show compliance warning in all listings"
+          ],
+          "architectural_constraints": [
+            "Service in scripts/pes/domain/image_fitness_service.py"
+          ],
+          "implementation_scope": {
+            "production_files": [
+              "scripts/pes/domain/image_fitness_service.py"
+            ],
+            "test_files": [
+              "tests/acceptance/corpus_image_reuse/milestone-02-search-and-fitness.feature"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Adaptation and Formatter Integration",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Image adaptation and reuse selection",
+          "description": "ImageAdaptationService: caption adaptation, file copy, figure inventory entry, attribution. Block compliance-flagged images.",
+          "stories": ["US-CIR-004"],
+          "estimated_hours": 3,
+          "dependencies": ["02-02"],
+          "criteria": [
+            "corpus images use copies image to ./artifacts/wave-5-visuals/",
+            "Caption adapted: proposal-specific terms removed/genericized",
+            "Original and adapted captions presented for human comparison",
+            "Manual review items listed for embedded image text",
+            "Figure inventory gains entry with generation_method: corpus-reuse",
+            "Compliance-flagged images blocked with clear error"
+          ],
+          "architectural_constraints": [
+            "Service in scripts/pes/domain/image_adaptation_service.py",
+            "Extends FigurePlaceholder to accept corpus-reuse method"
+          ],
+          "implementation_scope": {
+            "production_files": [
+              "scripts/pes/domain/image_adaptation_service.py"
+            ],
+            "test_files": [
+              "tests/acceptance/corpus_image_reuse/milestone-03-adaptation-and-formatter.feature"
+            ]
+          }
+        },
+        {
+          "id": "03-02",
+          "name": "Formatter corpus-reuse routing",
+          "description": "Extend VisualAssetService to recognize corpus-reuse method. Skip generation, present for review. Cross-reference validation includes corpus-reused figures.",
+          "stories": ["US-CIR-005"],
+          "estimated_hours": 2,
+          "dependencies": ["03-01"],
+          "criteria": [
+            "Formatter recognizes generation_method: corpus-reuse, skips generation",
+            "Corpus-reuse figures presented with approve/revise/replace options",
+            "Approve changes status to approved for Wave 6 insertion",
+            "Replace converts to standard generation with method change logged",
+            "Cross-reference validation includes corpus-reused figures",
+            "Existing generation methods unaffected"
+          ],
+          "architectural_constraints": [
+            "Extended routing in VisualAssetService.generate_figure()",
+            "No change to FigureGenerator port -- corpus-reuse never invokes it"
+          ],
+          "implementation_scope": {
+            "production_files": [
+              "scripts/pes/domain/visual_asset_service.py"
+            ],
+            "test_files": [
+              "tests/acceptance/corpus_image_reuse/milestone-03-adaptation-and-formatter.feature"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Agent and Skill Extensions",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "Agent and skill extensions for image-aware corpus and formatting",
+          "description": "Extend corpus-librarian agent with image commands. Add corpus-image-reuse skill. Extend formatter agent with corpus-reuse awareness. Extend visual-asset-generator skill. DES-exempt: markdown agent/skill work via forge, not TDD.",
+          "stories": ["US-CIR-001", "US-CIR-002", "US-CIR-003", "US-CIR-004", "US-CIR-005"],
+          "estimated_hours": 3,
+          "dependencies": ["03-02"],
+          "criteria": [
+            "corpus-librarian agent handles corpus images list/search/show/use/flag",
+            "corpus-image-reuse skill documents search strategies and fitness criteria",
+            "Formatter agent recognizes corpus-reuse in figure inventory",
+            "visual-asset-generator skill documents corpus-reuse method"
+          ],
+          "architectural_constraints": [
+            "Agent extensions stay within 400-line limit",
+            "New skill in skills/corpus-librarian/corpus-image-reuse.md",
+            "No new agents created (consistent with ADR-005)"
+          ],
+          "implementation_scope": {
+            "production_files": [
+              "agents/sbir-corpus-librarian.md",
+              "agents/sbir-formatter.md",
+              "skills/corpus-librarian/corpus-image-reuse.md",
+              "skills/formatter/visual-asset-generator.md"
+            ],
+            "test_files": []
+          }
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/domain/",
+      "scripts/pes/ports/",
+      "scripts/pes/adapters/",
+      "agents/",
+      "skills/"
+    ],
+    "test_directories": [
+      "tests/acceptance/corpus_image_reuse/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "reviewer": "solution-architect-reviewer",
+    "approved_at": "TODO"
+  }
+}
