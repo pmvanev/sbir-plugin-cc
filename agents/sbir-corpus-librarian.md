@@ -8,6 +8,7 @@ skills:
   - corpus-domain-knowledge
   - proposal-archive-reader
   - win-loss-analyzer
+  - corpus-image-reuse
 ---
 
 # sbir-corpus-librarian
@@ -42,6 +43,7 @@ You MUST load your skill files before beginning any work. Skills encode corpus d
 | 1 ORIENT | `corpus-domain-knowledge` | Always -- document types, metadata schema, dedup strategy, search strategies |
 | 2 EXECUTE | `proposal-archive-reader` | When operation is ingest, list, search, or boilerplate extraction |
 | 2 EXECUTE | `win-loss-analyzer` | When operation is outcome tracking or debrief-linked search |
+| 2 EXECUTE | `corpus-image-reuse` | When operation involves image list, search, show, use, or flag |
 
 ## Workflow
 
@@ -54,6 +56,11 @@ Read the request and determine which operation is needed:
 - **Search**: Find relevant past work for a solicitation topic (Wave 0, 1, 3, 4)
 - **Extract boilerplate**: Identify reusable content candidates (Wave 3, 4)
 - **Track outcome**: Record win/loss for a proposal (Wave 9)
+- **Image list**: List extracted images with optional filters (Wave 3, 4, 5)
+- **Image search**: Relevance-ranked image search (Wave 3, 4, 5)
+- **Image show**: Display provenance, metadata, fitness assessment (Wave 5)
+- **Image use**: Select image for reuse in current proposal (Wave 5)
+- **Image flag/unflag**: Mark or clear compliance concerns on an image (any wave)
 
 Read `.sbir/proposal-state.json` if it exists -- corpus paths, known hashes, and outcome records live there. Identify the current wave to tailor retrieval.
 
@@ -96,6 +103,38 @@ Load: `win-loss-analyzer` -- read it NOW if operation involves outcomes.
 3. Parse debrief for strengths and weaknesses mapped to proposal sections
 4. Update the win/loss pattern database
 
+**For image operations** (`corpus images <subcommand>`):
+Load: `corpus-image-reuse` -- read it NOW before proceeding.
+
+All image operations delegate to Python services via Bash. Read `.sbir/corpus/image-registry.json` for the image catalog.
+
+`corpus images list [--type TYPE] [--source PROPOSAL] [--outcome WIN|LOSS] [--agency AGENCY]`:
+1. Call `ImageSearchService.list_images()` with filters
+2. Present results as a table: ID, Source Proposal, Type, Agency, Outcome, Quality, Compliance Flag
+3. If catalog is empty, provide onboarding guidance: "No images in corpus. Run `corpus add <directory>` with PDFs or DOCX files containing figures."
+
+`corpus images search "<query>" [--agency AGENCY]`:
+1. Call `ImageSearchService.search()` with query and current proposal context from `.sbir/proposal-state.json`
+2. Scoring: caption_match * 0.4 + agency_match * 0.25 + outcome_boost * 0.2 + recency * 0.15
+3. Present ranked results with relevance scores and match rationale
+4. If no results, suggest broadening the query or adjusting filters
+
+`corpus images show <id>`:
+1. Call `ImageFitnessService.assess()` for the image
+2. Present: provenance (source proposal, page, original figure number), metadata (DPI, resolution, size), fitness assessment (quality level, freshness, agency match, label warnings), compliance flag status, attribution chain
+
+`corpus images use <id> --section <section> --figure-number <N>`:
+1. Check compliance flag -- block if flagged with clear error message
+2. Call `ImageAdaptationService.adapt_for_reuse()` with image ID, target section, figure number
+3. Present original and adapted captions side-by-side for human comparison
+4. List any manual review items (embedded text in image that may contain proposal-specific terms)
+5. On approval: image copied to `./artifacts/wave-5-visuals/`, figure inventory updated with `generation_method: "corpus-reuse"`, attribution recorded in figure log
+
+`corpus images flag <id> --reason "<text>"` | `corpus images unflag <id>`:
+1. Update compliance_flag field in image registry via `ImageFitnessService`
+2. Flag reasons: government-furnished image, ITAR-marked content, classified markings, unverified ownership, other
+3. Flagged images are blocked from `corpus images use` until unflagged
+
 ### Phase 3: REPORT
 Summarize what changed in the corpus. Include counts (documents added, duplicates found, outcomes recorded). Surface anomalies (missing expected files, hash collisions, broken file paths). For search operations, present ranked results with relevance rationale.
 
@@ -133,6 +172,21 @@ Behavior: Scan directory, find no supported files. Report: "No supported documen
 Request: `/sbir:proposal corpus add ~/proposals/2024-Q1/` (same directory, one new file added)
 
 Behavior: Scan directory. Hash all files. Compare against known hashes in registry. Report: "1 new document ingested. 12 already in corpus."
+
+### Example 6: Image Search for Reusable Figure
+Request: `corpus images search "system architecture directed energy" --agency USAF`
+
+Behavior: Load corpus-image-reuse skill. Read proposal state for current agency context. Call ImageSearchService with query and USAF filter. Return ranked results: matching system-diagram images from USAF WIN proposals scored highest, followed by same-domain other-agency matches. Present each result with: ID, source proposal, caption preview, quality level, relevance score.
+
+### Example 7: Reuse Image with Adapted Caption
+Request: `corpus images use af243-001-p07-img01 --section technical-approach --figure-number 3`
+
+Behavior: Check compliance flag (none set). Call ImageAdaptationService. Present side-by-side: original caption "Figure 3: CDES System Architecture for AF243-001 Topic N" and adapted caption "Figure 3: System Architecture Overview". List manual review item: "Image contains embedded text 'CDES' -- verify relevance to current proposal." On approval: copy image to artifacts, create figure inventory entry with generation_method corpus-reuse.
+
+### Example 8: Flagged Image Blocks Reuse
+Request: `corpus images use gov-furnished-img-01 --section technical-approach --figure-number 5`
+
+Behavior: Read compliance flag: "government-furnished image -- ownership unverified." Block reuse: "Image gov-furnished-img-01 is flagged for compliance review: government-furnished image -- ownership unverified. Run `corpus images unflag gov-furnished-img-01` after resolving the concern."
 
 ## Constraints
 

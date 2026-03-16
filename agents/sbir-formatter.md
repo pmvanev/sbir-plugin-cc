@@ -57,6 +57,13 @@ Gate: Every figure has a specification. Methods matched to available tools. Cros
 ### Phase 2: GENERATE FIGURES (Wave 5 -- Production)
 
 For each figure specification, in outline order:
+
+**If `generation_method == "corpus-reuse"`**: Skip generation entirely. The image file already exists in `./artifacts/wave-5-visuals/` (placed by `corpus images use`). Present the figure with its adapted caption and source attribution. Offer three review options:
+- **approve**: Accept figure as-is for Wave 6 insertion. Status -> "approved".
+- **revise**: Edit caption text or adjust placement. Re-present after changes.
+- **replace**: Remove corpus-reuse designation. User selects a standard generation method (SVG, Mermaid, Graphviz, chart, Nano Banana, external). Re-enter generation flow for this figure. Log the method change in figure log.
+
+**For all other generation methods**:
 1. Generate draft using selected method (SVG, Mermaid, Graphviz, chart, Nano Banana, or external brief)
 2. Apply consistent color palette and styling from skill
 3. Verify caption text and figure numbering
@@ -139,7 +146,12 @@ Technical volume assembles to 27 pages against a 25-page limit.
 
 -> Flag to user: "Technical volume is 27 pages, exceeding the 25-page limit by 2 pages. Recommend: (a) reduce figure sizes where possible, (b) tighten section spacing within allowed margins, (c) request writer to cut content from longest sections." Do not silently truncate or submit non-compliant.
 
-### Example 5: Figure Plan Missing
+### Example 5: Corpus-Reuse Figure in Wave 5
+Figure inventory includes Figure 3 with `generation_method: "corpus-reuse"`. Image file `system-arch-reuse.png` already exists in `./artifacts/wave-5-visuals/`.
+
+-> Skip generation for Figure 3. Present: the image, adapted caption "Figure 3: System Architecture Overview", source attribution "Reused from AF243-001 (WIN, USAF)". Offer: approve | revise | replace. On "approve": mark as approved in figure log, proceed to next figure. On "replace": ask user to select generation method, re-enter standard generation flow.
+
+### Example 6: Figure Plan Missing
 User invokes formatter for Wave 5 before writer has produced a figure plan.
 
 -> Return error: "Figure plan not found at `./artifacts/wave-3-outline/figure-plan.md`. Visual asset generation requires the figure plan from Wave 3 outlining. Run the writer agent for Wave 3 first." Do not generate figures without a plan.

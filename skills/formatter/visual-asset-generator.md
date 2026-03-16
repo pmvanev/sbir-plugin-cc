@@ -148,6 +148,22 @@ test -n "$GEMINI_API_KEY" && echo "nano-banana-available" || echo "nano-banana-u
 
 Fallback: If `GEMINI_API_KEY` is not set, write an external brief for manual generation.
 
+### Corpus Reuse
+Best for: figures that already exist in a past winning proposal at adequate resolution and are relevant to the current topic.
+
+**When to use**: A figure matching the needed type and content exists in the image corpus (discovered via `corpus images search`). The image has HIGH quality (>= 300 DPI), no compliance flags, and relevant content that needs only caption adaptation rather than full regeneration.
+
+**How it works**: The corpus librarian's `corpus images use` command places the image file in `./artifacts/wave-5-visuals/` and creates a `FigurePlaceholder` with `generation_method: "corpus-reuse"`. During Wave 5 generation, the formatter skips generation for corpus-reuse figures and presents them for human review instead.
+
+**Review process**:
+- **approve**: Use as-is with the adapted caption. Status -> "approved". Proceeds to Wave 6 insertion.
+- **revise**: Edit the caption text or adjust figure placement. Re-present after changes.
+- **replace**: Abandon corpus reuse for this figure. User selects a standard generation method (SVG, Mermaid, Graphviz, chart, Nano Banana, external). The figure re-enters the normal generation flow. The method change is logged.
+
+**Source attribution**: Every corpus-reused figure records in the figure log: source proposal ID, original figure number, agency, outcome, and the adapted caption alongside the original. This audit trail supports compliance review and intellectual property tracking.
+
+**Limitations**: Cannot modify embedded text within raster images. If the image contains proposal-specific text rendered as pixels, the user must edit the image externally or choose "replace" to generate a new figure.
+
 ### External Tool (Manual Fallback)
 Best for: figures no available tool can generate.
 Approach: Write detailed specification brief. Track as "pending-external" in figure log. The domain model's `ExternalBrief` captures `content_description`, `dimensions`, and `resolution`.
@@ -156,6 +172,7 @@ Approach: Write detailed specification brief. Track as "pending-external" in fig
 
 | Figure Need | First Choice | Fallback |
 |------------|-------------|----------|
+| Figure exists in corpus at HIGH quality | Corpus Reuse | Generate with standard method |
 | System architecture, block diagrams | Mermaid or SVG | SVG inline |
 | Flowcharts, sequence diagrams | Mermaid | SVG inline |
 | Dependency graphs, network topology | Graphviz | SVG inline |
@@ -213,9 +230,10 @@ Cross-references in text use "Figure N" (capitalized). Every figure cited in tex
 | 2 | Project Timeline | timeline | mermaid | pending-review | timeline.mmd | R-12 |
 | 3 | Deployment Scenario | concept | nano-banana | approved | deployment-scenario.png | R-10 |
 | 4 | Market Size | chart | external | pending-external | -- | R-15 |
+| 5 | System Architecture | system-diagram | corpus-reuse | pending-manual-review | system-arch-reuse.png | R-3 |
 ```
 
-Statuses: `draft` | `pending-review` | `revision-N` | `approved` | `pending-external` | `external-received`
+Statuses: `draft` | `pending-review` | `pending-manual-review` | `revision-N` | `approved` | `pending-external` | `external-received`
 
 These map to the `FigureGenerationResult.review_status` field in the domain model.
 
