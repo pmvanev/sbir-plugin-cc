@@ -9,7 +9,6 @@ Feature: Image Extraction During Corpus Ingestion
   # --- US-CIR-001: Image Extraction ---
 
   # Happy path: extract images from a PDF
-  @skip
   Scenario: Extract embedded images from a PDF during corpus ingestion
     Given Dr. Vasquez has a PDF proposal "AF243-001" with 8 embedded images
     And the images include formats PNG and JPEG
@@ -19,7 +18,6 @@ Feature: Image Extraction During Corpus Ingestion
     And the ingestion report shows "8 images extracted"
 
   # Happy path: extract images from a DOCX
-  @skip
   Scenario: Extract embedded images from a DOCX during corpus ingestion
     Given Dr. Vasquez has a DOCX proposal "N244-012" with 4 embedded images
     When she adds the proposal to her corpus
@@ -49,26 +47,22 @@ Feature: Image Extraction During Corpus Ingestion
     Then the image is classified as "unclassified"
 
   # Happy path: assess quality by DPI
-  @skip
   Scenario: High-resolution image assessed as high quality
     Given an extracted image has resolution 2048x1536 at 300 DPI
     When quality assessment runs
     Then quality level is "high"
 
-  @skip
   Scenario: Medium-resolution image assessed as medium quality
     Given an extracted image has resolution 1024x768 at 200 DPI
     When quality assessment runs
     Then quality level is "medium"
 
-  @skip
   Scenario: Low-resolution image assessed as low quality
     Given an extracted image has resolution 640x480 at 72 DPI
     When quality assessment runs
     Then quality level is "low"
 
   # Happy path: deduplicate identical images across proposals
-  @skip
   Scenario: Identical images from different proposals stored once
     Given "AF243-001" and "DARPA-HR-22" both contain the same facilities photo
     When both proposals are ingested
@@ -76,7 +70,6 @@ Feature: Image Extraction During Corpus Ingestion
     And the registry entry lists both "AF243-001" and "DARPA-HR-22" as sources
 
   # Error path: extraction failure for unsupported encoding
-  @skip
   Scenario: Unsupported image encoding fails gracefully
     Given a PDF contains 8 images, one encoded in JBIG2 format on page 14
     When the proposal is ingested
@@ -85,7 +78,6 @@ Feature: Image Extraction During Corpus Ingestion
     And the ingestion report shows "7 images extracted, 1 failed"
 
   # Error path: text-only document has no images
-  @skip
   Scenario: Text-only document reports zero images without error
     Given Dr. Vasquez has a PDF proposal "budget-narrative" with 0 embedded images
     When she adds the proposal to her corpus
@@ -93,7 +85,6 @@ Feature: Image Extraction During Corpus Ingestion
     And no image registry entries are created for "budget-narrative"
 
   # Edge case: re-ingesting same directory skips existing images
-  @skip
   Scenario: Re-ingesting a directory does not duplicate existing images
     Given Dr. Vasquez has already ingested "AF243-001" with 8 images
     When she ingests the same directory again
@@ -101,14 +92,13 @@ Feature: Image Extraction During Corpus Ingestion
     And existing registry entries remain unchanged
 
   # Edge case: batch ingestion across multiple proposals
-  @skip
   Scenario: Batch ingestion extracts images from all documents
     Given Dr. Vasquez has a directory with 3 proposals containing 8, 6, and 9 images respectively
     When she ingests the entire directory
     Then 23 images are extracted across all proposals
     And the ingestion report shows totals by figure type and quality level
 
-  @property @skip
+  @property
   Scenario: Content hash is deterministic for identical image bytes
     Given any two images with identical byte content
     When their content hashes are computed
