@@ -51,7 +51,6 @@ Feature: Image Adaptation and Formatter Integration
   # --- US-CIR-005: Formatter Integration ---
 
   # Happy path: formatter routes corpus-reuse to review instead of generation
-  @skip
   Scenario: Formatter skips generation for corpus-reuse figures
     Given the figure inventory has Figure 3 with method "corpus-reuse"
     And Figure 5 has method "svg" for standard generation
@@ -61,7 +60,6 @@ Feature: Image Adaptation and Formatter Integration
     And Figure 3 is presented for human review
 
   # Happy path: approve corpus-reused figure
-  @skip
   Scenario: Approved corpus-reuse figure is ready for document assembly
     Given Figure 3 has method "corpus-reuse" and status "pending-manual-review"
     When Dr. Vasquez approves Figure 3
@@ -69,7 +67,6 @@ Feature: Image Adaptation and Formatter Integration
     And Figure 3 is ready for document assembly
 
   # Happy path: replace corpus-reuse with generated figure
-  @skip
   Scenario: Replace corpus-reuse figure with standard generation
     Given Figure 3 has method "corpus-reuse" and status "pending-manual-review"
     When Dr. Vasquez chooses to replace Figure 3
@@ -77,7 +74,6 @@ Feature: Image Adaptation and Formatter Integration
     And the figure log records the original corpus-reuse as "replaced"
 
   # Happy path: cross-reference validation includes corpus-reused figures
-  @skip
   Scenario: Cross-reference validation resolves corpus-reuse figure references
     Given Figure 3 is approved with method "corpus-reuse"
     And the technical approach section references "Figure 3"
@@ -85,7 +81,6 @@ Feature: Image Adaptation and Formatter Integration
     Then the reference to Figure 3 resolves successfully
 
   # Error path: orphaned reference to deleted corpus-reuse file
-  @skip
   Scenario: Missing corpus-reuse file detected during cross-reference validation
     Given Figure 3 has method "corpus-reuse" and status "approved"
     And the image file for Figure 3 has been deleted from artifacts
@@ -94,7 +89,6 @@ Feature: Image Adaptation and Formatter Integration
     And the validation warns about the missing image file
 
   # Edge case: existing generation methods unaffected by corpus-reuse routing
-  @skip
   Scenario: Standard generation methods continue to work alongside corpus-reuse
     Given the figure inventory has Figure 1 method "svg", Figure 2 method "mermaid", Figure 3 method "corpus-reuse"
     When the formatter processes all figures

@@ -416,12 +416,19 @@ def replace_figure(fig_num: int, image_context: dict[str, Any]):
 
 @when("cross-reference validation runs")
 def run_cross_reference_validation(image_context: dict[str, Any]):
-    """Validate cross-references between text and figures."""
+    """Validate cross-references between text and figures.
+
+    Checks both explicit text references and all inventory figures
+    for missing files (orphaned references).
+    """
     inventory = image_context.get("figure_inventory", {})
     refs = image_context.get("cross_references", [])
     missing = image_context.get("missing_files", [])
 
     validation = []
+    checked = set()
+
+    # Check explicit text-to-figure references
     for ref in refs:
         exists = ref in inventory and ref not in missing
         validation.append({
@@ -429,6 +436,16 @@ def run_cross_reference_validation(image_context: dict[str, Any]):
             "resolved": exists,
             "orphaned": not exists,
         })
+        checked.add(ref)
+
+    # Check inventory figures for missing files (not already checked)
+    for fig_num in inventory:
+        if fig_num not in checked and fig_num in missing:
+            validation.append({
+                "figure_number": fig_num,
+                "resolved": False,
+                "orphaned": True,
+            })
 
     image_context["cross_ref_validation"] = validation
 

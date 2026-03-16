@@ -61,6 +61,8 @@ class FigureGenerationResult:
     review_options: list[str] = field(
         default_factory=lambda: ["approve", "revise", "replace"],
     )
+    generation_method: str = ""
+    original_method: str = ""
 
 
 class VisualAssetService:
@@ -88,10 +90,14 @@ class VisualAssetService:
         """Generate a figure from its placeholder specification.
 
         Routes by generation_method:
-        - Mermaid -> SVG via FigureGenerator
+        - corpus-reuse -> skip generation, return pending-manual-review
         - external -> ExternalBrief written to port
+        - Mermaid (default) -> SVG via FigureGenerator
         """
-        if placeholder.generation_method.lower() == "external":
+        method = placeholder.generation_method.lower()
+        if method == "corpus-reuse":
+            return self._corpus_reuse(placeholder)
+        if method == "external":
             return self._create_external_brief(placeholder)
         return self._generate_mermaid(placeholder)
 
@@ -99,13 +105,17 @@ class VisualAssetService:
         self,
         generated_figures: list[GeneratedFigure],
         text_references: list[dict],
+        corpus_reused_figures: list[FigureGenerationResult] | None = None,
     ) -> CrossReferenceLog:
         """Validate that all text references point to existing figures.
 
+        Includes both generated and corpus-reused figures in the lookup.
         Returns CrossReferenceLog with orphaned references flagged.
         Persists the log via the driven port.
         """
         existing_numbers = {f.figure_number for f in generated_figures}
+        if corpus_reused_figures:
+            existing_numbers |= {f.figure_number for f in corpus_reused_figures}
         entries = []
         for ref in text_references:
             fig_num = ref["referenced_figure"]
@@ -138,6 +148,61 @@ class VisualAssetService:
         Delegates to the driven port for persistence.
         """
         return self._port.replace_figure(figure_number, new_path)
+
+    def approve_figure(
+        self,
+        result: FigureGenerationResult,
+    ) -> FigureGenerationResult:
+        """Approve a figure for document assembly.
+
+        Returns a new result with status changed to approved.
+        """
+        return FigureGenerationResult(
+            figure_number=result.figure_number,
+            section_id=result.section_id,
+            file_path=result.file_path,
+            format=result.format,
+            review_status="approved",
+            review_options=result.review_options,
+            generation_method=result.generation_method,
+            original_method=result.original_method,
+        )
+
+    def replace_corpus_reuse(
+        self,
+        result: FigureGenerationResult,
+        new_method: str,
+    ) -> FigureGenerationResult:
+        """Replace a corpus-reuse figure with standard generation.
+
+        Returns a new result with the generation method changed and
+        original method recorded for audit.
+        """
+        return FigureGenerationResult(
+            figure_number=result.figure_number,
+            section_id=result.section_id,
+            file_path=result.file_path,
+            format=result.format,
+            review_status="pending",
+            review_options=result.review_options,
+            generation_method=new_method,
+            original_method=result.generation_method,
+        )
+
+    def _corpus_reuse(
+        self,
+        placeholder: FigurePlaceholder,
+    ) -> FigureGenerationResult:
+        """Handle corpus-reuse: skip generation, present for review."""
+        return FigureGenerationResult(
+            figure_number=placeholder.figure_number,
+            section_id=placeholder.section_id,
+            file_path="",
+            format="corpus-reuse",
+            review_status="pending-manual-review",
+            review_options=["approve", "revise", "replace"],
+            generation_method="corpus-reuse",
+        )
 
     def _generate_mermaid(
         self,
