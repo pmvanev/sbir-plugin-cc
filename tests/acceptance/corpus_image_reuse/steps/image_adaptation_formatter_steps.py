@@ -16,6 +16,11 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from pes.domain.image_adaptation_service import (
+    AdaptationResult,
+    ImageAdaptationService,
+    SelectionError,
+)
 from tests.acceptance.corpus_image_reuse.conftest import make_registry_entry
 from tests.acceptance.corpus_image_reuse.fakes import (
     ImageRegistryEntry,
@@ -256,89 +261,97 @@ def multi_figure_inventory(
 def select_for_reuse(
     fig_num: int,
     section: str,
+    adaptation_service: ImageAdaptationService,
     image_context: dict[str, Any],
 ):
     """Invoke adaptation service for reuse selection."""
     entry = image_context["reviewed_entry"]
     specific_terms = image_context.get("proposal_specific_terms", [])
 
-    # Adapt caption
-    adapted_caption = entry.caption
-    for term in specific_terms:
-        adapted_caption = adapted_caption.replace(term + " ", "")
-
-    # Update figure number in caption
-    import re
-    adapted_caption = re.sub(
-        r"Figure \d+:", f"Figure {fig_num}:", adapted_caption
+    result = adaptation_service.select_for_reuse(
+        image_id=entry.id,
+        figure_number=fig_num,
+        section_id=section,
+        proposal_specific_terms=specific_terms,
     )
 
-    image_context["adaptation"] = {
-        "figure_number": fig_num,
-        "section": section,
-        "original_caption": entry.caption,
-        "adapted_caption": adapted_caption,
-        "removed_terms": specific_terms,
-        "file_copied": True,
-        "figure_inventory_entry": {
-            "figure_number": fig_num,
-            "generation_method": "corpus-reuse",
-            "status": "pending-manual-review",
-        },
-        "attribution": {
-            "source_proposal": entry.source_proposal,
-            "original_figure": entry.caption,
-        },
-    }
+    if isinstance(result, AdaptationResult):
+        image_context["adaptation"] = {
+            "figure_number": result.figure_number,
+            "section": result.section_id,
+            "original_caption": result.original_caption,
+            "adapted_caption": result.adapted_caption,
+            "removed_terms": specific_terms,
+            "file_copied": result.file_copied,
+            "figure_inventory_entry": result.figure_inventory_entry,
+            "attribution": result.attribution,
+        }
+    else:
+        image_context["result"] = {
+            "message": result.message,
+            "blocked": result.blocked,
+        }
 
 
 @when(parsers.parse("Dr. Vasquez selects it for reuse as Figure {fig_num:d}"))
-def select_for_reuse_simple(fig_num: int, image_context: dict[str, Any]):
+def select_for_reuse_simple(
+    fig_num: int,
+    adaptation_service: ImageAdaptationService,
+    image_context: dict[str, Any],
+):
     """Select image for reuse with figure number only."""
     entry = image_context["reviewed_entry"]
     specific_terms = image_context.get("proposal_specific_terms", [])
 
-    adapted_caption = entry.caption
-    for term in specific_terms:
-        adapted_caption = adapted_caption.replace(term + " ", "")
-
-    import re
-    adapted_caption = re.sub(
-        r"Figure \d+:", f"Figure {fig_num}:", adapted_caption
+    result = adaptation_service.select_for_reuse(
+        image_id=entry.id,
+        figure_number=fig_num,
+        proposal_specific_terms=specific_terms,
     )
 
-    image_context["adaptation"] = {
-        "figure_number": fig_num,
-        "original_caption": entry.caption,
-        "adapted_caption": adapted_caption,
-        "removed_terms": specific_terms,
-        "warnings": [],
-    }
+    if isinstance(result, AdaptationResult):
+        image_context["adaptation"] = {
+            "figure_number": result.figure_number,
+            "original_caption": result.original_caption,
+            "adapted_caption": result.adapted_caption,
+            "removed_terms": specific_terms,
+            "warnings": result.warnings,
+        }
 
 
 @when("adaptation generates review items")
-def generate_review_items(image_context: dict[str, Any]):
+def generate_review_items(
+    adaptation_service: ImageAdaptationService,
+    image_context: dict[str, Any],
+):
     """Generate manual review items for the selected image."""
+    entry = image_context["reviewed_entry"]
     fig_type = image_context.get("diagram_type", "unclassified")
-    review_items = []
-    if fig_type in ("system-diagram", "process-flow"):
-        review_items.append("Check embedded component labels for proposal-specific names")
-        review_items.append("Verify system name labels match current proposal")
+
+    review_items = adaptation_service.generate_review_items(
+        image_id=entry.id,
+        figure_type=fig_type,
+    )
     image_context["review_items"] = review_items
 
 
 @when(parsers.parse('Dr. Vasquez attempts to select it for reuse'))
 def attempt_select_flagged(
-    image_registry: InMemoryImageRegistryAdapter,
+    adaptation_service: ImageAdaptationService,
     image_context: dict[str, Any],
 ):
     """Attempt to select a flagged image for reuse."""
     image_id = image_context.get("flagged_image_id")
-    entry = image_registry.get_by_id(image_id)
-    if entry and entry.compliance_flag:
+
+    result = adaptation_service.select_for_reuse(
+        image_id=image_id,
+        figure_number=1,
+    )
+
+    if isinstance(result, SelectionError):
         image_context["result"] = {
-            "message": "Image is flagged for compliance review",
-            "blocked": True,
+            "message": result.message,
+            "blocked": result.blocked,
         }
     else:
         image_context["result"] = {"blocked": False}
@@ -347,20 +360,19 @@ def attempt_select_flagged(
 @when(parsers.parse('Dr. Vasquez attempts to select "{image_id}" for reuse'))
 def attempt_select_by_id(
     image_id: str,
-    image_registry: InMemoryImageRegistryAdapter,
+    adaptation_service: ImageAdaptationService,
     image_context: dict[str, Any],
 ):
     """Attempt to select an image by ID."""
-    entry = image_registry.get_by_id(image_id)
-    if entry is None:
+    result = adaptation_service.select_for_reuse(
+        image_id=image_id,
+        figure_number=1,
+    )
+
+    if isinstance(result, SelectionError):
         image_context["result"] = {
-            "message": "Image not found in catalog",
-            "blocked": True,
-        }
-    elif entry.compliance_flag:
-        image_context["result"] = {
-            "message": "Image is flagged for compliance review",
-            "blocked": True,
+            "message": result.message,
+            "blocked": result.blocked,
         }
 
 

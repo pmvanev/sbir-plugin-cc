@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from pes.domain.image_adaptation_service import ImageAdaptationService
 from tests.acceptance.corpus_image_reuse.fakes import (
     ImageRegistryEntry,
     InMemoryImageExtractorAdapter,
@@ -44,6 +45,14 @@ def image_extractor() -> InMemoryImageExtractorAdapter:
 def image_registry() -> InMemoryImageRegistryAdapter:
     """In-memory image registry replacing filesystem JSON adapter."""
     return InMemoryImageRegistryAdapter()
+
+
+@pytest.fixture()
+def adaptation_service(
+    image_registry: InMemoryImageRegistryAdapter,
+) -> ImageAdaptationService:
+    """ImageAdaptationService wired to in-memory registry."""
+    return ImageAdaptationService(registry=image_registry)
 
 
 # ---------------------------------------------------------------------------

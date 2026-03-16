@@ -9,7 +9,6 @@ Feature: Image Adaptation and Formatter Integration
   # --- US-CIR-004: Image Adaptation and Reuse Selection ---
 
   # Happy path: adapt caption and copy image for reuse
-  @skip
   Scenario: Select image for reuse with adapted caption
     Given Dr. Vasquez has reviewed image "af243-001-p07-img01" with caption "Figure 3: CDES System Architecture"
     And "CDES" is identified as a proposal-specific term
@@ -21,7 +20,6 @@ Feature: Image Adaptation and Formatter Integration
     And the figure log records source attribution from "AF243-001"
 
   # Happy path: generic caption needs no adaptation
-  @skip
   Scenario: Generic caption reused with only figure number updated
     Given an image has caption "Figure 4: Organization Chart"
     And no proposal-specific terms are detected
@@ -30,7 +28,6 @@ Feature: Image Adaptation and Formatter Integration
     And no caption change warnings are generated
 
   # Happy path: manual review items listed for embedded text
-  @skip
   Scenario: Manual review items listed for diagram with embedded labels
     Given Dr. Vasquez has selected a system diagram for reuse
     And the diagram is classified as "system-diagram"
@@ -39,7 +36,6 @@ Feature: Image Adaptation and Formatter Integration
     And the review advises opening the image in an editor for label changes
 
   # Error path: compliance-flagged image blocked from reuse
-  @skip
   Scenario: Compliance-flagged image cannot be selected for reuse
     Given image "darpa-hr22-p05-img02" is flagged as "possible government-furnished"
     When Dr. Vasquez attempts to select it for reuse
@@ -47,7 +43,6 @@ Feature: Image Adaptation and Formatter Integration
     And suggests clearing the flag after verification before reuse
 
   # Error path: image not found in registry
-  @skip
   Scenario: Selecting a nonexistent image returns clear error
     Given the image catalog does not contain image "nonexistent-id"
     When Dr. Vasquez attempts to select "nonexistent-id" for reuse
