@@ -314,7 +314,7 @@ def any_image_with_dpi(image_context: dict[str, Any]):
     image_context["property_test"] = "quality_level"
 
 
-# --- When steps ---
+# --- When steps: search/list via ImageSearchService ---
 
 
 @when(parsers.parse('Dr. Vasquez lists images filtered by type "{fig_type}"'))
@@ -323,10 +323,14 @@ def list_by_type(
     image_registry: InMemoryImageRegistryAdapter,
     image_context: dict[str, Any],
 ):
-    """List images filtered by figure type."""
-    all_entries = image_registry.get_all()
-    filtered = [e for e in all_entries if e.figure_type == fig_type]
-    image_context["list_results"] = filtered
+    """List images filtered by figure type via ImageSearchService."""
+    from pes.domain.image_search_service import ImageSearchService
+
+    service = ImageSearchService(registry=image_registry)
+    result = service.list_images(figure_type=fig_type)
+    image_context["list_results"] = result.entries
+    if result.message:
+        image_context["result"] = {"message": result.message}
 
 
 @when(parsers.parse('Dr. Vasquez lists images filtered by outcome "{outcome}"'))
@@ -335,10 +339,14 @@ def list_by_outcome(
     image_registry: InMemoryImageRegistryAdapter,
     image_context: dict[str, Any],
 ):
-    """List images filtered by proposal outcome."""
-    all_entries = image_registry.get_all()
-    filtered = [e for e in all_entries if e.outcome == outcome]
-    image_context["list_results"] = filtered
+    """List images filtered by proposal outcome via ImageSearchService."""
+    from pes.domain.image_search_service import ImageSearchService
+
+    service = ImageSearchService(registry=image_registry)
+    result = service.list_images(outcome=outcome)
+    image_context["list_results"] = result.entries
+    if result.message:
+        image_context["result"] = {"message": result.message}
 
 
 @when(parsers.parse('she searches for "{query}"'))
@@ -347,32 +355,17 @@ def search_for_query(
     image_registry: InMemoryImageRegistryAdapter,
     image_context: dict[str, Any],
 ):
-    """Search images by query with relevance ranking."""
-    all_entries = image_registry.get_all()
+    """Search images by query with relevance ranking via ImageSearchService."""
+    from pes.domain.image_search_service import ImageSearchService
+
     current_agency = image_context.get("current_agency", "")
-
-    scored = []
-    for entry in all_entries:
-        caption_match = 1.0 if query.lower() in entry.caption.lower() else 0.0
-        agency_match = 1.0 if entry.agency == current_agency else 0.0
-        outcome_boost = 1.0 if entry.outcome == "WIN" else 0.0
-
-        score = (
-            caption_match * 0.4
-            + agency_match * 0.25
-            + outcome_boost * 0.2
-            + 0.15  # recency placeholder
-        )
-        if score > 0.15:  # Above baseline recency
-            scored.append({"entry": entry, "score": score})
-
-    scored.sort(key=lambda x: x["score"], reverse=True)
-    image_context["search_results_scored"] = scored
-
-    if not scored:
-        image_context["result"] = {
-            "message": "No matching images found",
-        }
+    service = ImageSearchService(registry=image_registry)
+    result = service.search(query=query, current_agency=current_agency)
+    image_context["search_results_scored"] = [
+        {"entry": sr.entry, "score": sr.score} for sr in result.scored_results
+    ]
+    if result.message:
+        image_context["result"] = {"message": result.message}
 
 
 @when(parsers.parse('Dr. Vasquez searches for "{query}"'))
@@ -381,19 +374,16 @@ def vasquez_searches(
     image_registry: InMemoryImageRegistryAdapter,
     image_context: dict[str, Any],
 ):
-    """Search with no results expected."""
-    all_entries = image_registry.get_all()
-    matches = [
-        e for e in all_entries
-        if query.lower() in e.caption.lower()
-    ]
-    if not matches:
-        image_context["result"] = {
-            "message": "No matching images found",
-        }
+    """Search images via ImageSearchService."""
+    from pes.domain.image_search_service import ImageSearchService
+
+    service = ImageSearchService(registry=image_registry)
+    result = service.search(query=query, current_agency="")
     image_context["search_results_scored"] = [
-        {"entry": m, "score": 1.0} for m in matches
+        {"entry": sr.entry, "score": sr.score} for sr in result.scored_results
     ]
+    if result.message:
+        image_context["result"] = {"message": result.message}
 
 
 @when("Dr. Vasquez lists all images")
@@ -401,97 +391,70 @@ def list_all_images(
     image_registry: InMemoryImageRegistryAdapter,
     image_context: dict[str, Any],
 ):
-    """List all images in the catalog."""
-    entries = image_registry.get_all()
-    if not entries:
-        image_context["result"] = {
-            "message": "No images in catalog",
-        }
-    image_context["list_results"] = entries
+    """List all images in the catalog via ImageSearchService."""
+    from pes.domain.image_search_service import ImageSearchService
+
+    service = ImageSearchService(registry=image_registry)
+    result = service.list_images()
+    image_context["list_results"] = result.entries
+    if result.message:
+        image_context["result"] = {"message": result.message}
+
+
+# --- When steps: fitness via ImageFitnessService ---
 
 
 @when("she views the fitness assessment")
-def view_fitness_assessment(image_context: dict[str, Any]):
-    """Run fitness assessment on the assessed image."""
+def view_fitness_assessment(
+    image_registry: InMemoryImageRegistryAdapter,
+    image_context: dict[str, Any],
+):
+    """Run fitness assessment on the assessed image via ImageFitnessService."""
+    from pes.domain.image_fitness_service import ImageFitnessService
+
+    service = ImageFitnessService(registry=image_registry)
     entry = image_context.get("assessed_entry")
-    months = image_context.get("assessed_months", 0)
-    dpi = entry.dpi if entry else image_context.get("assessed_dpi", 0)
     current_agency = image_context.get("current_agency", "")
-
-    # Quality assessment
-    if dpi >= 300:
-        quality = "PASS"
-    elif dpi >= 150:
-        quality = "WARN"
-    else:
-        quality = "FAIL"
-
-    # Freshness assessment
-    if months <= 12:
-        freshness = "OK"
-    elif months <= 24:
-        freshness = "WARNING"
-    else:
-        freshness = "STALE"
-
-    # Agency match
-    agency = entry.agency if entry else ""
-    agency_match = "YES" if agency == current_agency else "NO"
-
+    assessment = service.assess(entry.id, current_agency=current_agency)
     image_context["fitness"] = {
-        "quality": quality,
-        "quality_detail": f"{dpi} DPI",
-        "freshness": freshness,
-        "freshness_detail": f"{months} months",
-        "agency_match": agency_match,
+        "quality": assessment.quality_status,
+        "quality_detail": assessment.quality_detail,
+        "freshness": assessment.freshness_status,
+        "freshness_detail": assessment.freshness_detail,
+        "agency_match": assessment.agency_match,
     }
 
 
 @when("Dr. Vasquez views the fitness assessment")
-def vasquez_views_fitness(image_context: dict[str, Any]):
-    """Alias for viewing fitness assessment."""
+def vasquez_views_fitness(
+    image_registry: InMemoryImageRegistryAdapter,
+    image_context: dict[str, Any],
+):
+    """View fitness assessment via ImageFitnessService."""
+    from pes.domain.image_fitness_service import ImageFitnessService
+
+    service = ImageFitnessService(registry=image_registry)
     entry = image_context.get("assessed_entry")
-    months = image_context.get("assessed_months", 0)
-    dpi = entry.dpi if entry else image_context.get("assessed_dpi", 0)
-
-    if dpi >= 300:
-        quality = "PASS"
-    elif dpi >= 150:
-        quality = "WARN"
-    else:
-        quality = "FAIL"
-
-    if months <= 12:
-        freshness = "OK"
-    elif months <= 24:
-        freshness = "WARNING"
-    else:
-        freshness = "STALE"
-
+    assessment = service.assess(entry.id, current_agency="")
     image_context["fitness"] = {
-        "quality": quality,
-        "quality_detail": f"{dpi} DPI",
-        "freshness": freshness,
-        "freshness_detail": f"{months} months",
+        "quality": assessment.quality_status,
+        "quality_detail": assessment.quality_detail,
+        "freshness": assessment.freshness_status,
+        "freshness_detail": assessment.freshness_detail,
     }
 
 
 @when("caption analysis runs")
 def run_caption_analysis(image_context: dict[str, Any]):
-    """Analyze caption for proposal-specific terms."""
+    """Analyze caption for proposal-specific terms via ImageFitnessService."""
+    from pes.domain.image_fitness_service import ImageFitnessService
+
     caption = image_context.get("caption_text", "")
     specific_terms = image_context.get("proposal_specific_terms", [])
-
-    warnings = []
-    flagged_terms = []
-    for term in specific_terms:
-        if term in caption:
-            flagged_terms.append(term)
-            warnings.append(f"Proposal-specific term: {term}")
-
+    result = ImageFitnessService.analyze_caption(caption, specific_terms)
     image_context["caption_analysis"] = {
-        "flagged_terms": flagged_terms,
-        "warnings": warnings,
+        "flagged_terms": result.flagged_terms,
+        "warnings": result.warnings,
     }
 
 
@@ -501,10 +464,19 @@ def flag_image(
     image_registry: InMemoryImageRegistryAdapter,
     image_context: dict[str, Any],
 ):
-    """Flag an image for compliance review."""
+    """Flag an image for compliance review via ImageFitnessService."""
+    from pes.domain.image_fitness_service import ImageFitnessService
+
+    service = ImageFitnessService(registry=image_registry)
     target_id = image_context.get("flag_target_id")
-    success = image_registry.update_flag(target_id, reason)
+    success = service.flag_image(target_id, reason)
     image_context["flag_result"] = success
+
+
+@when("quality assessment runs")
+def quality_assessment_runs(image_context: dict[str, Any]):
+    """Property test: quality assessment is deterministic based on DPI."""
+    image_context["quality_assessment_ran"] = True
 
 
 # --- Then steps ---
