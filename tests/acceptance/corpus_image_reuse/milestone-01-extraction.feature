@@ -25,21 +25,18 @@ Feature: Image Extraction During Corpus Ingestion
     And each image has a registry entry with source "N244-012"
 
   # Happy path: classify extracted images by figure type
-  @skip
   Scenario: Classify extracted images using caption and context
     Given an image extracted from "AF243-001" page 7
     And the caption reads "Figure 3: CDES System Architecture"
     When classification runs
     Then the image is classified as "system-diagram"
 
-  @skip
   Scenario: Classify image as TRL roadmap from caption keywords
     Given an image extracted from "AF243-001" page 12
     And the caption reads "Figure 7: Technology Readiness Level Maturation Plan"
     When classification runs
     Then the image is classified as "trl-roadmap"
 
-  @skip
   Scenario: Image with no recognizable caption classified as unclassified
     Given an image extracted from "N244-012" page 3
     And the caption reads "Figure 2: Prototype Assembly"

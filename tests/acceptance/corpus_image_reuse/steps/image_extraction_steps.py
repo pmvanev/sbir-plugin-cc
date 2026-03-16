@@ -358,26 +358,11 @@ def add_proposal_to_corpus(
 
 @when("classification runs")
 def run_classification(image_context: dict[str, Any]):
-    """Run heuristic classification on the stored caption."""
-    caption = image_context.get("classify_caption", "").lower()
+    """Run heuristic classification through ImageExtractionService."""
+    from pes.domain.image_extraction_service import ImageExtractionService
 
-    # Heuristic classification matching architecture design
-    type_indicators = {
-        "system-diagram": ["system architecture", "block diagram", "system overview"],
-        "trl-roadmap": ["trl", "technology readiness", "maturation"],
-        "org-chart": ["organization", "team structure", "management"],
-        "schedule": ["schedule", "timeline", "gantt", "milestone"],
-        "concept-illustration": ["concept", "illustration", "deployment", "scenario"],
-        "data-chart": ["chart", "graph", "performance data", "results"],
-        "process-flow": ["process", "workflow", "flow", "sequence"],
-    }
-
-    classified = "unclassified"
-    for fig_type, indicators in type_indicators.items():
-        if any(ind in caption for ind in indicators):
-            classified = fig_type
-            break
-
+    caption = image_context.get("classify_caption", "")
+    classified = ImageExtractionService.classify_figure_type(caption, "")
     image_context["classified_type"] = classified
 
 
