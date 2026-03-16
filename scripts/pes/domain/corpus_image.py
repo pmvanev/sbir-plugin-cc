@@ -47,6 +47,9 @@ class ImageEntry:
     dpi: int
     content_hash: str
     quality_level: QualityLevel
+    extraction_date: str = ""
+    agency: str = ""
+    origin_type: str = "company-created"
     compliance_flag: str | None = None
     duplicate_sources: tuple[str, ...] = ()
 
@@ -61,6 +64,9 @@ class ImageEntry:
             dpi=self.dpi,
             content_hash=self.content_hash,
             quality_level=self.quality_level,
+            extraction_date=self.extraction_date,
+            agency=self.agency,
+            origin_type=self.origin_type,
             compliance_flag=flag,
             duplicate_sources=self.duplicate_sources,
         )
@@ -78,6 +84,9 @@ class ImageEntry:
             dpi=self.dpi,
             content_hash=self.content_hash,
             quality_level=self.quality_level,
+            extraction_date=self.extraction_date,
+            agency=self.agency,
+            origin_type=self.origin_type,
             compliance_flag=self.compliance_flag,
             duplicate_sources=(*self.duplicate_sources, source),
         )

@@ -103,6 +103,9 @@ class FilesystemImageRegistryAdapter(ImageRegistryPort):
             "dpi": entry.dpi,
             "content_hash": entry.content_hash,
             "quality_level": entry.quality_level.value,
+            "extraction_date": entry.extraction_date,
+            "agency": entry.agency,
+            "origin_type": entry.origin_type,
             "compliance_flag": entry.compliance_flag,
             "duplicate_sources": list(entry.duplicate_sources),
         }
@@ -118,6 +121,9 @@ class FilesystemImageRegistryAdapter(ImageRegistryPort):
             dpi=raw["dpi"],
             content_hash=raw["content_hash"],
             quality_level=QualityLevel(raw["quality_level"]),
+            extraction_date=raw.get("extraction_date", ""),
+            agency=raw.get("agency", ""),
+            origin_type=raw.get("origin_type", "company-created"),
             compliance_flag=raw.get("compliance_flag"),
             duplicate_sources=tuple(raw.get("duplicate_sources", ())),
         )
