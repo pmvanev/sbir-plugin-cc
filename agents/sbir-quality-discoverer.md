@@ -124,11 +124,155 @@ Gate: All proposals rated, skipped, or user finished early. Proceed to Phase 2.
 
 ### Phase 2: WRITING STYLE INTERVIEW
 
-*Placeholder -- implemented in step 01-02.*
+Capture the user's writing style preferences through a guided interview. Each dimension offers predefined options with a custom fallback. Store results in memory for Phase 4 artifact assembly.
 
-Captures tone, detail_level, evidence_style, organization, and practices arrays through a guided interview with predefined options and custom fallback.
+1. Present the interview header:
+```
+--------------------------------------------
+WRITING STYLE INTERVIEW
+--------------------------------------------
 
-Gate: Style preferences captured or skipped.
+I'll ask about your preferred writing style for
+proposals. This takes 5-8 prompts. Type "skip"
+to skip any question or "finish" to accept
+defaults for remaining questions.
+
+--------------------------------------------
+```
+
+2. Collect tone preference:
+```
+TONE
+--------------------------------------------
+
+How should proposals sound?
+
+  (1) Formal and authoritative
+  (2) Direct and data-driven
+  (3) Conversational and accessible
+  (4) Let me describe it (custom)
+
+Your choice (1-4, or skip):
+```
+
+Map: 1=formal_authoritative, 2=direct_data_driven, 3=conversational_accessible, 4=custom.
+If custom, prompt: "Describe your preferred tone in a sentence or two:" and store in `tone_custom_description`.
+
+3. Collect detail level:
+```
+DETAIL LEVEL
+--------------------------------------------
+
+How deep should technical explanations go?
+
+  (1) High-level overview
+  (2) Moderate detail
+  (3) Deep technical detail
+
+Your choice (1-3, or skip):
+```
+
+Map: 1=high_level, 2=moderate, 3=deep_technical.
+
+4. Collect evidence style:
+```
+EVIDENCE STYLE
+--------------------------------------------
+
+How should data and evidence be presented?
+
+  (1) Inline quantitative (numbers woven into text)
+  (2) Narrative supporting (evidence follows claims)
+  (3) Table-heavy (data in tables)
+
+Your choice (1-3, or skip):
+```
+
+Map: 1=inline_quantitative, 2=narrative_supporting, 3=table_heavy.
+
+5. Collect organization preference:
+```
+ORGANIZATION
+--------------------------------------------
+
+How should proposal text be structured?
+
+  (1) Short paragraphs, many subheadings
+  (2) Medium paragraphs, balanced structure
+  (3) Long flowing paragraphs
+
+Your choice (1-3, or skip):
+```
+
+Map: 1=short_paragraphs, 2=medium_paragraphs, 3=long_flowing.
+
+6. Collect practices to replicate:
+```
+PRACTICES TO REPLICATE
+--------------------------------------------
+
+List writing practices you want to keep doing.
+Enter one per line. Empty line to finish.
+
+Examples:
+  - Lead with quantitative results
+  - Include risk mitigation matrices
+  - Reference prior agency work
+
+Your practice (or empty to finish):
+```
+
+Store each non-empty line in `practices_to_replicate[]`.
+
+7. Collect practices to avoid:
+```
+PRACTICES TO AVOID
+--------------------------------------------
+
+List writing habits you want to eliminate.
+Enter one per line. Empty line to finish.
+
+Examples:
+  - Burying key results in appendices
+  - Using jargon without definitions
+  - Overly long executive summaries
+
+Your practice (or empty to finish):
+```
+
+Store each non-empty line in `practices_to_avoid[]`.
+
+8. Show review summary:
+```
+--------------------------------------------
+STYLE PREFERENCES SUMMARY
+--------------------------------------------
+
+  Tone:          {tone display name}
+  Detail level:  {detail_level display name}
+  Evidence:      {evidence_style display name}
+  Organization:  {organization display name}
+
+  Replicate:
+    - {practice 1}
+    - {practice 2}
+
+  Avoid:
+    - {practice 1}
+    - {practice 2}
+
+--------------------------------------------
+
+Look correct? (y) confirm  (e) edit a field
+```
+
+If "e", ask which field to edit (tone/detail/evidence/organization/replicate/avoid), then re-prompt that single question. After editing, show the summary again. Repeat until confirmed.
+
+9. Store confirmed preferences in memory as `style_preferences` dict with keys: `tone`, `tone_custom_description` (if applicable), `detail_level`, `evidence_style`, `organization`, `practices_to_replicate`, `practices_to_avoid`. Do NOT write to disk yet -- Phase 4 handles persistence.
+
+For any skipped dimension, omit from stored preferences (downstream agents handle missing fields gracefully).
+
+Gate: Style preferences captured and confirmed, or all skipped. Proceed to Phase 3.
 
 ### Phase 3: EVALUATOR FEEDBACK EXTRACTION
 
