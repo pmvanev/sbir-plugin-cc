@@ -1,0 +1,381 @@
+journey:
+  name: "Proposal Quality Discovery"
+  goal: "Capture institutional knowledge about what makes proposals win or lose from a writing quality perspective, and feed it forward to downstream agents"
+  persona: "Dr. Elena Vasquez (PI), Marcus Chen (BD Lead)"
+  feature_id: "proposal-quality-discovery"
+
+  emotional_arc:
+    start: "Anxious/uncertain -- is this worth the time investment?"
+    middle: "Engaged/reflective -- seeing patterns emerge from past experience"
+    end: "Confident/empowered -- institutional knowledge is preserved and active"
+
+  triggers:
+    - "First-time setup (after profile creation, during or after corpus setup)"
+    - "Post-proposal cycle update (after Wave 9 debrief processing)"
+    - "Manual invocation: /sbir:proposal quality discover"
+    - "Manual update: /sbir:proposal quality update"
+
+steps:
+  - id: 1
+    name: "Past Proposal Quality Review"
+    command: "Embedded in quality discovery flow (no separate command)"
+    description: "Walk through past_performance entries from company profile, asking about writing quality for each proposal"
+
+    tui_mockup: |
+      +-- Quality Discovery: Past Proposal Review ----------------------+
+      | Your profile shows ${proposal_count} past proposals.            |
+      | Proposal ${current_index} of ${proposal_count}:                 |
+      |   ${topic_id} (${agency}, ${topic_area})                        |
+      |   Outcome: ${outcome}                                           |
+      |                                                                 |
+      | How strong was this proposal's writing quality?                 |
+      |   (1) Weak  (2) Adequate  (3) Strong  (s) Skip                 |
+      +----------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "past_performance_entries"
+        source: "~/.sbir/company-profile.json#past_performance"
+        displayed_as: "${topic_id}, ${agency}, ${topic_area}, ${outcome}"
+        consumers:
+          - "Step 1 display"
+          - "Step 4 winning-patterns.json generation"
+
+      - name: "quality_ratings"
+        source: "~/.sbir/winning-patterns.json#proposal_ratings"
+        displayed_as: "${quality_rating}"
+        consumers:
+          - "Step 4 artifact assembly"
+          - "Step 5 strategist consumption"
+
+    emotional_state:
+      entry: "Anxious/uncertain -- will this be tedious?"
+      exit: "Curious/engaged -- patterns are already visible"
+
+    integration_checkpoint: |
+      past_performance entries from company-profile.json are readable and matched by topic_id.
+      Each entry has an outcome field (WIN/LOSS/ONGOING).
+      Quality ratings are additive -- they do not modify the company profile.
+
+    gherkin: |
+      Scenario: Review past proposal writing quality
+        Given Elena Vasquez has 5 past proposals in her company profile
+        And 3 have outcome "WIN" and 2 have outcome "LOSS"
+        When she starts quality discovery
+        Then the system presents each proposal for quality rating
+        And she can rate each as weak, adequate, or strong
+        And she can skip proposals she doesn't remember well enough
+
+  - id: 2
+    name: "Writing Style Interview"
+    command: "Embedded in quality discovery flow"
+    description: "Guided Q&A capturing tone, detail level, evidence style, organization, and explicit practices to replicate/avoid"
+
+    tui_mockup: |
+      +-- Quality Discovery: Writing Style Preferences -----------------+
+      | TONE                                                            |
+      | How should your proposals read?                                 |
+      |   (1) Formal and authoritative                                  |
+      |   (2) Direct and data-driven                                    |
+      |   (3) Conversational and accessible                             |
+      |   (4) Let me describe it                                        |
+      |                                                                 |
+      | PRACTICES TO REPLICATE                                          |
+      | ${practice_1}                                                   |
+      | ${practice_2}                                                   |
+      |                                                                 |
+      | PRACTICES TO AVOID                                              |
+      | ${anti_practice_1}                                              |
+      | ${anti_practice_2}                                              |
+      +----------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "quality_preferences"
+        source: "~/.sbir/quality-preferences.json"
+        displayed_as: "tone, detail_level, evidence_style, organization"
+        consumers:
+          - "Step 4 artifact assembly"
+          - "Step 6 writer consumption (writing_style skill selection)"
+          - "Step 7 reviewer consumption (prose quality checks)"
+
+      - name: "writing_style_field"
+        source: ".sbir/proposal-state.json#writing_style"
+        displayed_as: "${writing_style}"
+        consumers:
+          - "sbir-writer skill loading"
+          - "sbir-reviewer skill loading"
+
+    emotional_state:
+      entry: "Engaged -- I have opinions about this"
+      exit: "Expressive/satisfied -- the system knows my voice"
+
+    integration_checkpoint: |
+      Quality preferences captured cover all 6 dimensions (tone, detail, evidence, organization, replicate, avoid).
+      Tone selection maps to a writing_style value compatible with proposal-state.json schema.
+      Practices to replicate/avoid are freeform text stored as arrays.
+
+    gherkin: |
+      Scenario: Capture writing style preferences through guided interview
+        Given Marcus Chen is running quality discovery for Pacific Systems Engineering
+        When he completes the writing style interview
+        Then quality-preferences.json is created at ~/.sbir/
+        And it contains tone, detail_level, evidence_style, and organization selections
+        And it contains his practices to replicate and practices to avoid
+
+  - id: 3
+    name: "Evaluator Feedback Extraction"
+    command: "Embedded in quality discovery flow"
+    description: "Capture and categorize evaluator comments, separating meta-writing feedback from content feedback"
+
+    tui_mockup: |
+      +-- Quality Discovery: Evaluator Feedback -------------------------+
+      | Enter evaluator comments about writing quality.                  |
+      |                                                                  |
+      | Comment: "${evaluator_comment}"                                  |
+      | Proposal: ${topic_id} (${outcome})                               |
+      | Category: [auto-detected: ${feedback_category}]                  |
+      |                                                                  |
+      | Summary:                                                         |
+      |   Positive: ${positive_count} comments                           |
+      |   Negative: ${negative_count} comments                           |
+      |   Content-only: ${content_count} (tracked in weakness profile)   |
+      +------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "writing_quality_profile"
+        source: "~/.sbir/writing-quality-profile.json"
+        displayed_as: "feedback entries with categories and agencies"
+        consumers:
+          - "Step 4 artifact assembly"
+          - "Step 6 writer consumption (quality alerts)"
+          - "Step 7 reviewer consumption (quality profile match findings)"
+
+      - name: "weakness_profile_update"
+        source: ".sbir/proposal-state.json via win-loss-analyzer"
+        displayed_as: "content feedback routed to existing weakness profile"
+        consumers:
+          - "sbir-reviewer (existing flow)"
+          - "sbir-debrief-analyst (existing flow)"
+
+    emotional_state:
+      entry: "Reflective -- recalling difficult feedback"
+      exit: "Analytical/empowered -- patterns are visible and actionable"
+
+    integration_checkpoint: |
+      Auto-categorization correctly separates meta-writing from content feedback.
+      Content feedback routes to existing win-loss-analyzer weakness profile (no duplication).
+      Meta-writing feedback stores in new writing-quality-profile.json.
+      Each entry links to a proposal (topic_id) and agency for pattern detection.
+
+    gherkin: |
+      Scenario: Separate writing quality feedback from content feedback
+        Given Dr. Sarah Kim enters evaluator comment "technical approach was difficult to follow"
+        And she enters evaluator comment "commercialization plan lacked specific market data"
+        When the system categorizes the feedback
+        Then "difficult to follow" is categorized as writing quality (organization/clarity)
+        And "lacked specific market data" is categorized as content (routed to weakness profile)
+
+  - id: 4
+    name: "Artifact Assembly"
+    command: "Automatic after Steps 1-3 completion"
+    description: "Create/update the three quality discovery artifacts at ~/.sbir/"
+
+    tui_mockup: |
+      +-- Quality Discovery: Artifacts Created ---------------------------+
+      | [ok] ~/.sbir/quality-preferences.json                             |
+      |      Tone: ${tone} | Detail: ${detail_level}                      |
+      |      Evidence: ${evidence_style} | Org: ${organization}           |
+      |      Replicate: ${replicate_count} items                          |
+      |      Avoid: ${avoid_count} items                                  |
+      |                                                                   |
+      | [ok] ~/.sbir/winning-patterns.json                                |
+      |      Patterns from ${win_count} winning proposals                 |
+      |      Confidence: ${confidence_level}                              |
+      |                                                                   |
+      | [ok] ~/.sbir/writing-quality-profile.json                         |
+      |      Writing feedback entries: ${feedback_count}                   |
+      |      Agencies: ${agency_list}                                     |
+      |                                                                   |
+      | Update anytime: /sbir:proposal quality update                     |
+      +-------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "quality_preferences_artifact"
+        source: "~/.sbir/quality-preferences.json"
+        displayed_as: "summary of all preferences"
+        consumers:
+          - "sbir-writer (Wave 3-4)"
+          - "sbir-reviewer (Wave 4, 7)"
+
+      - name: "winning_patterns_artifact"
+        source: "~/.sbir/winning-patterns.json"
+        displayed_as: "pattern list with confidence"
+        consumers:
+          - "sbir-strategist (Wave 1)"
+          - "sbir-writer (Wave 3-4)"
+
+      - name: "writing_quality_profile_artifact"
+        source: "~/.sbir/writing-quality-profile.json"
+        displayed_as: "feedback summary by category"
+        consumers:
+          - "sbir-writer (Wave 3-4)"
+          - "sbir-reviewer (Wave 4, 7)"
+
+    emotional_state:
+      entry: "Anticipation -- what did the system learn?"
+      exit: "Accomplished -- knowledge is now institutional"
+
+    integration_checkpoint: |
+      All three artifacts exist at ~/.sbir/ (company-level, not per-proposal).
+      Each artifact has schema_version and updated_at fields.
+      Artifacts are valid JSON matching their respective schemas.
+      Consumer agents can read artifacts without error.
+
+    gherkin: |
+      Scenario: Quality discovery produces three artifacts
+        Given Elena Vasquez has completed all three discovery steps
+        When artifact assembly runs
+        Then quality-preferences.json exists at ~/.sbir/
+        And winning-patterns.json exists at ~/.sbir/
+        And writing-quality-profile.json exists at ~/.sbir/
+        And each artifact has schema_version and updated_at fields
+
+  - id: 5
+    name: "Strategist Consumption"
+    command: "Automatic during Wave 1 strategy brief generation"
+    description: "Strategist reads winning-patterns.json to inform competitive positioning and approach selection"
+
+    shared_artifacts:
+      - name: "winning_patterns_read"
+        source: "~/.sbir/winning-patterns.json"
+        displayed_as: "winning patterns informing strategy brief"
+        consumers:
+          - "strategy-brief.md competitive positioning section"
+
+    emotional_state:
+      entry: "Confident -- quality intelligence is automatically integrated"
+      exit: "Confident -- strategy informed by actual win data"
+
+    integration_checkpoint: |
+      Strategist loads winning-patterns.json if it exists.
+      Missing file is non-fatal (graceful degradation).
+      Winning patterns are cited in strategy brief with source attribution.
+
+    gherkin: |
+      Scenario: Strategist uses winning patterns in strategy brief
+        Given winning-patterns.json exists with 3 patterns from Air Force wins
+        And Elena is generating a strategy brief for a new Air Force proposal
+        When the strategist synthesizes the strategy brief
+        Then competitive positioning references applicable winning patterns
+        And each pattern citation includes source proposal and confidence level
+
+  - id: 6
+    name: "Writer Consumption"
+    command: "Automatic during Wave 3-4 drafting"
+    description: "Writer loads quality-preferences.json and winning-patterns.json to guide drafting style and content approach"
+
+    shared_artifacts:
+      - name: "quality_preferences_read"
+        source: "~/.sbir/quality-preferences.json"
+        displayed_as: "writing style and preferences informing drafts"
+        consumers:
+          - "Wave 3-4 section drafting"
+
+      - name: "winning_patterns_read"
+        source: "~/.sbir/winning-patterns.json"
+        displayed_as: "winning practices applied to drafts"
+        consumers:
+          - "Wave 3-4 section drafting"
+
+      - name: "writing_quality_alerts"
+        source: "~/.sbir/writing-quality-profile.json"
+        displayed_as: "quality warnings for specific agencies/sections"
+        consumers:
+          - "Wave 3-4 quality-aware drafting"
+
+    emotional_state:
+      entry: "Confident -- system has my writing DNA"
+      exit: "Confident -- draft reflects institutional quality standards"
+
+    integration_checkpoint: |
+      Writer loads all three artifacts if they exist.
+      Missing artifacts are non-fatal (writer uses default elements-of-style).
+      Quality preferences override default style when available.
+      Writing quality alerts surface for matching agency/section combinations.
+
+    gherkin: |
+      Scenario: Writer applies quality preferences during drafting
+        Given quality-preferences.json specifies "direct and data-driven" tone
+        And winning-patterns.json includes "lead with quantitative results"
+        When the writer drafts the technical approach section
+        Then the draft uses direct tone with inline quantitative evidence
+        And paragraphs follow the specified short-paragraph organization
+
+  - id: 7
+    name: "Reviewer Consumption"
+    command: "Automatic during Wave 4 and Wave 7 review"
+    description: "Reviewer loads writing-quality-profile.json to check drafts against known writing quality issues"
+
+    shared_artifacts:
+      - name: "writing_quality_review"
+        source: "~/.sbir/writing-quality-profile.json"
+        displayed_as: "quality profile match findings in review scorecards"
+        consumers:
+          - "Wave 4 section review"
+          - "Wave 7 full proposal review"
+
+      - name: "quality_preferences_review"
+        source: "~/.sbir/quality-preferences.json"
+        displayed_as: "style compliance checks in review"
+        consumers:
+          - "Wave 4 section review"
+          - "Wave 7 full proposal review"
+
+    emotional_state:
+      entry: "Confident -- review is calibrated to our specific quality issues"
+      exit: "Confident -- findings are targeted, not generic"
+
+    integration_checkpoint: |
+      Reviewer loads writing-quality-profile.json alongside existing weakness profile.
+      Quality profile matches are flagged as "[QUALITY PROFILE MATCH]" findings.
+      Quality preference violations are flagged as style findings.
+      Existing review workflow is extended, not replaced.
+
+    gherkin: |
+      Scenario: Reviewer flags quality profile match
+        Given writing-quality-profile.json has entry "organization/clarity" for Air Force
+        And the current proposal is for Air Force
+        When the reviewer reviews the technical approach section
+        And the section has paragraphs exceeding 6 sentences
+        Then the reviewer flags a quality profile match finding
+        And the finding references the specific past evaluator comment
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "past_performance_entries"
+      must_match_across: [1, 4]
+      failure_message: "Past performance entries in company profile must match those referenced in winning-patterns.json"
+
+    - artifact: "quality_preferences"
+      must_match_across: [2, 4, 6, 7]
+      failure_message: "Quality preferences must be consistent between capture (Step 2), storage (Step 4), and consumption (Steps 6, 7)"
+
+    - artifact: "writing_quality_profile"
+      must_match_across: [3, 4, 7]
+      failure_message: "Writing quality profile must be consistent between capture (Step 3), storage (Step 4), and review consumption (Step 7)"
+
+    - artifact: "writing_style_field"
+      must_match_across: [2, 6, 7]
+      failure_message: "writing_style in proposal-state.json must match tone selection from quality preferences interview"
+
+  graceful_degradation:
+    - condition: "No past proposals in profile"
+      behavior: "Skip Step 1, proceed to Step 2 (style interview)"
+
+    - condition: "No debrief feedback available"
+      behavior: "Skip Step 3, proceed to Step 4 (assemble from Steps 1-2 only)"
+
+    - condition: "No quality artifacts exist"
+      behavior: "Downstream agents use defaults (elements-of-style, standard review criteria)"
+
+    - condition: "Partial quality artifacts"
+      behavior: "Downstream agents load what exists, skip what is missing"
