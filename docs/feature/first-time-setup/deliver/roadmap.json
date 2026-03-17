@@ -1,0 +1,114 @@
+{
+  "roadmap": {
+    "project_id": "first-time-setup",
+    "created_at": "2026-03-16T12:00:00Z",
+    "total_steps": 3,
+    "phases": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Agent, Skill, and Command",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Setup wizard agent with 6-phase orchestration workflow",
+          "description": "Markdown agent implementing PREREQUISITES, COMPANY PROFILE, CORPUS SETUP, API KEY, VALIDATION SUMMARY, and NEXT STEPS phases. Delegates profile creation to sbir-profile-builder via Task tool. Enforces sequential gates with idempotent re-run support.",
+          "criteria": [
+            "Agent file at agents/sbir-setup-wizard.md follows plugin convention (YAML frontmatter, 200-400 lines)",
+            "Agent checks Python 3.12+, Git, Claude Code with [ok]/[!!] indicators",
+            "Agent detects existing profile via JsonProfileAdapter and offers keep/update/fresh options",
+            "Agent delegates profile creation to sbir-profile-builder via Task tool",
+            "Agent accepts comma-separated corpus directories with path validation",
+            "Agent checks GEMINI_API_KEY with skip/configure options",
+            "Phase 5 re-verifies all items (does not trust cached results)",
+            "Phase 6 displays concrete next-step commands"
+          ],
+          "files_to_modify": [
+            "agents/sbir-setup-wizard.md"
+          ],
+          "test_files": [],
+          "dependencies": [],
+          "stories": ["US-FTS-001", "US-FTS-002", "US-FTS-003", "US-FTS-004", "US-FTS-005"],
+          "estimated_hours": 4
+        },
+        {
+          "id": "01-02",
+          "name": "Setup domain skill with check commands and display patterns",
+          "description": "Domain knowledge skill covering: prerequisite check commands for Python/Git/Claude Code, validation status indicators ([ok]/[!!]/[--]), profile detection via JsonProfileAdapter, corpus detection, API key check, Gemini configuration instructions, next-step commands, and delegation patterns.",
+          "criteria": [
+            "Skill file at skills/setup-wizard/setup-domain.md within 100-200 lines",
+            "Documents prerequisite check commands with platform-specific notes (Windows python vs python3)",
+            "Defines three validation indicators with usage rules",
+            "Includes profile detection Python one-liner using JsonProfileAdapter",
+            "Documents Gemini API key configuration instructions with shell-specific syntax",
+            "Documents delegation patterns for profile builder and corpus ingestion"
+          ],
+          "files_to_modify": [
+            "skills/setup-wizard/setup-domain.md"
+          ],
+          "test_files": [],
+          "dependencies": [],
+          "stories": ["US-FTS-001", "US-FTS-004", "US-FTS-005"],
+          "estimated_hours": 2
+        },
+        {
+          "id": "01-03",
+          "name": "Setup command with agent dispatch",
+          "description": "Command file dispatching to sbir-setup-wizard. No arguments. Documents 6-step flow, prerequisites, and context files.",
+          "criteria": [
+            "Command at commands/sbir-setup.md follows plugin convention (YAML frontmatter with description and argument-hint)",
+            "Dispatches to @sbir-setup-wizard agent",
+            "Documents all 6 flow steps",
+            "Lists context files (company profile, corpus, skill)"
+          ],
+          "files_to_modify": [
+            "commands/sbir-setup.md"
+          ],
+          "test_files": [],
+          "dependencies": ["01-01"],
+          "stories": ["US-FTS-001"],
+          "estimated_hours": 1
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "README and Documentation",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "README update to lead with setup command",
+          "description": "Update README.md to lead with /sbir:setup as the primary entry point. Document setup phases, command reference, idempotency, and multi-project workflow.",
+          "criteria": [
+            "README leads with /sbir:setup as first command new users should run",
+            "Setup phases documented (prerequisites, profile, corpus, API key, validation)",
+            "Command reference table includes /sbir:setup in Pre phase",
+            "Idempotency and re-run behavior documented"
+          ],
+          "files_to_modify": [
+            "README.md"
+          ],
+          "test_files": [],
+          "dependencies": ["01-01", "01-02", "01-03"],
+          "stories": ["US-FTS-004"],
+          "estimated_hours": 1
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "agents/",
+      "commands/",
+      "skills/setup-wizard/"
+    ],
+    "test_directories": [],
+    "excluded_patterns": []
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "self",
+    "approved_at": "2026-03-16T14:00:00Z"
+  }
+}

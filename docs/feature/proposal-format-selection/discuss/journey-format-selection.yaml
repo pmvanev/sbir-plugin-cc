@@ -1,0 +1,121 @@
+journey:
+  name: "Proposal Format Selection"
+  goal: "Declare output format (LaTeX or DOCX) during proposal setup so downstream agents produce consistent output"
+  persona: "Phil Santos -- engineer writing 2-3 SBIR proposals per year"
+
+  emotional_arc:
+    start: "Expectant -- starting a new proposal, curious about topic fit"
+    middle: "Decisive -- quick confident choice about familiar tooling"
+    end: "Confident -- system configured for the full lifecycle"
+
+  job_story: >
+    When I am setting up a new SBIR proposal and the guided setup process
+    is collecting my preferences, I want to declare whether I will produce
+    my final proposal in LaTeX or DOCX, so I can ensure the entire downstream
+    pipeline is tailored to my chosen output medium from the start.
+
+steps:
+  - id: 1
+    name: "Parse Solicitation"
+    command: "/proposal new <solicitation-file-path>"
+    description: "Existing step -- parse solicitation document for topic metadata"
+
+    shared_artifacts:
+      - name: "topic_id"
+        source: ".sbir/proposal-state.json -> topic.id"
+        displayed_as: "${topic_id}"
+        consumers: ["status dashboard", "all wave artifacts"]
+      - name: "agency"
+        source: ".sbir/proposal-state.json -> topic.agency"
+        displayed_as: "${agency}"
+        consumers: ["status dashboard", "compliance matrix"]
+
+    emotional_state:
+      entry: "Expectant"
+      exit: "Informed -- topic metadata visible"
+
+    integration_checkpoint: >
+      Solicitation parsed successfully. Topic metadata extracted and persisted.
+
+  - id: 2
+    name: "Corpus Search and Fit Scoring"
+    command: "(automatic, part of /proposal new)"
+    description: "Existing step -- search corpus for related past work, score fit"
+
+    shared_artifacts:
+      - name: "fit_scores"
+        source: ".sbir/proposal-state.json -> fit_scoring"
+        displayed_as: "${fit_scores}"
+        consumers: ["Go/No-Go checkpoint"]
+
+    emotional_state:
+      entry: "Curious"
+      exit: "Aware -- knows fit level"
+
+    integration_checkpoint: >
+      Fit scoring complete. Corpus matches ranked.
+
+  - id: 3
+    name: "Format Selection"
+    command: "(interactive prompt during /proposal new)"
+    description: "NEW STEP -- user selects LaTeX or DOCX as proposal output format"
+
+    tui_mockup: |
+      +-- Output Format Selection ----------------------------------------+
+      |                                                                    |
+      |  Choose how the final proposal will be produced:                   |
+      |                                                                    |
+      |    (1) LaTeX  -- Compile to PDF via LaTeX                          |
+      |    (2) DOCX   -- Microsoft Word format                             |
+      |                                                                    |
+      |  Default: docx                                                     |
+      |                                                                    |
+      |  Your choice [1/2]: _                                              |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "output_format"
+        source: ".sbir/proposal-state.json -> output_format"
+        displayed_as: "${output_format}"
+        consumers:
+          - "status dashboard (Format field)"
+          - "sbir-writer (content structure hints)"
+          - "sbir-formatter (Wave 5/6 output medium)"
+          - "sbir-submission-agent (package format)"
+
+    emotional_state:
+      entry: "Decisive -- knows own tooling preference"
+      exit: "Confirmed -- format recorded"
+
+    integration_checkpoint: >
+      output_format persisted in proposal-state.json. Value is either "latex" or "docx".
+
+  - id: 4
+    name: "Go/No-Go Checkpoint"
+    command: "(automatic, part of /proposal new)"
+    description: "Existing step -- present fit analysis and collect human decision"
+
+    shared_artifacts:
+      - name: "go_no_go_decision"
+        source: ".sbir/proposal-state.json -> go_no_go"
+        displayed_as: "${go_no_go}"
+        consumers: ["wave progression", "status dashboard"]
+
+    emotional_state:
+      entry: "Deliberate -- weighing whether to pursue"
+      exit: "Committed (go) or Relieved (no-go)"
+
+    integration_checkpoint: >
+      Go/No-Go decision recorded. If go, Wave 1 unlocked with output_format already set.
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "output_format"
+      must_match_across: [3]
+      consumers_read_from: ".sbir/proposal-state.json"
+      failure_message: "output_format in state must be the single source of truth. Writer, formatter, and submission agent must all read from state, never hardcode."
+
+    - artifact: "topic_id"
+      must_match_across: [1, 4]
+      consumers_read_from: ".sbir/proposal-state.json"
+      failure_message: "topic_id must be consistent from parse through all downstream artifacts."
