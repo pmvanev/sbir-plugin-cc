@@ -101,6 +101,9 @@ Gate: Human decision recorded. State updated.
 - `proposal wave <name>` -- Transition to named wave. PES validates prerequisites.
 - `proposal review` -- Trigger human review checkpoint for current wave.
 
+### Configuration
+- `proposal config format <format>` -- Update output format (latex or docx). At Wave 3+, display rework warning and require user confirmation before state update. Dispatch to FormatConfigService.
+
 ### Wave 0: Intelligence and Fit
 - `proposal new` -- Initialize state, dispatch corpus-librarian for solicitation ingestion, score fit, prompt for output format selection, present Go/No-Go checkpoint.
 - `proposal corpus add <path>` -- Dispatch sbir-corpus-librarian to ingest directory.

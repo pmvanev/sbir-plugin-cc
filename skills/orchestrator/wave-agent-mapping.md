@@ -24,6 +24,7 @@ description: Wave definitions, agent routing table, and checkpoint gates for the
 
 | Command | Dispatches To | Wave Context |
 |---------|--------------|-------------|
+| `proposal config format <format>` | FormatConfigService (orchestrator-inline) | Any wave (rework warning at 3+) |
 | `proposal new` | corpus-librarian (+ topic-scout, fit-scorer in C2) | Wave 0 |
 | `proposal shape` | sbir-solution-shaper | Wave 0 (post-Go) |
 | `proposal corpus add <path>` | sbir-corpus-librarian | Any wave |
