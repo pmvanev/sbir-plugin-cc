@@ -194,3 +194,113 @@ def test_format_accepted_case_insensitively(fmt_input: str) -> None:
     assert result["success"] is True
     assert len(writer.saved_states) == 1
     assert writer.saved_states[0]["output_format"] == fmt_input.strip().lower()
+
+
+# ---------------------------------------------------------------------------
+# Behavior 7: Error message content (mutation testing coverage)
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_format_error_message_contains_invalid_prefix() -> None:
+    """Error message starts with 'Invalid' for invalid format values."""
+    service, _ = _make_service()
+    state = _make_state()
+
+    result = service.change_format(state, "pdf")
+
+    assert result["error"].startswith("Invalid format")
+
+
+def test_apply_selected_format_error_message_contains_invalid_prefix() -> None:
+    """apply_selected_format error message starts with 'Invalid'."""
+    service, _ = _make_service()
+    state = _make_state()
+
+    with pytest.raises(ValueError, match=r"^Invalid format"):
+        service.apply_selected_format(state, "pdf")
+
+
+def test_validate_format_error_message_contains_invalid_prefix() -> None:
+    """validate_format error message starts with 'Invalid'."""
+    result = FormatConfigService.validate_format({"output_format": "pdf"})
+
+    assert result["valid"] is False
+    assert result["error"].startswith("Invalid output_format")
+
+
+def test_rework_warning_message_starts_with_changing() -> None:
+    """Rework warning message begins with 'Changing format'."""
+    service, _ = _make_service()
+    state = _make_state(current_wave=3, output_format="docx")
+
+    result = service.change_format(state, "latex")
+
+    assert result["warning_message"].startswith("Changing format")
+
+
+# ---------------------------------------------------------------------------
+# Behavior 8: Default value behavior (mutation testing coverage)
+# ---------------------------------------------------------------------------
+
+
+def test_apply_default_sets_docx_when_key_missing() -> None:
+    """apply_default_format sets 'docx' specifically when key is absent."""
+    service, writer = _make_service()
+    state = {"current_wave": 0}
+
+    service.apply_default_format(state)
+
+    assert state["output_format"] == "docx"
+    assert len(writer.saved_states) == 1
+
+
+def test_apply_default_preserves_existing_format() -> None:
+    """apply_default_format does NOT overwrite existing output_format."""
+    service, writer = _make_service()
+    state = {"current_wave": 0, "output_format": "latex"}
+
+    service.apply_default_format(state)
+
+    assert state["output_format"] == "latex"
+
+
+def test_validate_format_missing_key_returns_invalid() -> None:
+    """validate_format with missing output_format key returns invalid."""
+    result = FormatConfigService.validate_format({})
+
+    assert result["valid"] is False
+    assert "Invalid" in result["error"]
+
+
+def test_change_format_missing_output_format_defaults_to_docx() -> None:
+    """change_format with missing output_format treats current as 'docx'."""
+    service, writer = _make_service()
+    state = {"current_wave": 1}
+
+    result = service.change_format(state, "latex")
+
+    assert result["success"] is True
+    assert writer.saved_states[0]["output_format"] == "latex"
+
+
+def test_change_format_missing_output_format_same_as_default_is_noop() -> None:
+    """change_format to 'docx' when key missing is a no-op (default matches)."""
+    service, writer = _make_service()
+    state = {"current_wave": 1}
+
+    result = service.change_format(state, "docx")
+
+    assert result["success"] is True
+    assert result["rework_warning"] is False
+    assert len(writer.saved_states) == 0
+
+
+def test_change_format_missing_current_wave_defaults_to_zero() -> None:
+    """change_format with missing current_wave defaults to 0 (no warning)."""
+    service, writer = _make_service()
+    state = {"output_format": "docx"}
+
+    result = service.change_format(state, "latex")
+
+    assert result["success"] is True
+    assert result["rework_warning"] is False
