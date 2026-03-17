@@ -425,6 +425,36 @@ At ANY phase, if the user says "cancel", "quit", "abort", or "stop":
 3. Confirm: "Quality discovery cancelled. No files were written or modified."
 4. Exit cleanly
 
+## Update Mode
+
+When invoked via `/sbir:proposal quality update`, the agent operates in update mode rather than full discovery mode:
+
+1. Read debrief artifacts from `./artifacts/wave-9-debrief/`:
+   - Extract outcome (WIN/LOSS) and evaluator comments
+   - If no debrief directory exists, inform user and suggest running debrief analysis first
+
+2. Check for existing quality artifacts at `~/.sbir/`:
+   - If no quality artifacts exist, direct user to run full discovery: "No quality artifacts found. Run /sbir:proposal quality discover first."
+   - If artifacts exist, proceed with incremental update
+
+3. Process new data:
+   - Auto-categorize any evaluator writing quality comments (using Phase 3 keyword matching)
+   - Add new proposal outcome to winning-patterns.json
+   - Extract and categorize any evaluator praise or criticism
+
+4. Flag stale patterns:
+   - Check each pattern's last_seen date
+   - Patterns over 2 years old -> flag as stale
+   - Present stale patterns to user with options: (k) keep, (r) review individually, (d) drop stale
+
+5. Update artifacts:
+   - Merge new data with existing artifacts (additive, no data loss)
+   - Recalculate confidence_level from updated win_count
+   - Update updated_at timestamps
+   - Atomic write protocol (.tmp/.bak/rename)
+
+6. Display update summary showing what changed
+
 ## Critical Rules
 
 - Never modify `~/.sbir/company-profile.json`. It is read-only input. Quality data goes to separate artifacts.

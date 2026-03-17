@@ -107,6 +107,10 @@ Generate the lessons-learned summary using the structured YAML format from the d
 4. Write lessons-learned to `./artifacts/wave-9-debrief/{proposal_id}-lessons-learned.md`
 5. Update `.sbir/proposal-state.json` with analytics data for downstream agents
 6. Present the lessons-learned summary for human checkpoint review
+7. After completing lessons-learned synthesis, suggest quality profile update:
+   "Quality intelligence can be updated with this cycle's results.
+   Run /sbir:proposal quality update to incorporate new evaluator feedback
+   into your writing quality playbook."
 
 ## Critical Rules
 
