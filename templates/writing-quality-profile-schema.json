@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Writing Quality Profile",
+  "description": "Company-level writing quality feedback from evaluator comments, categorized as meta-writing entries.",
+  "type": "object",
+  "required": ["schema_version", "updated_at", "entries"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["comment", "topic_id", "agency", "outcome", "category", "sentiment", "added_at"],
+        "properties": {
+          "comment": { "type": "string", "minLength": 1 },
+          "topic_id": { "type": "string", "minLength": 1 },
+          "agency": { "type": "string", "minLength": 1 },
+          "outcome": { "type": "string", "enum": ["WIN", "LOSS"] },
+          "category": {
+            "type": "string",
+            "enum": ["organization_clarity", "persuasiveness", "tone", "specificity"]
+          },
+          "sentiment": { "type": "string", "enum": ["positive", "negative"] },
+          "section": {
+            "type": "string",
+            "enum": ["technical_approach", "sow", "commercialization", "general"]
+          },
+          "auto_categorized": { "type": "boolean" },
+          "user_confirmed": { "type": "boolean" },
+          "added_at": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "agency_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["agency", "discriminators", "positive_count", "negative_count"],
+        "properties": {
+          "agency": { "type": "string", "minLength": 1 },
+          "discriminators": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "positive_count": { "type": "integer", "minimum": 0 },
+          "negative_count": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

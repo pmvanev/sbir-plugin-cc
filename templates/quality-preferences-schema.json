@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Quality Preferences",
+  "description": "Company-level writing quality preferences captured during quality discovery.",
+  "type": "object",
+  "required": ["schema_version", "updated_at", "tone", "detail_level", "evidence_style", "organization", "practices_to_replicate", "practices_to_avoid"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["formal_authoritative", "direct_data_driven", "conversational_accessible", "custom"]
+    },
+    "tone_custom_description": {
+      "type": "string"
+    },
+    "detail_level": {
+      "type": "string",
+      "enum": ["high_level", "moderate", "deep_technical"]
+    },
+    "evidence_style": {
+      "type": "string",
+      "enum": ["inline_quantitative", "narrative_supporting", "table_heavy"]
+    },
+    "organization": {
+      "type": "string",
+      "enum": ["short_paragraphs", "medium_paragraphs", "long_flowing"]
+    },
+    "practices_to_replicate": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "practices_to_avoid": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "if": {
+    "properties": { "tone": { "const": "custom" } }
+  },
+  "then": {
+    "required": ["tone_custom_description"]
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Winning Patterns",
+  "description": "Company-level winning patterns extracted from past proposal quality ratings.",
+  "type": "object",
+  "required": ["schema_version", "updated_at", "confidence_level", "win_count", "proposal_ratings", "patterns"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "confidence_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "win_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "proposal_ratings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["topic_id", "agency", "outcome", "quality_rating", "rated_at"],
+        "properties": {
+          "topic_id": { "type": "string", "minLength": 1 },
+          "agency": { "type": "string", "minLength": 1 },
+          "topic_area": { "type": "string" },
+          "outcome": { "type": "string", "enum": ["WIN", "LOSS"] },
+          "quality_rating": { "type": "string", "enum": ["weak", "adequate", "strong"] },
+          "winning_practices": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "evaluator_praise": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "rated_at": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["pattern", "frequency", "agencies", "source_proposals"],
+        "properties": {
+          "pattern": { "type": "string", "minLength": 1 },
+          "frequency": { "type": "integer", "minimum": 1 },
+          "agencies": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "source_proposals": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "universal": { "type": "boolean" },
+          "first_seen": { "type": "string", "format": "date-time" },
+          "last_seen": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
