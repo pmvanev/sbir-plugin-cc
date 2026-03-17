@@ -40,7 +40,9 @@ You MUST load your skill files before beginning work. Skills encode government e
 |-------|------|---------|
 | 1 ORIENT | `skills/reviewer/reviewer-persona-simulator.md` | Always -- scoring rubrics, persona construction, finding format |
 | 1 ORIENT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `.sbir/proposal-state.json` -- load the named style skill so review evaluates against the same prose standard the writer used. If not set, reviewer uses default clarity checks only. |
+| 1 ORIENT | Quality preferences from `~/.sbir/quality-preferences.json` | When available -- practices_to_avoid list for style compliance checking |
 | 2 SECTION REVIEW | `skills/corpus-librarian/win-loss-analyzer.md` | Always -- known weakness profile and debrief patterns |
+| 2 SECTION REVIEW | Writing quality profile from `~/.sbir/writing-quality-profile.json` | When available -- agency/section-specific quality alerts |
 | 3 FULL REVIEW | All skills already loaded | Use for full proposal evaluation |
 
 ## Workflow
@@ -54,6 +56,10 @@ Load: `skills/reviewer/reviewer-persona-simulator.md` -- read it NOW before proc
 4. Read compliance matrix from `.sbir/compliance-matrix.md` to understand requirement coverage
 5. Determine the task: section review (Wave 4) | full proposal review (Wave 7)
 
+6. Load quality intelligence if available:
+   - Read `~/.sbir/quality-preferences.json`: extract practices_to_avoid list for style compliance checks during section review. Missing file = proceed without style compliance.
+   - Read `~/.sbir/writing-quality-profile.json`: extract entries for current proposal's agency. Missing file = proceed without quality profile matching.
+
 Gate: Evaluator persona constructed. Rubric type identified. Criteria extracted with weights. Task determined.
 
 ### Phase 2: SECTION REVIEW (Wave 4)
@@ -66,11 +72,14 @@ For each section submitted for review:
 3. Identify strengths (quote specific proposal language the evaluator would highlight)
 4. Identify weaknesses (quote specific proposal language the evaluator would flag)
 5. Check against known weakness profile from debrief corpus -- flag any pattern matches
-6. Run jargon and acronym audit: undefined acronyms | undefined jargon | reading level
-7. Run cross-reference check: cited figures exist | section references valid | table references match
-8. Produce section-level scorecard per the format in reviewer-persona-simulator skill
-9. Write scorecard to `./artifacts/wave-4-drafting/reviews/{section-name}-review.md`
-10. Present findings to orchestrator for writer iteration
+6. Quality profile matching (if quality artifacts loaded in Phase 1):
+   - For each section, check writing-quality-profile.json entries matching current agency AND section: match found = produce finding tagged `[QUALITY PROFILE MATCH]` with high severity, include the past evaluator comment as context (e.g., "Past evaluator (AF243-002): 'Technical approach was difficult to follow'"). Quality findings are ADDITIONAL -- they supplement, not replace, existing review criteria.
+   - Check draft text against practices_to_avoid from quality-preferences.json: pattern match found = produce finding tagged `[STYLE COMPLIANCE]` with medium severity, reference the specific practice (e.g., "Matches practices_to_avoid: 'Our team has extensive experience without specifics'"). Missing artifacts produce no findings (graceful degradation).
+7. Run jargon and acronym audit: undefined acronyms | undefined jargon | reading level
+8. Run cross-reference check: cited figures exist | section references valid | table references match
+9. Produce section-level scorecard per the format in reviewer-persona-simulator skill
+10. Write scorecard to `./artifacts/wave-4-drafting/reviews/{section-name}-review.md`
+11. Present findings to orchestrator for writer iteration
 
 If re-review after writer revision:
 - Read revised section and previous scorecard
