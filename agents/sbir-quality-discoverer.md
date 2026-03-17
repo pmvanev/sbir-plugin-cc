@@ -357,9 +357,63 @@ Gate: Feedback categorized and confirmed, or skipped. Proceed to Phase 4.
 
 ### Phase 4: ARTIFACT ASSEMBLY
 
-*Placeholder -- implemented in step 01-04.*
+Assembles quality artifacts from Phases 1-3 data. Only creates artifacts for phases that produced data. Merges incrementally with existing artifacts. Writes to `~/.sbir/` using atomic write protocol.
 
-Assembles quality artifacts from data collected in Phases 1-3. Writes to `~/.sbir/` using atomic write protocol. Shows confidence levels and lists consumer agents. Only creates artifacts for completed phases.
+1. Determine artifacts to create:
+   - Phase 1 data (proposal_ratings non-empty) -> `winning-patterns.json`
+   - Phase 2 data (style_preferences non-empty) -> `quality-preferences.json`
+   - Phase 3 data (feedback entries non-empty) -> `writing-quality-profile.json`
+
+2. For each artifact, apply atomic write protocol:
+```bash
+python -c "
+import json, os, shutil; from datetime import datetime, timezone
+path = os.path.expanduser('~/.sbir/{name}')
+existing = json.load(open(path)) if os.path.exists(path) else {}
+data = {**existing, **new_data, 'schema_version': '1.0.0',
+        'updated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}
+# Merge arrays additively, deduplicate by key field
+with open(path+'.tmp','w') as f: json.dump(data, f, indent=2)
+if os.path.exists(path): shutil.copy2(path, path+'.bak')
+os.rename(path+'.tmp', path)
+"
+```
+
+3. Artifact-specific merge rules:
+
+   **winning-patterns.json**: Append `proposal_ratings` (dedupe by `topic_id`). Recalculate `win_count` from ratings where outcome=WIN. Set `confidence_level`: low (<10 wins), medium (10-19), high (>=20). Detect patterns: winning practices in 2+ strong proposals become pattern entries with frequency, agencies, universal flag (true if multi-agency).
+
+   **quality-preferences.json**: Overwrite scalars (tone, detail_level, evidence_style, organization). Append to `practices_to_replicate`/`practices_to_avoid`, dedupe by exact string.
+
+   **writing-quality-profile.json**: Append entries (dedupe by `comment`). Recalculate `agency_patterns`: group by agency, count positive/negative, extract discriminators (categories with 2+ entries).
+
+4. Display completion summary showing each artifact's status:
+```
+--------------------------------------------
+QUALITY DISCOVERY COMPLETE
+--------------------------------------------
+Artifacts created:
+  [checkmark] quality-preferences.json
+    Tone: {tone} | Detail: {detail_level}
+    Practices: {n} to replicate, {n} to avoid
+  [checkmark] winning-patterns.json
+    Proposals rated: {n} | Wins: {win_count}
+    Confidence: {level} ({win_count} wins {vs threshold})
+    Patterns detected: {n}
+  [checkmark] writing-quality-profile.json
+    Feedback entries: {n} ({meta} meta-writing, {content} content)
+    Agency patterns: {agency} ({focus})
+
+Consumer agents:
+  - sbir-strategist -- reads winning patterns
+  - sbir-writer     -- reads all three artifacts
+  - sbir-reviewer   -- reads quality profile + preferences
+
+Run /sbir:proposal quality status to check artifact state.
+--------------------------------------------
+```
+
+5. Partial completion -- show skipped artifacts as `[dash] {name} -- skipped ({reason})` and suggest re-running quality discovery to complete them. Incremental updates -- when merging with existing, show additions: `Added: {n} new | Existing: {n} preserved | Confidence: {new} (up from {old})`.
 
 Gate: Artifacts written and verified, or user cancelled.
 
