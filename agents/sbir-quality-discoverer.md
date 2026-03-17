@@ -276,11 +276,84 @@ Gate: Style preferences captured and confirmed, or all skipped. Proceed to Phase
 
 ### Phase 3: EVALUATOR FEEDBACK EXTRACTION
 
-*Placeholder -- implemented in step 01-03.*
+Extract and categorize evaluator feedback using keyword matching from the quality-discovery-domain skill. Meta-writing feedback feeds writing-quality-profile.json. Content feedback is noted for weakness profile without duplication.
 
-For proposals with evaluator feedback, auto-categorizes comments using keyword matching from the quality-discovery-domain skill. User confirms or overrides each categorization. Detects cross-proposal patterns for same agency.
+1. Ask if user has evaluator feedback:
+```
+--------------------------------------------
+EVALUATOR FEEDBACK EXTRACTION
+--------------------------------------------
+Do you have evaluator feedback from past proposals?
+  (y) yes  (n) no  (s) skip
+--------------------------------------------
+```
 
-Gate: Feedback categorized and confirmed, or skipped.
+If "n" or "s", proceed to Phase 4. If "y", loop through comments below.
+
+2. For each comment, prompt: `Enter evaluator comment (or "done"/"finish" to stop):`
+
+3. Ask which proposal. If Phase 1 ratings exist, present numbered list:
+```
+Which proposal?
+  (1) {agency} - {topic_area} [{outcome}]
+  ...
+  (m) manual entry
+```
+If "m" or no Phase 1 ratings, prompt for agency name directly.
+
+4. Ask section: `(1) technical_approach (2) sow (3) commercialization (4) general` -- default "general" if skipped.
+
+5. Auto-categorize using keyword matching (see quality-discovery-domain skill):
+   - Scan comment case-insensitively for keyword matches
+   - Meta-writing keywords map to: organization_clarity, persuasiveness, tone
+   - Content keywords map to: specificity
+   - Both match: prefer meta-writing (more actionable for writing style)
+   - No match: set auto_categorized=false, prompt user directly (skip to step 7)
+
+6. Present auto-categorization for confirmation:
+```
+Comment: "{comment text}"
+Auto-category: {meta-writing|content} -> {category}
+Sentiment: {positive|negative}
+  (c) confirm  (o) override  (s) skip
+```
+
+Sentiment inference: positive keywords ("well-organized", "clear", "compelling", "persuasive", "strong case", "professional", "appropriate tone") yield positive; all others yield negative.
+
+7. Override or manual categorization (when auto_categorized=false or user chose "o"):
+```
+Category: (1) organization_clarity (2) persuasiveness (3) tone (4) specificity
+Sentiment: (p) positive  (n) negative
+```
+
+8. Store each entry in memory with fields: comment, topic_id, agency, outcome, category, sentiment, section, auto_categorized, user_confirmed. Do NOT write to disk -- Phase 4 handles persistence.
+
+9. Route: meta-writing categories (organization_clarity, persuasiveness, tone) go to writing-quality-profile.json. Content (specificity) noted for weakness profile only -- not duplicated.
+
+10. After "done"/"finish", detect cross-proposal patterns (same category 2+ times for same agency):
+```
+--------------------------------------------
+CROSS-PROPOSAL PATTERNS DETECTED
+--------------------------------------------
+{agency}:
+  - {category} flagged {count} times ({sentiment breakdown})
+--------------------------------------------
+```
+If no patterns: `No cross-proposal patterns detected (need 2+ comments in same category for same agency).`
+
+11. Show summary:
+```
+--------------------------------------------
+FEEDBACK SUMMARY
+--------------------------------------------
+  Total: {total}  Meta-writing: {meta_count}
+  Content: {content_count}  Skipped: {skipped_count}
+  Categories: organization_clarity={n} persuasiveness={n}
+              tone={n} specificity={n}
+--------------------------------------------
+```
+
+Gate: Feedback categorized and confirmed, or skipped. Proceed to Phase 4.
 
 ### Phase 4: ARTIFACT ASSEMBLY
 
@@ -310,20 +383,11 @@ At ANY phase, if the user says "cancel", "quit", "abort", or "stop":
 
 ## Examples
 
-### Example 1: Full Review of 5 Proposals
-User has 5 past proposals. Rates 2 as strong (provides winning practices), 2 as adequate, 1 as weak (provides issues). Agent stores 5 ratings, calculates confidence as low (2 wins < 10). Proceeds to Phase 2.
-
-### Example 2: Skip All Proposals
-User has 3 past proposals but types "finish" immediately. Zero ratings collected. Agent proceeds to Phase 2 with empty proposal_ratings. Confidence remains low.
-
-### Example 3: Zero Past Proposals
-Company profile has empty past_performance array. Agent displays "no past proposals" message and skips directly to Phase 2.
-
-### Example 4: Cancel During Review
-User rates 2 of 4 proposals, then types "cancel". Agent confirms cancellation. No artifacts written. Existing quality artifacts (if any) remain unchanged.
-
-### Example 5: Strong Proposal with Practices
-User rates a proposal as strong and provides 3 winning practices: "Led with quantitative results", "Included risk mitigation matrix", "Referenced prior agency work". All 3 stored in winning_practices array for that rating entry.
+### Example 1: Full Review -- 5 proposals rated (2 strong with practices, 2 adequate, 1 weak with issues). Confidence low (2 wins < 10). Proceeds to Phase 2.
+### Example 2: Skip All -- User types "finish" immediately. Zero ratings. Proceeds to Phase 2 with empty proposal_ratings.
+### Example 3: No Proposals -- Empty past_performance. Displays "no past proposals" message, skips to Phase 2.
+### Example 4: Cancel -- User cancels mid-review. No artifacts written. Existing artifacts unchanged.
+### Example 5: Strong with Practices -- User provides 3 winning practices for a strong-rated proposal. All stored in winning_practices array.
 
 ## Constraints
 
