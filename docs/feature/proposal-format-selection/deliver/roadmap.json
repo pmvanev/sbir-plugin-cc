@@ -1,0 +1,130 @@
+{
+  "roadmap": {
+    "project_id": "proposal-format-selection",
+    "created_at": "2026-03-17T16:42:03Z",
+    "total_steps": 4,
+    "phases": 2
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "State Schema and Domain Logic",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Add output_format to state schema and initial state builder",
+          "description": "Extend proposal-state-schema.json with output_format enum (latex, docx). Update ProposalCreationService to include output_format with default docx in initial state.",
+          "stories": ["US-PFS-001"],
+          "criteria": [
+            "Schema accepts output_format as 'latex' or 'docx'",
+            "New proposals include output_format defaulting to 'docx'",
+            "Existing proposals without output_format remain valid",
+            "Schema rejects invalid format values (e.g. 'pdf')"
+          ],
+          "time_estimate": "0.5 day",
+          "dependencies": [],
+          "production_files": [
+            "templates/proposal-state-schema.json",
+            "scripts/pes/domain/proposal_service.py"
+          ],
+          "test_files": [
+            "tests/acceptance/proposal_format_selection/format_setup.feature"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "FormatConfigService for mid-proposal format changes",
+          "description": "New domain service validates format value, determines rework risk by wave number, updates state via existing StateWriter port.",
+          "stories": ["US-PFS-002"],
+          "criteria": [
+            "Valid format values accepted and persisted",
+            "Invalid or empty format values rejected with error listing valid options",
+            "Changes at Wave 3+ return rework warning with wave context",
+            "Changes before Wave 3 proceed without warning",
+            "Same-format change is a no-op without warning"
+          ],
+          "time_estimate": "1 day",
+          "dependencies": ["01-01"],
+          "production_files": [
+            "scripts/pes/domain/format_config_service.py"
+          ],
+          "test_files": [
+            "tests/acceptance/proposal_format_selection/format_change.feature"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Agent and Command Integration",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Orchestrator format prompt and status display",
+          "description": "Add format selection prompt to /proposal new flow after fit scoring, before Go/No-Go. Display output_format in /proposal status dashboard. Surface LaTeX recommendation when solicitation hints at PDF submission.",
+          "stories": ["US-PFS-001"],
+          "criteria": [
+            "Format prompt appears after fit scoring, before Go/No-Go",
+            "Default selection (Enter) sets output_format to 'docx'",
+            "Explicit selection sets chosen format in state",
+            "PDF-submission hint triggers LaTeX recommendation",
+            "Status dashboard shows chosen output format"
+          ],
+          "time_estimate": "1 day",
+          "dependencies": ["01-01"],
+          "production_files": [
+            "agents/sbir-orchestrator.md",
+            "commands/proposal-new.md",
+            "skills/common/proposal-state-schema.md"
+          ],
+          "test_files": [
+            "tests/acceptance/proposal_format_selection/format_setup.feature"
+          ]
+        },
+        {
+          "id": "02-02",
+          "name": "Config format command and routing",
+          "description": "New /proposal config format command. Orchestrator routes to FormatConfigService. Rework warning at Wave 3+ requires user confirmation before state update.",
+          "stories": ["US-PFS-002"],
+          "criteria": [
+            "/proposal config format latex updates state",
+            "/proposal config format docx updates state",
+            "Rework warning displayed at Wave 3+ with confirmation required",
+            "Invalid format value rejected with helpful error"
+          ],
+          "time_estimate": "0.5 day",
+          "dependencies": ["01-02", "02-01"],
+          "production_files": [
+            "commands/proposal-config-format.md",
+            "agents/sbir-orchestrator.md",
+            "skills/orchestrator/wave-agent-mapping.md"
+          ],
+          "test_files": [
+            "tests/acceptance/proposal_format_selection/format_change.feature"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/domain/",
+      "templates/",
+      "agents/",
+      "commands/",
+      "skills/"
+    ],
+    "test_directories": [
+      "tests/acceptance/proposal_format_selection/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "self",
+    "approved_at": "2026-03-17T16:45:00Z"
+  }
+}
