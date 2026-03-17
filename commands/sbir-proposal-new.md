@@ -18,7 +18,8 @@ Start a new proposal from a solicitation document.
 1. **Parse solicitation** -- Extract topic ID, agency, phase, deadline, and title from the provided document
 2. **Search corpus** -- Find related past work from ingested documents using keyword matching
 3. **Fit scoring** -- Score fit across subject matter, past performance, and certifications
-4. **Go/No-Go checkpoint** -- Present analysis and wait for human decision:
+4. **Format selection** -- Prompt for output format (LaTeX or DOCX). Default is DOCX (press Enter to accept). If the solicitation hints at PDF submission (e.g. "submit as PDF", "PDF format required"), a LaTeX recommendation is displayed. The choice is recorded as `output_format` in proposal state.
+5. **Go/No-Go checkpoint** -- Present analysis and wait for human decision:
    - **go** -- Record decision, unlock Wave 1 for proposal writing
    - **no-go** -- Archive the proposal
    - **defer** -- Save state for later decision
@@ -50,6 +51,7 @@ After parsing, you will see:
 - Parsed metadata (topic ID, agency, phase, deadline, title)
 - Related past work from corpus (if any documents ingested)
 - Fit scoring and Go/No-Go recommendation
+- Output format prompt (with LaTeX recommendation if PDF submission hinted)
 
 ## Implementation
 

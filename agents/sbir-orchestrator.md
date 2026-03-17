@@ -102,7 +102,7 @@ Gate: Human decision recorded. State updated.
 - `proposal review` -- Trigger human review checkpoint for current wave.
 
 ### Wave 0: Intelligence and Fit
-- `proposal new` -- Initialize state, dispatch corpus-librarian for solicitation ingestion, present Go/No-Go checkpoint.
+- `proposal new` -- Initialize state, dispatch corpus-librarian for solicitation ingestion, score fit, prompt for output format selection, present Go/No-Go checkpoint.
 - `proposal corpus add <path>` -- Dispatch sbir-corpus-librarian to ingest directory.
 - `proposal corpus list` -- Dispatch sbir-corpus-librarian to list contents.
 
@@ -136,13 +136,15 @@ User runs `/sbir:proposal new` with a solicitation file path.
 2. ROUTE: `proposal new` -> sbir-corpus-librarian for solicitation ingestion
 3. DISPATCH: Create `.sbir/` directory, initialize state with topic metadata
 4. DISPATCH: Invoke sbir-corpus-librarian to ingest solicitation
-5. CHECKPOINT: Present Go/No-Go with fit scoring results
+5. DISPATCH: Score fit across subject matter, past performance, certifications
+6. FORMAT SELECTION: Prompt for output format (LaTeX or DOCX, default DOCX). If solicitation hints at PDF submission, recommend LaTeX. Record `output_format` in state.
+7. CHECKPOINT: Present Go/No-Go with fit scoring results and chosen format
 
 ### Example 2: Session Resume After Days Away
 User runs `/sbir:proposal status` after 5 days.
 
 1. ORIENT: Read state -- Wave 1 active, TPOC status "questions_generated", deadline in 22 days
-2. Render dashboard showing wave progress, pending TPOC, deadline countdown
+2. Render dashboard showing wave progress, pending TPOC, deadline countdown, output format (e.g. "Format: docx")
 3. Suggest next action: "TPOC call still pending. You can proceed with `/sbir:proposal tpoc ingest` if the call happened, or continue to strategy brief without TPOC data."
 
 ### Example 3: Checkpoint Revision Loop
