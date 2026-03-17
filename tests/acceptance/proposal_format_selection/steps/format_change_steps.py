@@ -3,9 +3,6 @@
 Invokes through: FormatConfigService (driving port -- domain service).
 The service validates format values, determines rework risk by wave number,
 and updates state via the StateWriter port.
-
-NOTE: All scenarios except the first walking skeleton are marked with
-pytest.mark.skip. Enable one at a time during implementation.
 """
 
 from __future__ import annotations
@@ -15,10 +12,29 @@ from typing import Any
 import pytest
 from pytest_bdd import parsers, scenarios, then, when
 
+from pes.domain.format_config_service import FormatConfigService
 from tests.acceptance.proposal_format_selection.steps.format_common_steps import *  # noqa: F403
 
 # Link to feature file
 scenarios("../format_change.feature")
+
+
+# --- Helpers ---
+
+
+def _make_service(write_state) -> FormatConfigService:
+    """Build a FormatConfigService wired to the test's state writer."""
+
+    class _TestStateWriter:
+        """Adapter bridging FormatConfigService to conftest write_state fixture."""
+
+        def __init__(self, writer):
+            self._writer = writer
+
+        def save(self, state: dict[str, Any]) -> None:
+            self._writer(state)
+
+    return FormatConfigService(state_writer=_TestStateWriter(write_state))
 
 
 # --- When steps ---
@@ -33,64 +49,26 @@ def change_format(
     format_result: dict[str, Any],
     write_state,
 ) -> None:
-    """Change the output format via FormatConfigService.
-
-    Invokes the domain service to validate the format value,
-    check rework risk, and update state.
-    """
+    """Change the output format via FormatConfigService."""
     state = proposal_context["state"]
-    normalized = fmt.strip().lower()
-    valid_formats = ("latex", "docx")
-
-    if normalized not in valid_formats:
-        format_result["success"] = False
-        format_result["error"] = (
-            f"Invalid format '{fmt}'. Valid options: latex, docx"
-        )
-        format_result["rework_warning"] = False
-        return
-
-    current_wave = state.get("current_wave", 0)
-    current_format = state.get("output_format", "docx")
-
-    # Same format = no-op, no warning
-    if normalized == current_format:
-        format_result["success"] = True
-        format_result["rework_warning"] = False
-        state["output_format"] = normalized
-        write_state(state)
-        return
-
-    # Wave 3+ triggers rework warning
-    if current_wave >= 3:
-        format_result["success"] = True
-        format_result["rework_warning"] = True
-        format_result["warning_wave"] = current_wave
-        format_result["warning_message"] = (
-            f"Changing format at Wave {current_wave} may require rework. "
-            "Outline and draft work may need adjustment."
-        )
-        # Apply the change (assuming confirmation in real flow)
-        state["output_format"] = normalized
-        write_state(state)
-        return
-
-    # Pre-Wave 3: change without warning
-    state["output_format"] = normalized
-    format_result["success"] = True
-    format_result["rework_warning"] = False
+    # Persist initial state so read_state() works even for no-op changes
     write_state(state)
+    service = _make_service(write_state)
+    result = service.change_format(state, fmt)
+    format_result.update(result)
 
 
 @when("Phil Santos submits a blank format value")
 def submit_blank_format(
     proposal_context: dict[str, Any],
     format_result: dict[str, Any],
+    write_state,
 ) -> None:
     """Submit an empty/blank format value -- should be rejected."""
-    format_result["success"] = False
-    format_result["error"] = "Invalid format ''. Valid options: latex, docx"
-    format_result["rework_warning"] = False
+    state = proposal_context["state"]
+    service = _make_service(write_state)
+    result = service.change_format(state, "")
+    format_result.update(result)
 
 
 @when(
@@ -100,37 +78,13 @@ def request_format_change(
     fmt: str,
     proposal_context: dict[str, Any],
     format_result: dict[str, Any],
+    write_state,
 ) -> None:
-    """Request a format change -- does not persist, just evaluates risk.
-
-    Used for scenarios that focus on the rework warning without
-    asserting state persistence.
-    """
+    """Request a format change -- evaluates risk and persists if valid."""
     state = proposal_context["state"]
-    normalized = fmt.strip().lower()
-    valid_formats = ("latex", "docx")
-
-    if normalized not in valid_formats:
-        format_result["success"] = False
-        format_result["error"] = (
-            f"Invalid format '{fmt}'. Valid options: latex, docx"
-        )
-        format_result["rework_warning"] = False
-        return
-
-    current_wave = state.get("current_wave", 0)
-
-    if current_wave >= 3:
-        format_result["success"] = True
-        format_result["rework_warning"] = True
-        format_result["warning_wave"] = current_wave
-        format_result["warning_message"] = (
-            f"Changing format at Wave {current_wave} may require rework. "
-            "Outline and draft work may need adjustment."
-        )
-    else:
-        format_result["success"] = True
-        format_result["rework_warning"] = False
+    service = _make_service(write_state)
+    result = service.change_format(state, fmt)
+    format_result.update(result)
 
 
 # --- Then steps ---
