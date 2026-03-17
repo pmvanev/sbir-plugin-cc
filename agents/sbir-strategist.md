@@ -51,12 +51,16 @@ Load: `sbir-strategy-knowledge` -- read it NOW before proceeding.
 2. Read approach brief from `./artifacts/wave-0-intelligence/approach-brief.md` if available. The approach brief provides the selected technical approach, discrimination angles, Phase III quick assessment, and risks -- use these as strategic inputs rather than asking the user to re-explain.
 3. Read TPOC ingestion results from `.sbir/tpoc-answers.json` if available
 4. Read company profile from `~/.sbir/company-profile.json` if available
-5. Read solicitation text and evaluation criteria from corpus
-6. If compliance matrix is missing, return error: "Compliance matrix required before strategy brief generation. Run compliance extraction first."
+5. Read quality intelligence from `~/.sbir/winning-patterns.json` if available
+   - If file exists: load winning patterns, filter by current proposal's agency, note confidence level
+   - If file missing: note "Quality playbook: not available. Run /sbir:proposal quality discover for pattern-based strategy."
+   - Universal patterns (patterns with `universal: true`) apply regardless of agency
+6. Read solicitation text and evaluation criteria from corpus
+7. If compliance matrix is missing, return error: "Compliance matrix required before strategy brief generation. Run compliance extraction first."
 
 Note: If no approach brief exists, proceed without it (backward compatible). The user may not have run approach selection.
 
-Gate: Compliance matrix loaded. TPOC availability determined. Approach brief availability determined. Source materials cataloged.
+Gate: Compliance matrix loaded. TPOC availability determined. Approach brief availability determined. Quality intelligence availability determined. Source materials cataloged.
 
 ### Phase 2: SYNTHESIZE
 Load: `trl-assessor` and `budget-scaffolder` -- read them NOW before proceeding.
@@ -73,6 +77,8 @@ Generate strategy brief with all six required sections:
 For each section: cite source material | integrate TPOC insights where available | note TPOC absence where it would matter.
 
 Assess competitive positioning: identify discriminators across technical, team, organizational, and commercial dimensions.
+
+When winning patterns are available, cite agency-specific patterns in competitive positioning with source attribution and confidence level. Example: "Past Air Force wins (confidence: low, 3 wins) showed success with 'lead with quantitative results' -- apply this pattern."
 
 Gate: All six sections populated. Sources cited. TPOC status noted per section.
 
