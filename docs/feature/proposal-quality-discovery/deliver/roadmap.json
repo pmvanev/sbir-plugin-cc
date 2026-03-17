@@ -1,0 +1,225 @@
+{
+  "roadmap": {
+    "project_id": "proposal-quality-discovery",
+    "created_at": "2026-03-17T19:35:54Z",
+    "total_steps": 9,
+    "phases": 3
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Core Discovery Agent and Flow",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Quality discoverer agent with past proposal review",
+          "criteria": [
+            "Agent reads past_performance entries from company-profile.json",
+            "User rates each proposal as weak, adequate, or strong",
+            "User can skip proposals or finish early",
+            "Zero past proposals skips to next step",
+            "Quality ratings are additive -- company profile not modified"
+          ],
+          "stories": ["US-QD-001"],
+          "files": [
+            "agents/sbir-quality-discoverer.md",
+            "skills/quality-discoverer/quality-discovery-domain.md",
+            "commands/sbir-proposal-quality-discover.md"
+          ],
+          "constraints": [
+            "New agent at agents/sbir-quality-discoverer.md",
+            "New skill at skills/quality-discoverer/quality-discovery-domain.md",
+            "New command at commands/sbir-proposal-quality-discover.md"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Writing style preferences interview",
+          "criteria": [
+            "Interview captures tone, detail_level, evidence_style, organization, and practices arrays",
+            "Predefined options available with custom/freeform fallback",
+            "User can review and edit answers before saving",
+            "Completable in under 15 prompts"
+          ],
+          "stories": ["US-QD-002"],
+          "files": [
+            "agents/sbir-quality-discoverer.md"
+          ],
+          "constraints": [
+            "All logic within sbir-quality-discoverer agent Phase 2"
+          ]
+        },
+        {
+          "id": "01-03",
+          "name": "Evaluator feedback extraction with auto-categorization",
+          "criteria": [
+            "Auto-categorizes comments as meta-writing or content",
+            "User confirms or overrides each categorization",
+            "Meta-writing stored in writing-quality-profile.json",
+            "Content feedback noted for weakness profile (not duplicated)",
+            "Cross-proposal patterns detected for same agency"
+          ],
+          "stories": ["US-QD-003"],
+          "files": [
+            "agents/sbir-quality-discoverer.md",
+            "skills/quality-discoverer/quality-discovery-domain.md"
+          ],
+          "constraints": [
+            "Auto-categorization uses keyword matching from skill",
+            "All logic within sbir-quality-discoverer agent Phase 3"
+          ]
+        },
+        {
+          "id": "01-04",
+          "name": "Artifact assembly with atomic persistence",
+          "criteria": [
+            "Creates only artifacts for completed steps",
+            "Each artifact has schema_version and updated_at",
+            "Incremental updates merge without data loss",
+            "Atomic write prevents partial corruption",
+            "Summary shows confidence levels and consumer agents"
+          ],
+          "stories": ["US-QD-004"],
+          "files": [
+            "agents/sbir-quality-discoverer.md"
+          ],
+          "constraints": [
+            "Atomic write: .tmp, .bak, rename",
+            "Confidence: low (<10 wins), medium (10-19), high (>=20)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Downstream Agent Consumption",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Strategist loads winning patterns",
+          "criteria": [
+            "Strategist reads winning-patterns.json if it exists",
+            "Patterns filtered by current proposal agency",
+            "Patterns cited with source and confidence in strategy brief",
+            "Missing file produces informational note, not error"
+          ],
+          "stories": ["US-QD-005"],
+          "files": [
+            "agents/sbir-strategist.md"
+          ],
+          "constraints": [
+            "Additive change to sbir-strategist.md Phase 1 GATHER",
+            "No existing behavior removed or modified"
+          ]
+        },
+        {
+          "id": "02-02",
+          "name": "Writer applies quality intelligence",
+          "criteria": [
+            "Writer loads all three artifacts if they exist",
+            "Style preferences influence tone and organization",
+            "Quality alerts surface for matching agency/section",
+            "Missing artifacts degrade gracefully to defaults",
+            "Quality intelligence supplements elements-of-style"
+          ],
+          "stories": ["US-QD-006"],
+          "files": [
+            "agents/sbir-writer.md"
+          ],
+          "constraints": [
+            "Additive change to sbir-writer.md Phase 3 DRAFT skill table",
+            "Quality preferences loaded alongside writing_style skill"
+          ]
+        },
+        {
+          "id": "02-03",
+          "name": "Reviewer checks quality profile",
+          "criteria": [
+            "Reviewer loads both artifacts during Waves 4 and 7",
+            "Quality profile matches produce tagged findings with elevated severity",
+            "Practices-to-avoid violations produce style findings",
+            "Missing artifacts are non-fatal",
+            "Quality findings are additional, not replacing existing findings"
+          ],
+          "stories": ["US-QD-007"],
+          "files": [
+            "agents/sbir-reviewer.md"
+          ],
+          "constraints": [
+            "Additive change to sbir-reviewer.md Phases 1 and 2",
+            "Existing weakness profile check remains unchanged"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Incremental Learning and Integration",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Quality update command and incremental learning",
+          "criteria": [
+            "Reads debrief artifacts from ./artifacts/wave-9-debrief/",
+            "New feedback extracted and categorized",
+            "Existing artifacts updated additively",
+            "Patterns over 2 years old flagged as stale",
+            "Confidence recalculated from updated corpus size",
+            "Missing prior artifacts directs to full discovery"
+          ],
+          "stories": ["US-QD-008"],
+          "files": [
+            "commands/sbir-proposal-quality-update.md",
+            "agents/sbir-quality-discoverer.md",
+            "agents/sbir-debrief-analyst.md"
+          ],
+          "constraints": [
+            "New command at commands/sbir-proposal-quality-update.md",
+            "Reuses sbir-quality-discoverer agent in update mode",
+            "Additive note in sbir-debrief-analyst.md Phase 4"
+          ]
+        },
+        {
+          "id": "03-02",
+          "name": "Setup wizard integration and quality status command",
+          "criteria": [
+            "Setup wizard offers quality discovery after corpus setup",
+            "Quality status command displays artifact summary",
+            "Status shows which artifacts exist and their freshness",
+            "Skip option available at every point"
+          ],
+          "stories": ["US-QD-002", "US-QD-004"],
+          "files": [
+            "commands/sbir-proposal-quality-status.md",
+            "agents/sbir-setup-wizard.md"
+          ],
+          "constraints": [
+            "Additive change to sbir-setup-wizard.md after Phase 3",
+            "New command at commands/sbir-proposal-quality-status.md"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "agents/",
+      "commands/",
+      "skills/quality-discoverer/",
+      "templates/"
+    ],
+    "test_directories": [
+      "tests/acceptance/proposal_quality_discovery/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "solution-architect-reviewer",
+    "approved_at": "2026-03-17T19:50:00Z",
+    "override": "6 AC-coupling findings overridden — file names, field names, and thresholds are behavioral contracts in markdown-agent domain, not implementation coupling. Architecture and distill artifacts reference these specifics."
+  }
+}
