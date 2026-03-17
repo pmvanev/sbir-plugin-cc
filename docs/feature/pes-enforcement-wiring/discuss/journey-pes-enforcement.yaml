@@ -1,0 +1,133 @@
+journey:
+  name: "PES Enforcement Wiring"
+  goal: "Activate 4 dormant PES evaluators via config rules so they enforce proposal invariants through the hook pipeline"
+  persona: "Phil Santos -- small business engineer, 2-3 proposals/year, CLI-native"
+
+  emotional_arc:
+    start: "Unaware -- working as normal, PES invisible"
+    middle: "Surprised/Grateful -- PES catches a mistake"
+    end: "Confident -- the system enforces process integrity automatically"
+
+steps:
+  - id: 1
+    name: "PDC Gate Enforcement"
+    trigger: "PreToolUse targeting wave_5 tool"
+    evaluator: "pdc_gate.py"
+    rule_type: "pdc_gate"
+
+    state_fields_read:
+      - "pdc_status.{section_id}.tier_1"
+      - "pdc_status.{section_id}.tier_2"
+      - "pdc_status.{section_id}.red_items"
+
+    rule_condition:
+      target_wave: 5
+      requires_pdc_green: true
+
+    trigger_logic: |
+      1. Check condition has target_wave
+      2. Check tool_name contains "wave_{target_wave}"
+      3. Check condition has requires_pdc_green = true
+      4. Iterate pdc_status sections
+      5. If any section has tier_1 == "RED" or tier_2 == "RED" -> BLOCK
+
+    block_message_format: |
+      "{rule.message}. RED PDC items: Section {section_id}: {tiers} RED ({red_items})"
+
+    emotional_state:
+      entry: "Eager to start drafting"
+      exit: "Relieved that gap was caught before wasted effort"
+
+  - id: 2
+    name: "Deadline Blocking Enforcement"
+    trigger: "PreToolUse targeting non-essential wave tool within critical threshold"
+    evaluator: "deadline_blocking.py"
+    rule_type: "deadline_blocking"
+
+    state_fields_read:
+      - "current_wave"
+      - "topic.deadline"
+
+    rule_condition:
+      critical_days: 3
+      non_essential_waves: [2, 3]
+
+    trigger_logic: |
+      1. Check condition has critical_days
+      2. Check current_wave is in non_essential_waves list
+      3. Check tool_name contains "wave_{current_wave}"
+      4. Parse topic.deadline as ISO date
+      5. Calculate days_remaining = deadline - today
+      6. If days_remaining <= critical_days -> BLOCK
+
+    block_message_format: |
+      "{rule.message}. {days_remaining} days remaining until deadline. Consider: submit with available work or skip non-essential waves."
+
+    emotional_state:
+      entry: "Focused on current wave work"
+      exit: "Grateful for deadline awareness, redirected to essential work"
+
+  - id: 3
+    name: "Submission Immutability Enforcement"
+    trigger: "PreToolUse on any tool when proposal is submitted and immutable"
+    evaluator: "submission_immutability.py"
+    rule_type: "submission_immutability"
+
+    state_fields_read:
+      - "submission.status"
+      - "submission.immutable"
+      - "topic.id"
+
+    rule_condition:
+      requires_immutable: true
+
+    trigger_logic: |
+      1. Check condition has requires_immutable = true
+      2. Check state.submission is a dict
+      3. Check submission.status == "submitted" AND submission.immutable == true
+      4. If both true -> BLOCK (regardless of tool_name)
+
+    block_message_format: |
+      "Proposal {topic.id} is submitted. Artifacts are read-only."
+      Falls back to rule.message if topic.id is unavailable.
+
+    emotional_state:
+      entry: "Attempting to modify submitted work"
+      exit: "Protected from accidental corruption of submitted artifacts"
+
+  - id: 4
+    name: "Corpus Integrity Enforcement"
+    trigger: "PreToolUse on outcome/record_outcome tools when existing outcome tag would change"
+    evaluator: "corpus_integrity.py"
+    rule_type: "corpus_integrity"
+
+    state_fields_read:
+      - "learning.outcome"
+      - "requested_outcome_change"
+
+    rule_condition:
+      append_only_tags: true
+
+    trigger_logic: |
+      1. Check condition has append_only_tags = true
+      2. Check tool_name contains "outcome" or "record_outcome"
+      3. Check state.learning is a dict
+      4. Check learning.outcome is not None (existing outcome exists)
+      5. Check requested_outcome_change is not None and differs from existing
+      6. If all true -> BLOCK
+
+    block_message_format: |
+      Uses rule.message (no custom build_block_message on this evaluator).
+
+    emotional_state:
+      entry: "Attempting to change a historical record"
+      exit: "Understands why outcomes are immutable for corpus learning"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "pes-config.json rules array"
+      must_match_across: ["engine._rule_triggers dispatch", "evaluator.triggers() condition checks"]
+      failure_message: "Rule type in config must match engine dispatch and evaluator condition field names"
+    - artifact: "state field names"
+      must_match_across: ["evaluator code", "proposal-state.json schema"]
+      failure_message: "Evaluator reads fields that must exist in the state schema"
