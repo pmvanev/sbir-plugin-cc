@@ -97,6 +97,31 @@ Guide document ingestion:
 
 Gate: Corpus ingested or explicitly skipped. User informed of add-later option.
 
+### Phase 3b: QUALITY DISCOVERY (optional)
+
+After corpus setup completes, offer quality discovery:
+
+```
+--------------------------------------------
+QUALITY DISCOVERY (optional)
+--------------------------------------------
+
+Would you like to capture writing quality intelligence?
+This analyzes your past proposals and evaluator feedback
+to improve future writing.
+
+  (y) yes  -- start quality discovery now
+  (s) skip -- skip for now (run later with /sbir:proposal quality discover)
+  (q) quit
+--------------------------------------------
+```
+
+If user selects yes: inform them "Run `/sbir:proposal quality discover` to begin quality discovery."
+If user selects skip: proceed to the next setup step.
+If user selects quit: exit setup.
+
+Gate: Quality discovery offered. User chose to start, skip, or quit.
+
 ### Phase 4: API KEY
 
 Check Gemini configuration:
