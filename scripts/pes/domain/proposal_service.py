@@ -204,6 +204,7 @@ class ProposalCreationService:
             },
             "current_wave": 0,
             "go_no_go": "pending",
+            "output_format": "docx",
             "waves": {
                 "0": {"status": "active", "completed_at": None},
                 **{

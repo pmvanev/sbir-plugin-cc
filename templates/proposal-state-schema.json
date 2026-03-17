@@ -61,6 +61,11 @@
         "revision_count": { "type": "integer", "description": "Number of approach revisions" }
       }
     },
+    "output_format": {
+      "type": "string",
+      "enum": ["latex", "docx"],
+      "description": "Output format for the proposal. Default: docx. Set during proposal setup."
+    },
     "writing_style": {
       "type": ["string", "null"],
       "description": "Optional prose style for writer/reviewer. Maps to a skill file at skills/writer/{value}.md. Examples: 'elements' (Strunk & White), null (standard). Set before Wave 4 drafting."

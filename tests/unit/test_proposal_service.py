@@ -9,12 +9,19 @@ Domain objects (TopicInfo, SolicitationParseResult) used as real collaborators.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
+
+import jsonschema
+import pytest
 
 from pes.domain.proposal_service import ProposalCreationService
 from pes.domain.solicitation import SolicitationParseResult, TopicInfo
 from pes.ports.solicitation_port import SolicitationParser
 from pes.ports.state_port import StateWriter
+
+SCHEMA_PATH = Path(__file__).resolve().parents[2] / "templates" / "proposal-state-schema.json"
 
 # ---------------------------------------------------------------------------
 # Fake driven ports
@@ -268,7 +275,22 @@ class TestExpandedStateSchema:
 
 
 # ---------------------------------------------------------------------------
-# Behavior 8: Waves dict includes entries for Waves 0 through 9
+# Behavior 8: Initial state includes output_format defaulting to docx
+# ---------------------------------------------------------------------------
+
+
+class TestInitialStateOutputFormat:
+    def test_initial_state_includes_output_format_defaulting_to_docx(self):
+        service, writer = _make_service()
+
+        service.create_proposal("solicitation text")
+
+        state = writer.saved_states[0]
+        assert state["output_format"] == "docx"
+
+
+# ---------------------------------------------------------------------------
+# Behavior 9: Waves dict includes entries for Waves 0 through 9
 # ---------------------------------------------------------------------------
 
 
@@ -287,3 +309,50 @@ class TestExpandedWaves:
         for i in range(1, 10):
             assert waves[str(i)]["status"] == "not_started"
             assert waves[str(i)]["completed_at"] is None
+
+
+# ---------------------------------------------------------------------------
+# Behavior 10: Schema validates output_format enum
+# ---------------------------------------------------------------------------
+
+
+def _load_schema() -> dict[str, Any]:
+    """Load the proposal state JSON schema."""
+    return json.loads(SCHEMA_PATH.read_text())
+
+
+def _minimal_valid_state(**overrides: Any) -> dict[str, Any]:
+    """Build a minimal state that satisfies required fields."""
+    state: dict[str, Any] = {
+        "schema_version": "2.0.0",
+        "proposal_id": "test-uuid",
+        "topic": {"id": "AF243-001", "agency": "Air Force", "title": "Test Topic"},
+        "current_wave": 0,
+        "go_no_go": "pending",
+        "waves": {"0": {"status": "active", "completed_at": None}},
+        "created_at": "2026-03-01T10:00:00Z",
+        "updated_at": "2026-03-01T10:00:00Z",
+    }
+    state.update(overrides)
+    return state
+
+
+class TestSchemaOutputFormatValidation:
+    @pytest.mark.parametrize("fmt", ["latex", "docx"])
+    def test_schema_accepts_valid_output_format(self, fmt: str) -> None:
+        schema = _load_schema()
+        state = _minimal_valid_state(output_format=fmt)
+        jsonschema.validate(state, schema)  # Should not raise
+
+    def test_schema_rejects_invalid_output_format(self) -> None:
+        schema = _load_schema()
+        state = _minimal_valid_state(output_format="pdf")
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(state, schema)
+
+    def test_schema_accepts_state_without_output_format(self) -> None:
+        """Backward compatibility: existing proposals without output_format remain valid."""
+        schema = _load_schema()
+        state = _minimal_valid_state()
+        # No output_format key -- should still validate
+        jsonschema.validate(state, schema)  # Should not raise
