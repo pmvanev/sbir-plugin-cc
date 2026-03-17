@@ -45,6 +45,7 @@ You MUST load your skill files before beginning work. Skills encode SBIR proposa
 | 3 DRAFT | `skills/corpus-librarian/proposal-archive-reader.md` | Already loaded -- use Wave 4 retrieval strategy for section drafting |
 | 3 DRAFT | `skills/reviewer/reviewer-persona-simulator.md` | When available -- self-check drafts against evaluation criteria |
 | 3 DRAFT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `.sbir/proposal-state.json` -- load the named style skill (e.g., `elements-of-style.md` for Strunk & White). If not set, no style skill is loaded and standard prose conventions apply. |
+| 3 DRAFT | Quality artifacts from `~/.sbir/` | When available -- quality-preferences.json, winning-patterns.json, writing-quality-profile.json. Supplements elements-of-style with company-specific intelligence. Missing artifacts = proceed with defaults. |
 
 ## Workflow
 
@@ -99,13 +100,20 @@ For each section:
 - Write to `./artifacts/wave-4-drafting/sections/{section-name}.md`
 - Present checkpoint for human review
 
+Quality intelligence integration (if quality artifacts available):
+- Read `~/.sbir/quality-preferences.json`: apply tone (formal/direct/conversational), organization (paragraph length), evidence style (inline/narrative/table). These preferences supplement, not replace, the loaded writing_style skill.
+- Read `~/.sbir/winning-patterns.json`: for sections matching the current agency, apply winning practices as drafting guidance. Cite pattern source and confidence.
+- Read `~/.sbir/writing-quality-profile.json`: for the current agency and section, check for quality alerts. If past evaluator feedback matches (e.g., "organization_clarity" negative for Air Force on technical_approach), surface an alert:
+  "Warning -- Quality alert: Past Air Force evaluators noted 'Technical approach was difficult to follow' -- ensure clear subheading structure and short paragraphs for this section."
+- Missing artifacts: no error, no alert. Use standard prose conventions or loaded writing_style skill.
+
 After all sections drafted:
 - Verify compliance matrix -- all items addressed somewhere
 - Run jargon audit across full draft
 - Cross-reference check -- figures cited, page numbers, internal references
 - Present full draft checkpoint
 
-Gate: All sections drafted. Compliance matrix fully addressed. No undefined acronyms. Cross-references valid.
+Gate: All sections drafted. Compliance matrix fully addressed. No undefined acronyms. Cross-references valid. Quality intelligence applied where available.
 
 ## Critical Rules
 
