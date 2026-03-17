@@ -1,0 +1,61 @@
+{
+  "roadmap": {
+    "project_id": "pes-enforcement-wiring",
+    "created_at": "2026-03-17T18:10:44Z",
+    "total_steps": 2,
+    "phases": 1
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Configuration and Integration Verification",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Add 4 evaluator rules to pes-config.json",
+          "criteria": [
+            "pes-config.json contains 8 rules total (4 existing wave_ordering + 4 new)",
+            "PDC gate rule blocks Wave 5 entry when any Tier 1/2 PDC item is RED",
+            "Deadline blocking rule blocks non-essential waves within 3 critical days",
+            "Submission immutability rule blocks all writes after proposal submitted",
+            "Corpus integrity rule blocks outcome tag modification on learning entries"
+          ],
+          "stories": ["US-PEW-001", "US-PEW-002", "US-PEW-003", "US-PEW-004"],
+          "production_files": ["templates/pes-config.json"],
+          "estimate_days": 0.5
+        },
+        {
+          "id": "01-02",
+          "name": "Integration tests proving end-to-end wiring",
+          "criteria": [
+            "Tests load real pes-config.json through JsonRuleAdapter",
+            "Engine dispatches each new rule_type to the correct evaluator",
+            "PDC gate evaluator triggers BLOCK on RED Tier 1/2 and ALLOW otherwise",
+            "Deadline, submission, and corpus evaluators BLOCK on matching conditions",
+            "Each evaluator returns ALLOW when its conditions are not met"
+          ],
+          "stories": ["US-PEW-001", "US-PEW-002", "US-PEW-003", "US-PEW-004"],
+          "test_files": ["tests/integration/test_pes_config_wiring.py"],
+          "estimate_days": 1.0
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "templates/"
+    ],
+    "test_directories": [
+      "tests/integration/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "self",
+    "approved_at": "2026-03-17T18:15:00Z"
+  }
+}
