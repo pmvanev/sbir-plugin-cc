@@ -19,6 +19,16 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PYTHONPATH=${CLAUDE_PLUGIN_ROOT}/scripts python3 -m pes.adapters.hook_adapter post-tool-use"
+          }
+        ]
+      }
     ]
   }
 }

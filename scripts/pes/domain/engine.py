@@ -9,6 +9,7 @@ from typing import Any
 
 from pes.domain.corpus_integrity import CorpusIntegrityEvaluator
 from pes.domain.deadline_blocking import DeadlineBlockingEvaluator
+from pes.domain.post_action_validator import PostActionValidator
 from pes.domain.housekeeping import AuditLogRotator, CrashSignalCleaner
 from pes.domain.pdc_gate import PdcGateEvaluator
 from pes.domain.rules import Decision, EnforcementResult, EnforcementRule
@@ -35,6 +36,7 @@ class EnforcementEngine:
         self._session_checker = SessionChecker()
         self._crash_cleaner = CrashSignalCleaner()
         self._audit_rotator = AuditLogRotator()
+        self._post_action_validator = PostActionValidator()
 
     def check_session_start(
         self,
@@ -123,6 +125,36 @@ class EnforcementEngine:
             "tool_name": tool_name,
             "proposal_id": state.get("proposal_id", "unknown"),
             "messages": block_messages,
+        })
+
+        return result
+
+    def check_post_action(
+        self,
+        state: dict[str, Any],
+        tool_name: str,
+        artifact_info: dict[str, Any],
+    ) -> EnforcementResult:
+        """Validate post-action results after a tool completes.
+
+        Checks artifact placement and state file integrity for write operations.
+        Returns ALLOW with warning messages for issues found.
+        Post-action validation is advisory -- never blocks.
+        """
+        messages = self._post_action_validator.validate(
+            state, tool_name, artifact_info,
+        )
+
+        result = EnforcementResult(decision=Decision.ALLOW, messages=messages)
+
+        self._safe_audit_log({
+            "timestamp": datetime.now(UTC).isoformat(),
+            "event": "post_action",
+            "decision": "allow",
+            "tool_name": tool_name,
+            "proposal_id": state.get("proposal_id", "unknown"),
+            "messages": messages,
+            "file_path": artifact_info.get("file_path", ""),
         })
 
         return result

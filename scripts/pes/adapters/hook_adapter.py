@@ -46,6 +46,11 @@ def process_hook_event(
         tool_name = hook_input.get("tool", {}).get("name", "")
         return _handle_pre_tool_use(engine, state_dir, tool_name)
 
+    if event == "PostToolUse":
+        tool_info = hook_input.get("tool", {})
+        tool_name = tool_info.get("name", "")
+        return _handle_post_tool_use(engine, state_dir, tool_name, tool_info)
+
     return {"exit_code": 0}  # unknown event — allow
 
 
@@ -82,6 +87,31 @@ def _handle_pre_tool_use(
     return {"exit_code": 0}  # pre-tool-use allowed
 
 
+def _handle_post_tool_use(
+    engine: EnforcementEngine,
+    state_dir: str,
+    tool_name: str,
+    tool_info: dict[str, Any],
+) -> dict[str, Any]:
+    """Handle PostToolUse event -- post-action validation."""
+    state_reader = JsonStateAdapter(state_dir)
+    try:
+        state = state_reader.load()
+    except StateNotFoundError:
+        return {"exit_code": 0}
+
+    artifact_info = {
+        "tool_name": tool_name,
+        "file_path": tool_info.get("file_path", ""),
+    }
+    result = engine.check_post_action(state, tool_name, artifact_info)
+
+    response: dict[str, Any] = {"exit_code": 0}
+    if result.messages:
+        response["message"] = "; ".join(result.messages)
+    return response
+
+
 def main() -> None:
     """CLI entry point for Claude Code hooks.
 
@@ -93,13 +123,14 @@ def main() -> None:
     import sys
 
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "Usage: hook_adapter <session-start|pre-tool-use>"}))
+        print(json.dumps({"error": "Usage: hook_adapter <session-start|pre-tool-use|post-tool-use>"}))
         sys.exit(2)
 
     subcommand = sys.argv[1]
     event_map = {
         "session-start": "SessionStart",
         "pre-tool-use": "PreToolUse",
+        "post-tool-use": "PostToolUse",
     }
 
     event = event_map.get(subcommand)

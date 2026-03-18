@@ -27,11 +27,20 @@ scenarios("../post_action_validation.feature")
 def save_state_after_compliance(
     enforcement_engine,
     enforcement_context: dict[str, Any],
+    proposal_dir,
 ):
     """Invoke post-action check for state file write."""
+    import json as _json
+
     state = enforcement_context["state"]
-    enforcement_context["tool_name"] = "write_state"
-    result = enforcement_engine.evaluate(state, tool_name="write_state")
+    # Write a valid state file for verification
+    state_file = proposal_dir / ".sbir" / "proposal-state.json"
+    state_file.write_text(_json.dumps(state, indent=2))
+    artifact_info = {
+        "tool_name": "Write",
+        "file_path": str(state_file),
+    }
+    result = enforcement_engine.check_post_action(state, "Write", artifact_info)
     enforcement_context["result"] = result
     return enforcement_context
 
@@ -46,9 +55,11 @@ def artifact_in_wrong_directory(
 ):
     """Invoke post-action check where artifact is in wrong wave directory."""
     state = enforcement_context["state"]
-    enforcement_context["artifact_path"] = "artifacts/wave-3-outline/technical-approach.md"
-    enforcement_context["expected_path"] = "artifacts/wave-4-drafting/sections/"
-    result = enforcement_engine.evaluate(state, tool_name="write_section")
+    artifact_info = {
+        "tool_name": "Write",
+        "file_path": "artifacts/wave-3-outline/technical-approach.md",
+    }
+    result = enforcement_engine.check_post_action(state, "Write", artifact_info)
     enforcement_context["result"] = result
     return enforcement_context
 
@@ -60,10 +71,18 @@ def artifact_in_wrong_directory(
 def state_file_corrupted(
     enforcement_engine,
     enforcement_context: dict[str, Any],
+    proposal_dir,
 ):
     """Invoke post-action check where state file is corrupted."""
     state = enforcement_context["state"]
-    result = enforcement_engine.evaluate(state, tool_name="write_state")
+    # Write malformed content to state file
+    state_file = proposal_dir / ".sbir" / "proposal-state.json"
+    state_file.write_text("{invalid json content###")
+    artifact_info = {
+        "tool_name": "Write",
+        "file_path": str(state_file),
+    }
+    result = enforcement_engine.check_post_action(state, "Write", artifact_info)
     enforcement_context["result"] = result
     return enforcement_context
 
@@ -78,7 +97,11 @@ def artifact_missing(
 ):
     """Invoke post-action check where expected artifact is missing."""
     state = enforcement_context["state"]
-    result = enforcement_engine.evaluate(state, tool_name="write_section")
+    artifact_info = {
+        "tool_name": "Write",
+        "file_path": "artifacts/wave-4-drafting/sections/nonexistent-section.md",
+    }
+    result = enforcement_engine.check_post_action(state, "Write", artifact_info)
     enforcement_context["result"] = result
     return enforcement_context
 
@@ -93,7 +116,8 @@ def check_status(
 ):
     """Invoke engine with a read-only tool (no post-action needed)."""
     state = enforcement_context["state"]
-    result = enforcement_engine.evaluate(state, tool_name="check_status")
+    artifact_info = {"tool_name": "Read"}
+    result = enforcement_engine.check_post_action(state, "Read", artifact_info)
     enforcement_context["result"] = result
     return enforcement_context
 

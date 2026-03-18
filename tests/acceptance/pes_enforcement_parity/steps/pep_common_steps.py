@@ -362,19 +362,13 @@ def complete_writing_section(
     enforcement_engine,
     enforcement_context: dict[str, Any],
 ):
-    """Invoke post-action validation through the engine driving port.
-
-    This will call a new engine method (to be implemented) for post-tool
-    validation, checking that the artifact landed in the correct directory.
-    """
+    """Invoke post-action validation through the engine driving port."""
     state = enforcement_context["state"]
-    # Post-action validation: verify artifact placement after write
-    # The engine will need a check_post_action() method -- this is the
-    # acceptance test that drives its creation.
-    enforcement_context["tool_name"] = "write_section"
-    enforcement_context["artifact_path"] = "artifacts/wave-4-drafting/sections/technical-approach.md"
-    # For now, invoke evaluate() -- post-action method will be added during implementation
-    result = enforcement_engine.evaluate(state, tool_name="write_section")
+    artifact_info = {
+        "tool_name": "Write",
+        "file_path": "artifacts/wave-4-drafting/sections/technical-approach.md",
+    }
+    result = enforcement_engine.check_post_action(state, "Write", artifact_info)
     enforcement_context["result"] = result
     return enforcement_context
 

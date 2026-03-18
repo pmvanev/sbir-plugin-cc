@@ -9,14 +9,12 @@ Feature: Post-Action Validation
 
   # --- Happy Path Scenarios ---
 
-  @skip
   Scenario: Artifact written to correct wave directory is confirmed
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When Phil completes writing the technical approach section
     Then the system confirms the artifact is in the correct location
     And the verification result is recorded in the audit trail
 
-  @skip
   Scenario: State file is verified as valid after a write operation
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When Phil saves the proposal state after updating the compliance matrix
@@ -25,7 +23,6 @@ Feature: Post-Action Validation
 
   # --- Error Path Scenarios ---
 
-  @skip
   Scenario: Artifact written to wrong wave directory is flagged
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When Phil completes writing and the artifact lands in the Wave 3 directory
