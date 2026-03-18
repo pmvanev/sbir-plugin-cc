@@ -50,7 +50,6 @@ Feature: Active Audit Logging
     Then the action is blocked
     And the audit entry includes all block reasons
 
-  @skip
   Scenario: Audit log handles concurrent session starts without data loss
     Given Phil has two proposals "AF243-001" and "AF243-002" with separate audit directories
     When both proposals start sessions simultaneously
@@ -59,7 +58,6 @@ Feature: Active Audit Logging
 
   # --- Boundary / Property Scenarios ---
 
-  @skip
   @property
   Scenario: Every enforcement decision produces exactly one audit entry
     Given any valid proposal state and any tool action
@@ -67,7 +65,6 @@ Feature: Active Audit Logging
     Then exactly one audit entry is produced
     And the entry contains a timestamp, decision, and proposal identifier
 
-  @skip
   @property
   Scenario: Audit entries are never retroactively modified
     Given any sequence of enforcement decisions

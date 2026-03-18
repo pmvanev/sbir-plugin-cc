@@ -62,15 +62,33 @@ def proposal_submitted_near_deadline(
 def two_proposals(
     base_proposal_state: dict[str, Any],
     enforcement_context: dict[str, Any],
+    pes_config_path,
     tmp_path,
     id1: str,
     id2: str,
 ):
-    """Set up two separate proposals for concurrent testing."""
-    enforcement_context["proposals"] = {
-        id1: {**base_proposal_state, "topic": {**base_proposal_state["topic"], "id": id1}},
-        id2: {**base_proposal_state, "topic": {**base_proposal_state["topic"], "id": id2}},
-    }
+    """Set up two separate proposals with isolated audit directories and engines."""
+    from pes.adapters.file_audit_adapter import FileAuditAdapter
+    from pes.adapters.json_rule_adapter import JsonRuleAdapter
+    from pes.domain.engine import EnforcementEngine
+
+    proposals = {}
+    engines = {}
+    audit_dirs = {}
+    for pid in (id1, id2):
+        state = {**base_proposal_state, "topic": {**base_proposal_state["topic"], "id": pid}}
+        audit_dir = tmp_path / pid / ".sbir" / "audit"
+        audit_dir.mkdir(parents=True)
+        adapter = FileAuditAdapter(str(audit_dir))
+        rule_loader = JsonRuleAdapter(str(pes_config_path))
+        engine = EnforcementEngine(rule_loader, adapter)
+        proposals[pid] = state
+        engines[pid] = engine
+        audit_dirs[pid] = audit_dir
+
+    enforcement_context["proposals"] = proposals
+    enforcement_context["engines"] = engines
+    enforcement_context["audit_dirs"] = audit_dirs
 
 
 @given(
@@ -87,9 +105,22 @@ def any_valid_state(
 
 
 @given("any sequence of enforcement decisions")
-def any_sequence(enforcement_context: dict[str, Any]):
-    """Property: any sequence of decisions should preserve prior entries."""
-    enforcement_context["prior_count"] = 0
+def any_sequence(
+    enforcement_engine,
+    base_proposal_state: dict[str, Any],
+    enforcement_context: dict[str, Any],
+    proposal_dir,
+):
+    """Property: record initial decisions and snapshot them for later comparison."""
+    import copy
+
+    state = base_proposal_state.copy()
+    enforcement_context["state"] = state
+    enforcement_context["proposal_dir"] = str(proposal_dir)
+    # Record initial decisions
+    enforcement_engine.evaluate(state, tool_name="tool_a")
+    enforcement_engine.evaluate(state, tool_name="tool_b")
+    enforcement_context["prior_count"] = 2
 
 
 @when(
@@ -112,22 +143,34 @@ def process_any_action(
     target_fixture="enforcement_context",
 )
 def concurrent_sessions(
-    enforcement_engine,
     enforcement_context: dict[str, Any],
 ):
-    """Start sessions for both proposals."""
-    proposals = enforcement_context.get("proposals", {})
+    """Start sessions for both proposals using their isolated engines."""
+    proposals = enforcement_context["proposals"]
+    engines = enforcement_context["engines"]
     results = {}
     for pid, state in proposals.items():
-        results[pid] = enforcement_engine.check_session_start(state)
+        results[pid] = engines[pid].check_session_start(state)
     enforcement_context["multi_results"] = results
     return enforcement_context
 
 
 @when("new decisions are recorded")
-def new_decisions_recorded(enforcement_context: dict[str, Any]):
-    """Record additional decisions (property test stub)."""
-    pass
+def new_decisions_recorded(
+    enforcement_engine,
+    in_memory_audit_log,
+    enforcement_context: dict[str, Any],
+):
+    """Record additional decisions and snapshot prior entries for comparison."""
+    import copy
+
+    # Snapshot the entries written so far (before new decisions)
+    enforcement_context["snapshot"] = copy.deepcopy(in_memory_audit_log.entries)
+
+    # Record new decisions
+    state = enforcement_context["state"]
+    enforcement_engine.evaluate(state, tool_name="tool_c")
+    enforcement_engine.evaluate(state, tool_name="tool_d")
 
 
 @then("an audit file exists in the proposal audit directory")
@@ -181,17 +224,42 @@ def audit_has_all_reasons(in_memory_audit_log):
 
 
 @then("each proposal has its own audit entry")
-def separate_audit_entries(in_memory_audit_log):
-    """Verify each proposal has its own audit entry."""
-    entries = in_memory_audit_log.entries
-    assert len(entries) >= 2
+def separate_audit_entries(enforcement_context: dict[str, Any]):
+    """Verify each proposal has its own audit file with its own entry."""
+    import json
+
+    audit_dirs = enforcement_context["audit_dirs"]
+    for pid, audit_dir in audit_dirs.items():
+        log_files = list(audit_dir.glob("*.log"))
+        assert len(log_files) >= 1, (
+            f"Expected audit log file for proposal {pid} in {audit_dir}"
+        )
+        content = log_files[0].read_text().strip()
+        assert content, f"Audit file for {pid} is empty"
+        entry = json.loads(content.split("\n")[0])
+        assert entry.get("proposal_id") is not None, (
+            f"Audit entry for {pid} missing proposal_id"
+        )
 
 
 @then("no entries are lost or mixed between proposals")
-def no_mixed_entries(in_memory_audit_log):
-    """Verify no audit entries were lost or mixed."""
-    entries = in_memory_audit_log.entries
-    assert len(entries) >= 2
+def no_mixed_entries(enforcement_context: dict[str, Any]):
+    """Verify no audit entries were lost or mixed between proposal files."""
+    import json
+
+    audit_dirs = enforcement_context["audit_dirs"]
+    proposals = enforcement_context["proposals"]
+    for pid, audit_dir in audit_dirs.items():
+        log_file = list(audit_dir.glob("*.log"))[0]
+        lines = log_file.read_text().strip().split("\n")
+        for line in lines:
+            entry = json.loads(line)
+            # Entry proposal_id should match state's proposal_id for this proposal
+            expected_pid = proposals[pid].get("proposal_id")
+            assert entry["proposal_id"] == expected_pid, (
+                f"Cross-contamination: entry in {pid}'s audit has "
+                f"proposal_id={entry['proposal_id']}, expected {expected_pid}"
+            )
 
 
 @then("exactly one audit entry is produced")
@@ -213,7 +281,23 @@ def entry_has_required_fields(in_memory_audit_log):
 
 
 @then("previously written audit entries remain unchanged")
-def prior_entries_unchanged(in_memory_audit_log):
-    """Property: prior audit entries are never modified."""
-    # Implementation: compare entry snapshots before and after
-    pass
+def prior_entries_unchanged(
+    in_memory_audit_log,
+    enforcement_context: dict[str, Any],
+):
+    """Property: prior audit entries are never modified after new writes."""
+    snapshot = enforcement_context["snapshot"]
+    current = in_memory_audit_log.entries
+
+    # There should be more entries now than in the snapshot
+    assert len(current) > len(snapshot), (
+        f"Expected new entries after snapshot. Snapshot: {len(snapshot)}, "
+        f"Current: {len(current)}"
+    )
+
+    # Every entry from the snapshot must be identical in the current list
+    for i, prior_entry in enumerate(snapshot):
+        assert current[i] == prior_entry, (
+            f"Entry at index {i} was modified. "
+            f"Before: {prior_entry}, After: {current[i]}"
+        )

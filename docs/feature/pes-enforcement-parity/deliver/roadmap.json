@@ -1,0 +1,190 @@
+{
+  "roadmap": {
+    "project_id": "pes-enforcement-parity",
+    "created_at": "2026-03-18T22:34:57Z",
+    "total_steps": 9,
+    "phases": 4
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Active Audit Logging",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Wire FileAuditAdapter into hook adapter",
+          "description": "Replace _NullAuditLogger with FileAuditAdapter in hook_adapter so all enforcement decisions persist to disk. Audit directory under .sbir/audit/.",
+          "criteria": [
+            "Allowed action produces audit entry with decision, timestamp, proposal ID",
+            "Blocked action produces audit entry with decision and block reason",
+            "Session start check produces audit entry for session_start event",
+            "Audit file exists in proposal audit directory after any enforcement decision"
+          ],
+          "time_estimate": "1h",
+          "dependencies": [],
+          "scenarios": ["active_audit_logging:28-31"]
+        },
+        {
+          "id": "01-02",
+          "name": "Non-blocking audit failures and multi-reason capture",
+          "description": "Audit write failures must not block enforcement decisions. Blocked actions with multiple rule violations capture all reasons in a single entry.",
+          "criteria": [
+            "Enforcement decision returns correct result even when audit directory is unwritable",
+            "Warning logged when audit write fails",
+            "Audit entry for multi-rule block includes all block reasons"
+          ],
+          "time_estimate": "1h",
+          "dependencies": ["01-01"],
+          "scenarios": ["active_audit_logging:32-33"]
+        },
+        {
+          "id": "01-03",
+          "name": "Audit isolation and append-only properties",
+          "description": "Separate proposals use separate audit files. Each decision produces exactly one entry. Entries are never modified after writing.",
+          "criteria": [
+            "Concurrent proposals write to isolated audit files with no cross-contamination",
+            "Every enforcement decision produces exactly one audit entry",
+            "Previously written audit entries remain unchanged after new decisions"
+          ],
+          "time_estimate": "1h",
+          "dependencies": ["01-01"],
+          "scenarios": ["active_audit_logging:34-36"]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Session Start Housekeeping",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Crash signal cleanup on session start",
+          "description": "Extend session start to detect and remove stale crash signal files. Handle multiple signals, locked files (warn but continue), and clean workspaces gracefully.",
+          "criteria": [
+            "Stale crash signal removed on session start and cleanup recorded in audit",
+            "Multiple crash signals all removed with each cleanup audited",
+            "Locked crash signal produces warning without blocking session",
+            "Clean workspace (no crash signals) starts normally with session audited"
+          ],
+          "time_estimate": "1.5h",
+          "dependencies": ["01-01"],
+          "scenarios": ["walking-skeleton:WS1", "session_housekeeping:1-2,4-6"]
+        },
+        {
+          "id": "02-02",
+          "name": "Audit log retention and file size rotation",
+          "description": "Rotate audit entries exceeding 365-day retention window. Rotate oversized log files with timestamped archive. Preserve entries at exact boundary.",
+          "criteria": [
+            "Entries older than 365 days archived; current entries preserved",
+            "Oversized log file archived with timestamp and fresh file started",
+            "Entries exactly 365 days old are preserved (not archived)",
+            "Entries 366+ days old are archived"
+          ],
+          "time_estimate": "1.5h",
+          "dependencies": ["02-01"],
+          "scenarios": ["session_housekeeping:3,7-8"]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Post-Action Validation",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "PostToolUse hook binding and artifact verification",
+          "description": "Add PostToolUse event to hooks.json with command hook to hook_adapter post-tool-use. Add _handle_post_tool_use() to hook_adapter.py. Add check_post_action(state, tool_name, artifact_info) to EnforcementEngine. Verify artifacts landed in the correct wave directory and state files are well-formed after write operations.",
+          "criteria": [
+            "PostToolUse hook bound in hooks.json and dispatched by hook_adapter",
+            "Artifact in correct wave directory confirmed and result audited",
+            "State file verified as well-formed after write and result audited"
+          ],
+          "time_estimate": "2h",
+          "dependencies": ["01-01"],
+          "scenarios": ["walking-skeleton:WS2", "post_action_validation:10-12"]
+        },
+        {
+          "id": "03-02",
+          "name": "Post-action error handling and boundary cases",
+          "description": "Warn on misplaced artifacts, corrupted state, missing artifacts. Hook adapter ensures audit directory exists before calling engine (infrastructure concern stays in adapter, not domain). Skip validation for read-only tools.",
+          "criteria": [
+            "Misplaced artifact warns with expected vs actual directory",
+            "Corrupted state file and missing artifact each produce warning and audit entry",
+            "Hook adapter auto-creates missing audit directory before post-action validation",
+            "Read-only tool use skips post-action validation entirely"
+          ],
+          "time_estimate": "1.5h",
+          "dependencies": ["03-01"],
+          "scenarios": ["post_action_validation:13-17"]
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Agent Lifecycle Tracking",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "SubagentStart hook with agent-wave authorization",
+          "description": "Add SubagentStart event to hooks.json with command hook to hook_adapter subagent-start. Add _handle_subagent_start() to hook_adapter.py. Add check_agent_dispatch(state, agent_name) to EnforcementEngine using agent-wave mapping config. Validate dispatched agent is authorized for the current wave. Block unauthorized or unknown agents.",
+          "criteria": [
+            "SubagentStart hook bound in hooks.json and dispatched by hook_adapter",
+            "Authorized agent allowed and activation audited",
+            "Unauthorized agent blocked with reason naming agent and wave",
+            "Unknown agent blocked with reason identifying it as unrecognized",
+            "Agent dispatch blocked when no active proposal exists"
+          ],
+          "time_estimate": "2h",
+          "dependencies": ["01-01"],
+          "scenarios": ["walking-skeleton:WS3", "agent_lifecycle:18-20,22-27"]
+        },
+        {
+          "id": "04-02",
+          "name": "SubagentStop hook for agent deactivation tracking",
+          "description": "Add SubagentStop event to hooks.json with command hook to hook_adapter subagent-stop. Add _handle_subagent_stop() to hook_adapter.py. Record agent deactivation in audit trail with agent name and wave number.",
+          "criteria": [
+            "SubagentStop hook bound in hooks.json and dispatched by hook_adapter",
+            "Agent deactivation recorded in audit with agent name and wave number"
+          ],
+          "time_estimate": "0.5h",
+          "dependencies": ["04-01"],
+          "scenarios": ["agent_lifecycle:21"]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/adapters/",
+      "scripts/pes/domain/",
+      "scripts/pes/ports/",
+      "hooks/"
+    ],
+    "test_directories": [
+      "tests/unit/",
+      "tests/acceptance/pes_enforcement_parity/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ],
+    "files_to_modify": [
+      "hooks/hooks.json — add PostToolUse, SubagentStart, SubagentStop event bindings",
+      "scripts/pes/adapters/hook_adapter.py — add _handle_post_tool_use(), _handle_subagent_start(), _handle_subagent_stop(); replace _NullAuditLogger with FileAuditAdapter",
+      "scripts/pes/domain/engine.py — add check_post_action(state, tool_name, artifact_info) and check_agent_dispatch(state, agent_name) methods; extend check_session_start() with crash signal cleanup and log rotation",
+      "scripts/pes/domain/session_checker.py — extend with crash signal detection/removal and audit log rotation logic",
+      "scripts/pes/ports/audit_port.py — no change (abstract port already exists)"
+    ],
+    "files_to_create": [
+      "scripts/pes/adapters/file_audit_adapter.py — FileAuditAdapter implementing AuditLogger port with append-only JSON lines, per-proposal isolation",
+      "scripts/pes/domain/agent_wave_mapping.py — agent-to-wave authorization rules (which agents are valid for which waves)",
+      "scripts/pes/domain/post_action_validator.py — artifact placement and state verification logic",
+      "scripts/pes/domain/housekeeping.py — crash signal cleanup, audit log retention rotation, file size rotation"
+    ]
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "software-crafter-reviewer",
+    "approved_at": "2026-03-18T23:00:00Z"
+  }
+}

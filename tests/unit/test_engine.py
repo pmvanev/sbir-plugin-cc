@@ -215,6 +215,57 @@ class TestEnforcementEngineNonBlockingAudit:
         assert result.messages == []
 
 
+class TestEnforcementEngineAuditIsolation:
+    """Separate proposals with separate audit loggers produce isolated audit trails."""
+
+    def test_concurrent_proposals_write_to_isolated_audit_loggers(
+        self, clean_state: dict[str, Any]
+    ) -> None:
+        """Two engines with separate audit loggers produce independent entries."""
+        logger_a = FakeAuditLogger()
+        logger_b = FakeAuditLogger()
+        state_a = {**clean_state, "proposal_id": "proposal-A"}
+        state_b = {**clean_state, "proposal_id": "proposal-B"}
+
+        engine_a = EnforcementEngine(FakeRuleLoader(), logger_a)
+        engine_b = EnforcementEngine(FakeRuleLoader(), logger_b)
+
+        engine_a.check_session_start(state_a)
+        engine_b.check_session_start(state_b)
+
+        # Each logger has exactly one entry
+        assert len(logger_a.entries) == 1
+        assert len(logger_b.entries) == 1
+        # No cross-contamination
+        assert logger_a.entries[0]["proposal_id"] == "proposal-A"
+        assert logger_b.entries[0]["proposal_id"] == "proposal-B"
+
+
+class TestEnforcementEngineAppendOnly:
+    """Audit entries are append-only -- prior entries never change."""
+
+    def test_prior_entries_unchanged_after_new_decisions(
+        self, audit_logger: FakeAuditLogger, clean_state: dict[str, Any]
+    ) -> None:
+        """Recording new decisions does not modify previously written entries."""
+        import copy
+
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+
+        # Record first decision
+        engine.evaluate(clean_state, tool_name="tool_a")
+        snapshot = copy.deepcopy(audit_logger.entries)
+
+        # Record second decision
+        engine.evaluate(clean_state, tool_name="tool_b")
+
+        # Prior entry unchanged
+        assert len(audit_logger.entries) == 2
+        assert audit_logger.entries[0] == snapshot[0]
+        # New entry appended, not inserted
+        assert audit_logger.entries[1]["tool_name"] == "tool_b"
+
+
 class TestEnforcementEngineMultiReasonBlock:
     """Audit entry for multi-rule blocks includes all block reasons."""
 
