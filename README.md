@@ -4,11 +4,18 @@ A multi-agent Claude Code plugin that guides you through the full SBIR/STTR prop
 
 All interaction happens in the Claude Code CLI. State persists as local JSON files. No web UI, no server, no database.
 
+Built with [nWave](https://github.com/nwave-ai/nwave-marketplace) — agents and skills created via `nw:forge`, development driven by nWave's wave-based methodology (`nw:discuss` → `nw:design` → `nw:distill` → `nw:deliver`). The Proposal Enforcement System (PES) is inspired by nWave's Design Enforcement System (DES).
+
 ## Prerequisites
 
+**Required:**
 - [Claude Code](https://claude.ai/claude-code) installed and authenticated
 - Python 3.12+
 - Git
+
+**Optional:**
+- LaTeX distribution (e.g., TeX Live, MiKTeX) — only if you choose LaTeX output format instead of DOCX
+- Gemini API key — only for AI-generated concept figures in Wave 5 (see [Image Generation Setup](#image-generation-setup-optional))
 
 ## Install
 
@@ -16,19 +23,36 @@ All interaction happens in the Claude Code CLI. State persists as local JSON fil
 /plugin install sbir@pmvanev-plugins
 ```
 
-## Getting Started
+## Quick Start
+
+Never used the plugin before? Here's the complete path from install to your first proposal:
 
 ```bash
-cd my-proposal-project
+# 1. Create a project directory and open Claude Code in it
+mkdir my-first-proposal && cd my-first-proposal
+claude
+
+# 2. Run setup — the wizard walks you through everything
 /sbir:setup
+
+# 3. Find solicitations that match your company
+/sbir:solicitation find
+
+# 4. Start a proposal from a topic you like
+/sbir:proposal new AF263-042
+
+# 5. Coming back later? Pick up where you left off
+/sbir:continue
 ```
+
+That's it. The plugin guides you through each step interactively. You don't need to memorize commands — `/sbir:continue` always tells you what to do next.
+
+### What setup covers
 
 The setup wizard detects your environment and adapts. First-time users build everything from scratch; returning users can keep their existing profile and corpus or update them.
 
-The wizard walks you through:
-
 1. **Prerequisites check** — verifies Python 3.12+, Git, and Claude Code
-2. **Company profile** — creates a new profile (via document extraction, guided interview, or both) or offers to keep/update an existing one
+2. **Company profile** — searches the web for your company (SAM.gov, SBIR award history, capabilities), then lets you verify and fill gaps via document extraction, guided interview, or both
 3. **Corpus ingestion** — locates past proposals, debriefs, and capability documents
 4. **API key setup** (optional) — configures Gemini for concept figure generation in Wave 5
 5. **Validation** — re-checks everything and displays a unified status summary
@@ -61,9 +85,79 @@ When setup completes, you'll see:
 
 Your company profile at `~/.sbir/company-profile.json` carries over across projects. Each completed proposal enriches the corpus — fit scoring improves with more past performance data, the writer pulls better exemplars, and the reviewer cross-references debrief patterns.
 
+## Decision Tree
+
+```
+                        /sbir:setup
+                            |
+                    Prerequisites pass?
+                   /                  \
+                 NO                   YES
+            Fix & rerun          Build profile
+                                      |
+                              /sbir:solicitation find
+                                      |
+                              Pick a topic
+                                      |
+                         /sbir:proposal new <topic>
+                                      |
+                               Go / No-Go?
+                              /       |       \
+                           NO-GO   DEFER     GO
+                          archive   pause      |
+                                     |    /sbir:proposal shape (optional)
+                                     |         |
+                                     |    /sbir:proposal check
+                                     |    /sbir:proposal tpoc questions
+                                     |         |
+                                     |    [TPOC call happens]
+                                     |         |
+                                     |    /sbir:proposal tpoc ingest
+                                     |         |
+                                     |    /sbir:proposal wave strategy
+                                     |         |
+                                     |    Approve strategy? -----> Revise
+                                     |         |
+                                     |    [Wave 2: Research runs]
+                                     |         |
+                                     |    [Wave 3: Outline + discrimination table]
+                                     |         |
+                                     |    Approve outline? ------> Revise
+                                     |         |
+                                     |    /sbir:proposal draft <section>
+                                     |    /sbir:proposal iterate <section>
+                                     |         |  (max 2 revision cycles)
+                                     |         |
+                                     |    /sbir:proposal wave visuals
+                                     |         |
+                                     |    /sbir:proposal format
+                                     |         |
+                                     |    /sbir:proposal wave final-review
+                                     |         |
+                                     |    Sign off? ----------------> Revise
+                                     |         |
+                                     |    /sbir:proposal submit prep
+                                     |         |
+                                     |    [You upload to portal]
+                                     |         |
+                                     |    /sbir:proposal submit confirm
+                                     |         |
+                                     |    [Archive locked — read-only]
+                                     |         |
+                                     |    /sbir:proposal debrief outcome
+                                     |    /sbir:proposal debrief lessons
+                                     |         |
+                                     |    [Lessons feed back into corpus]
+                                     |         |
+          /sbir:continue  <-----------+---------+
+          (resume from any point)
+```
+
+At every gate (strategy approval, outline approval, final sign-off), you choose: **approve** to proceed, **revise** to iterate, **skip** to defer, or **quit** to save state and exit. `/sbir:continue` picks up from wherever you stopped.
+
 ## The 10-Wave Lifecycle
 
-Each wave produces specific artifacts and ends with a human checkpoint (approve / revise / skip). PES enforces wave ordering — you cannot skip ahead without completing prerequisites.
+Each wave produces specific artifacts and ends with a human checkpoint. PES enforces wave ordering — you cannot skip ahead without completing prerequisites.
 
 ### Wave 0: Setup, Intelligence & Fit
 
@@ -74,6 +168,7 @@ Set up your environment (profile, corpus), then score topics against your compan
 /sbir:solicitation find                    # Search and rank open topics
 /sbir:proposal new <topic-or-file>         # Start proposal, Go/No-Go checkpoint
 /sbir:proposal shape                       # Generate 3-5 candidate approaches (optional)
+/sbir:continue                             # Pick up where you left off (works in any wave)
 ```
 
 **Artifacts:** `artifacts/wave-0-intelligence/` — topic digest, go-no-go brief, approach brief
@@ -182,6 +277,63 @@ Record outcomes, request debriefs, extract lessons learned.
 
 Lessons and debrief data feed back into the corpus for future proposals.
 
+## Proposal Enforcement System (PES)
+
+The PES is a Python-based guardrail system that validates every action against proposal lifecycle rules. It runs automatically via Claude Code hooks — you never invoke it directly, but it prevents mistakes like skipping waves, drafting before strategy approval, or modifying a submitted proposal.
+
+Inspired by nWave's [Design Enforcement System (DES)](https://github.com/nwave-ai/nwave-marketplace), which enforces wave ordering in software development workflows. PES adapts the same concept for the SBIR proposal domain.
+
+### How it works
+
+PES hooks into two Claude Code events:
+
+- **SessionStart** — validates state file integrity when you open a project. If `.sbir/proposal-state.json` is corrupted, PES attempts recovery from the `.bak` backup.
+- **PreToolUse** — evaluates every tool call against active enforcement rules before it executes. If a rule is violated, PES blocks the action with an explanation of what's wrong and what to do instead.
+
+### What PES enforces
+
+| Rule | Example |
+|------|---------|
+| **Wave ordering** | Can't start Wave 4 drafting until Wave 3 outline is approved |
+| **Gate compliance** | Can't proceed past strategy brief until it's explicitly approved |
+| **Deadline awareness** | Warnings at 7 days, blocks at critical thresholds |
+| **Submission immutability** | Can't modify proposal content after submission is confirmed |
+| **Quality gates** | Validates quality profile consistency when quality discovery is active |
+
+### Architecture
+
+PES uses ports-and-adapters architecture to keep domain rules pure and testable:
+
+- **Domain** (`scripts/pes/domain/`) — pure Python business rules with no infrastructure imports
+- **Ports** (`scripts/pes/ports/`) — abstract interfaces (StateReader, StateWriter, RulePort)
+- **Adapters** (`scripts/pes/adapters/`) — JSON file persistence, Claude Code hook protocol translation
+
+Hook protocol: JSON on stdin/stdout, exit codes 0 (allow), 1 (block with explanation).
+
+## Agents
+
+17 specialized agents collaborate across the lifecycle. Each agent owns a specific domain and is dispatched by the orchestrator based on proposal state.
+
+| Agent | Waves | What it does |
+|-------|-------|-------------|
+| **setup-wizard** | Pre | Orchestrates first-time setup: prerequisites, profile, corpus, API key, validation. Detects existing config and adapts for returning users. |
+| **profile-builder** | Pre | Builds company profile via web research (SAM.gov, sbir.gov, company site), document extraction, and guided interview. Explains how each field affects fit scoring. |
+| **quality-discoverer** | Pre | Extracts writing quality intelligence from past proposals and evaluator feedback. Builds preferences, winning patterns, and quality profile artifacts that downstream agents consume. |
+| **corpus-librarian** | 0,1,3,4,9 | Indexes past proposals, debriefs, and capability documents. Provides wave-aware retrieval: fit exemplars in Wave 0, section structures in Wave 3, tone references in Wave 4. Manages corpus image reuse with adapted captions. |
+| **topic-scout** | 0 | Scores open solicitations against company profile using five-dimension fit scoring (subject matter 0.35, past performance 0.25, certifications 0.15, phase eligibility 0.15, STTR 0.10). Detects disqualifiers: clearance gaps, missing STTR partner, expired deadlines. |
+| **solution-shaper** | 0 | Generates 3-5 candidate technical approaches post-Go decision. Scores each against personnel alignment, past performance, technical readiness, solicitation fit, and commercialization potential with traceability to specific people and contracts. |
+| **compliance-sheriff** | 1,6,7 | Extracts every SHALL, FORMAT, and implicit requirement from the solicitation into a living compliance matrix. Preserves original contractual wording. Flags ambiguities as TPOC question opportunities. Runs final compliance audit in Wave 7. |
+| **tpoc-analyst** | 1 | Generates 7-15 strategically sequenced TPOC questions (opener → core → strategic → closer) with rationale. After the call, ingests notes and produces delta analysis: clarifications, expansions, contradictions, and confirmations against the solicitation. |
+| **strategist** | 1 | Generates strategy brief covering six required dimensions: technical approach, TRL assessment, teaming, Phase III commercialization, budget scaffold, and risk analysis. Every claim cites its source (solicitation, compliance item, TPOC answer, corpus data). |
+| **researcher** | 2 | Produces six research artifacts: technical landscape, patent landscape, prior award analysis (SBIR.gov, USASpending.gov), market research with bottom-up sizing, commercialization pathway, and TRL refinement. Every claim sourced. |
+| **writer** | 3,4 | Builds discrimination table (Wave 3), creates section-by-section outline with page budgets (Wave 3), then drafts each section (Wave 4). Compliance-matrix-driven: every paragraph traces to a requirement. Applies Strunk & White writing principles — active voice, no needless words, positive form, parallel construction. Pulls corpus exemplars for calibration without copying verbatim. |
+| **reviewer** | 4,7 | Simulates government evaluator scoring using the agency's actual rubric (adjectival for DoD, binary for NSF, numeric for NIH). Produces actionable findings with location, severity, and specific fix suggestions. Red team analysis identifies 3-5 strongest reasons not to fund. Checks drafts against debrief history and quality profile. Max 2 revision cycles per section. |
+| **formatter** | 5,6 | Generates figures from the Wave 3 plan using available tools (Mermaid, Graphviz, SVG, Gemini). Checks tool availability before selecting method. Applies agency-specific formatting rules (fonts, margins, headers, page limits) and assembles submission volumes. Solicitation FORMAT requirements override all defaults. |
+| **submission-agent** | 8 | Packages proposal for the target portal with correct naming conventions and size limits. Runs pre-submission verification (PDF validity, budget consistency, company identifiers). Generates step-by-step upload instructions. After user confirms with portal confirmation number, creates immutable SHA-256 checksummed archive. |
+| **debrief-analyst** | 9 | Records outcomes, drafts debrief request letters (for losses), ingests evaluator feedback, and maps every comment to a specific proposal section. Categorizes loss root causes (technical, cost, strategic, past performance, compliance). Extracts winning practices from wins. Updates institutional weakness profile. |
+| **orchestrator** | All | Dispatches specialist agents based on proposal state and user commands. Enforces human checkpoints at every wave exit. Surfaces deadline warnings. Never writes proposal content — coordinates only. |
+| **continue** | All | Read-only state detector. Checks setup status, proposal state, and corpus to determine where you left off. Suggests the exact command to run next. |
+
 ## Project Structure
 
 ```
@@ -204,6 +356,9 @@ my-proposal-project/
 
 ~/.sbir/
   company-profile.json           # Global company profile (shared across all proposals)
+  quality-preferences.json       # Writing style preferences (tone, detail, evidence style)
+  winning-patterns.json          # Proposal ratings and winning practices by agency
+  writing-quality-profile.json   # Evaluator feedback patterns by agency and section
 ```
 
 ## Command Reference
@@ -214,9 +369,13 @@ my-proposal-project/
 | `/sbir:proposal profile setup` | Pre | Create company profile (standalone) |
 | `/sbir:proposal profile update` | Pre | Update company profile |
 | `/sbir:proposal corpus add <dir>` | Pre | Ingest past proposals and documents (standalone) |
+| `/sbir:proposal quality discover` | Pre | Build writing quality intelligence from past proposals |
+| `/sbir:proposal quality update` | Pre | Update quality artifacts from new debrief data |
+| `/sbir:proposal quality status` | Pre | Show quality intelligence status |
 | `/sbir:solicitation find` | 0 | Search and rank open topics by fit |
 | `/sbir:proposal new <topic-or-file>` | 0 | Start proposal with Go/No-Go checkpoint |
 | `/sbir:proposal shape` | 0 | Generate candidate technical approaches |
+| `/sbir:continue` | Any | Detect where you left off and suggest next action |
 | `/sbir:proposal status` | Any | Show current wave, progress, next actions |
 | `/sbir:proposal check` | 1+ | View compliance matrix coverage |
 | `/sbir:proposal compliance add` | 1+ | Add missed compliance item |
