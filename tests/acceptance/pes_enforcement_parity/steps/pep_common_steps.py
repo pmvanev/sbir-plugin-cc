@@ -706,14 +706,50 @@ def old_entries_archived(
     days: int,
 ):
     """Verify audit entries older than retention window were archived."""
-    # Implementation will move old entries to archive file
-    pass
+    import json as _json
+    from datetime import UTC, datetime, timedelta
+    from pathlib import Path
+
+    proposal_dir = enforcement_context["proposal_dir"]
+    audit_file = Path(proposal_dir) / ".sbir" / "audit" / "pes-audit.log"
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+
+    # Read remaining entries in the active log
+    if audit_file.exists():
+        lines = [l for l in audit_file.read_text().strip().split("\n") if l.strip()]
+        for line in lines:
+            entry = _json.loads(line)
+            ts = entry.get("timestamp", "")
+            # Skip non-timestamped entries (e.g., rotation audit entries)
+            if ts:
+                entry_time = datetime.fromisoformat(ts)
+                if entry_time.tzinfo is None:
+                    from datetime import timezone
+                    entry_time = entry_time.replace(tzinfo=timezone.utc)
+                assert entry_time >= cutoff, (
+                    f"Entry with timestamp {ts} should have been archived "
+                    f"(older than {days} days)"
+                )
+
+    # Verify archive file exists with old entries
+    archive_files = list((Path(proposal_dir) / ".sbir" / "audit").glob("pes-audit.log.archive*"))
+    assert len(archive_files) >= 1, (
+        f"Expected at least one archive file in {Path(proposal_dir) / '.sbir' / 'audit'}"
+    )
 
 
 @then("current audit entries are preserved")
 def current_entries_preserved(enforcement_context: dict[str, Any]):
     """Verify current audit entries were not removed during rotation."""
-    pass
+    import json as _json
+    from pathlib import Path
+
+    proposal_dir = enforcement_context["proposal_dir"]
+    audit_file = Path(proposal_dir) / ".sbir" / "audit" / "pes-audit.log"
+    assert audit_file.exists(), "Active audit log file should still exist"
+    lines = [l for l in audit_file.read_text().strip().split("\n") if l.strip()]
+    # At least the session_start entry from the current session should be there
+    assert len(lines) >= 1, "Expected at least one current entry preserved"
 
 
 @then("the log rotation is recorded in the audit trail")
@@ -842,3 +878,171 @@ def warning_crash_signal_locked(enforcement_context: dict[str, Any]):
 def no_post_action_validation(enforcement_context: dict[str, Any]):
     """Verify read-only operations skip post-action validation."""
     pass
+
+
+# ---------------------------------------------------------------------------
+# Audit Log Rotation Steps (size, retention boundary)
+# ---------------------------------------------------------------------------
+
+
+@given(
+    parsers.parse(
+        'Phil\'s proposal "{topic_id}" has an audit log file larger than the size limit'
+    ),
+)
+def proposal_with_oversized_audit_log(
+    base_proposal_state: dict[str, Any],
+    enforcement_context: dict[str, Any],
+    proposal_dir,
+    oversized_audit_log,
+    topic_id: str,
+):
+    """Set up proposal with an oversized audit log file."""
+    state = base_proposal_state.copy()
+    state["topic"]["id"] = topic_id
+    enforcement_context["state"] = state
+    enforcement_context["proposal_dir"] = str(proposal_dir)
+    enforcement_context["audit_file"] = oversized_audit_log
+
+
+@given(
+    parsers.parse(
+        'Phil\'s proposal "{topic_id}" has audit entries from exactly 365 days ago'
+    ),
+)
+def proposal_with_boundary_audit(
+    base_proposal_state: dict[str, Any],
+    enforcement_context: dict[str, Any],
+    proposal_dir,
+    boundary_audit_entries,
+    topic_id: str,
+):
+    """Set up proposal with audit entries at exact retention boundary."""
+    state = base_proposal_state.copy()
+    state["topic"]["id"] = topic_id
+    enforcement_context["state"] = state
+    enforcement_context["proposal_dir"] = str(proposal_dir)
+    enforcement_context["audit_file"] = boundary_audit_entries
+
+
+@given(
+    parsers.parse(
+        'Phil\'s proposal "{topic_id}" has audit entries from 366 days ago'
+    ),
+)
+def proposal_with_past_boundary_audit(
+    base_proposal_state: dict[str, Any],
+    enforcement_context: dict[str, Any],
+    proposal_dir,
+    past_boundary_audit_entries,
+    topic_id: str,
+):
+    """Set up proposal with audit entries one day past retention boundary."""
+    state = base_proposal_state.copy()
+    state["topic"]["id"] = topic_id
+    enforcement_context["state"] = state
+    enforcement_context["proposal_dir"] = str(proposal_dir)
+    enforcement_context["audit_file"] = past_boundary_audit_entries
+
+
+@then("the oversized log file is archived with a timestamp")
+def oversized_log_archived(enforcement_context: dict[str, Any]):
+    """Verify the oversized log file was renamed to a timestamped archive."""
+    from pathlib import Path
+
+    proposal_dir = enforcement_context["proposal_dir"]
+    audit_dir = Path(proposal_dir) / ".sbir" / "audit"
+    archive_files = list(audit_dir.glob("pes-audit.log.archive*"))
+    assert len(archive_files) >= 1, (
+        f"Expected timestamped archive file in {audit_dir}. "
+        f"Files: {list(audit_dir.iterdir())}"
+    )
+
+
+@then("a fresh audit log file is started")
+def fresh_log_started(enforcement_context: dict[str, Any]):
+    """Verify a new empty (or near-empty) audit log file exists."""
+    from pathlib import Path
+
+    proposal_dir = enforcement_context["proposal_dir"]
+    audit_file = Path(proposal_dir) / ".sbir" / "audit" / "pes-audit.log"
+    assert audit_file.exists(), "Fresh audit log file should exist"
+    # Fresh file should be much smaller than the size limit (10MB)
+    assert audit_file.stat().st_size < 1024 * 1024, (
+        f"Fresh audit log should be small, but is {audit_file.stat().st_size} bytes"
+    )
+
+
+@then("the file rotation is recorded in the audit trail")
+def file_rotation_audited(in_memory_audit_log):
+    """Verify an audit entry was recorded for file size rotation."""
+    entries = in_memory_audit_log.entries
+    rotation_entries = [
+        e for e in entries
+        if e.get("event") in ("audit_log_size_rotation", "audit_log_rotation")
+    ]
+    assert len(rotation_entries) >= 1, (
+        f"Expected file rotation audit entry. Got: {entries}"
+    )
+
+
+@then("audit entries from exactly 365 days ago are preserved")
+def boundary_entries_preserved(enforcement_context: dict[str, Any]):
+    """Verify entries at exactly 365 days are kept in the active log."""
+    import json as _json
+    from pathlib import Path
+
+    proposal_dir = enforcement_context["proposal_dir"]
+    audit_file = Path(proposal_dir) / ".sbir" / "audit" / "pes-audit.log"
+    assert audit_file.exists(), "Active audit log should exist"
+    lines = [l for l in audit_file.read_text().strip().split("\n") if l.strip()]
+    # The boundary entry should still be in the active log
+    evaluate_entries = [
+        _json.loads(l) for l in lines
+        if '"evaluate"' in l
+    ]
+    assert len(evaluate_entries) >= 1, (
+        f"Expected boundary entry preserved in active log. Lines: {lines}"
+    )
+
+
+@then("no entries are archived")
+def no_entries_archived(enforcement_context: dict[str, Any]):
+    """Verify no archive file was created."""
+    from pathlib import Path
+
+    proposal_dir = enforcement_context["proposal_dir"]
+    audit_dir = Path(proposal_dir) / ".sbir" / "audit"
+    archive_files = list(audit_dir.glob("pes-audit.log.archive*"))
+    assert len(archive_files) == 0, (
+        f"Expected no archive files but found: {archive_files}"
+    )
+
+
+@then(parsers.parse("audit entries from {days:d} days ago are archived"))
+def specific_days_entries_archived(
+    enforcement_context: dict[str, Any],
+    days: int,
+):
+    """Verify entries from N days ago were archived."""
+    from pathlib import Path
+
+    proposal_dir = enforcement_context["proposal_dir"]
+    audit_dir = Path(proposal_dir) / ".sbir" / "audit"
+    archive_files = list(audit_dir.glob("pes-audit.log.archive*"))
+    assert len(archive_files) >= 1, (
+        f"Expected archive file with {days}-day-old entries in {audit_dir}"
+    )
+
+
+@then("recent entries are preserved")
+def recent_entries_preserved(enforcement_context: dict[str, Any]):
+    """Verify recent entries remain in the active log."""
+    import json as _json
+    from pathlib import Path
+
+    proposal_dir = enforcement_context["proposal_dir"]
+    audit_file = Path(proposal_dir) / ".sbir" / "audit" / "pes-audit.log"
+    assert audit_file.exists(), "Active audit log should exist"
+    lines = [l for l in audit_file.read_text().strip().split("\n") if l.strip()]
+    assert len(lines) >= 1, "Expected at least one recent entry preserved"

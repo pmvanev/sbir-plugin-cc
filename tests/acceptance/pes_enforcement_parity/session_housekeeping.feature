@@ -22,7 +22,6 @@ Feature: Session Start Housekeeping
     And current audit entries are preserved
     And the log rotation is recorded in the audit trail
 
-  @skip
   Scenario: Audit log file is rotated when it exceeds size limit
     Given Phil's proposal "AF243-001" has an audit log file larger than the size limit
     When Phil starts a new session
@@ -53,14 +52,12 @@ Feature: Session Start Housekeeping
 
   # --- Boundary / Edge Scenarios ---
 
-  @skip
   Scenario: Audit entries exactly at the retention boundary are preserved
     Given Phil's proposal "AF243-001" has audit entries from exactly 365 days ago
     When Phil starts a new session
     Then audit entries from exactly 365 days ago are preserved
     And no entries are archived
 
-  @skip
   Scenario: Audit entries one day past the retention boundary are archived
     Given Phil's proposal "AF243-001" has audit entries from 366 days ago
     When Phil starts a new session

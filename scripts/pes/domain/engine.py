@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from pes.domain.corpus_integrity import CorpusIntegrityEvaluator
 from pes.domain.deadline_blocking import DeadlineBlockingEvaluator
-from pes.domain.housekeeping import CrashSignalCleaner
+from pes.domain.housekeeping import AuditLogRotator, CrashSignalCleaner
 from pes.domain.pdc_gate import PdcGateEvaluator
 from pes.domain.rules import Decision, EnforcementResult, EnforcementRule
 from pes.domain.session_checker import SessionChecker
@@ -33,6 +34,7 @@ class EnforcementEngine:
         self._corpus_evaluator = CorpusIntegrityEvaluator()
         self._session_checker = SessionChecker()
         self._crash_cleaner = CrashSignalCleaner()
+        self._audit_rotator = AuditLogRotator()
 
     def check_session_start(
         self,
@@ -64,6 +66,24 @@ class EnforcementEngine:
                         f"Crash signal '{cleanup['file']}' could not be removed: "
                         f"{reason}"
                     )
+
+        # Audit log rotation
+        if proposal_dir:
+            audit_dir = str(Path(proposal_dir) / ".sbir" / "audit")
+            rotation_results = self._audit_rotator.rotate(audit_dir)
+            for rotation in rotation_results:
+                event_name = (
+                    "audit_log_size_rotation"
+                    if rotation["action"] == "size_rotation"
+                    else "audit_log_retention_rotation"
+                )
+                self._safe_audit_log({
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "event": event_name,
+                    "action": rotation["action"],
+                    "archive_file": rotation.get("archive_file", ""),
+                    "proposal_id": state.get("proposal_id", "unknown"),
+                })
 
         # Existing integrity checks
         messages.extend(

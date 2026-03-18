@@ -220,7 +220,7 @@ def crash_signal_file(proposal_dir: Path) -> Path:
 def aged_audit_entries(proposal_dir: Path) -> Path:
     """Create an audit log file with entries older than retention window."""
     audit_dir = proposal_dir / ".sbir" / "audit"
-    audit_file = audit_dir / "enforcement.log"
+    audit_file = audit_dir / "pes-audit.log"
     old_timestamp = (datetime.now(UTC) - timedelta(days=400)).isoformat()
     recent_timestamp = datetime.now(UTC).isoformat()
     entries = [
@@ -228,4 +228,46 @@ def aged_audit_entries(proposal_dir: Path) -> Path:
         json.dumps({"timestamp": recent_timestamp, "event": "evaluate", "decision": "block"}),
     ]
     audit_file.write_text("\n".join(entries) + "\n")
+    return audit_file
+
+
+@pytest.fixture()
+def boundary_audit_entries(proposal_dir: Path) -> Path:
+    """Create audit log with entries from exactly 365 days ago."""
+    audit_dir = proposal_dir / ".sbir" / "audit"
+    audit_file = audit_dir / "pes-audit.log"
+    boundary_timestamp = (datetime.now(UTC) - timedelta(days=365)).isoformat()
+    entries = [
+        json.dumps({"timestamp": boundary_timestamp, "event": "evaluate", "decision": "allow"}),
+    ]
+    audit_file.write_text("\n".join(entries) + "\n")
+    return audit_file
+
+
+@pytest.fixture()
+def past_boundary_audit_entries(proposal_dir: Path) -> Path:
+    """Create audit log with entries from 366 days ago and recent ones."""
+    audit_dir = proposal_dir / ".sbir" / "audit"
+    audit_file = audit_dir / "pes-audit.log"
+    old_timestamp = (datetime.now(UTC) - timedelta(days=366)).isoformat()
+    recent_timestamp = datetime.now(UTC).isoformat()
+    entries = [
+        json.dumps({"timestamp": old_timestamp, "event": "evaluate", "decision": "allow"}),
+        json.dumps({"timestamp": recent_timestamp, "event": "evaluate", "decision": "block"}),
+    ]
+    audit_file.write_text("\n".join(entries) + "\n")
+    return audit_file
+
+
+@pytest.fixture()
+def oversized_audit_log(proposal_dir: Path) -> Path:
+    """Create an audit log file larger than the 10MB size limit."""
+    audit_dir = proposal_dir / ".sbir" / "audit"
+    audit_file = audit_dir / "pes-audit.log"
+    # Write ~11MB of audit entries
+    entry = json.dumps({"timestamp": datetime.now(UTC).isoformat(), "event": "evaluate", "decision": "allow"})
+    line = entry + "\n"
+    target_size = 11 * 1024 * 1024  # 11MB
+    repeat_count = target_size // len(line) + 1
+    audit_file.write_text(line * repeat_count)
     return audit_file
