@@ -32,14 +32,24 @@ def proposal_submitted_near_deadline(
     proposal_dir,
     topic_id: str,
 ):
-    """Set up a submitted proposal near the deadline."""
-    from datetime import date, timedelta
+    """Set up a submitted proposal with multiple rule violations.
 
+    State triggers both submission_immutability (submitted + immutable)
+    and pdc_gate (wave 5 with RED PDC items). The 'when' step uses
+    wave_5 tool name to match both rules.
+    """
     state = base_proposal_state.copy()
     state["topic"]["id"] = topic_id
-    state["current_wave"] = 8
+    state["current_wave"] = 5
+    state["go_no_go"] = "go"
     state["submission"] = {"status": "submitted", "immutable": True}
-    state["topic"]["deadline"] = (date.today() + timedelta(days=2)).isoformat()
+    state["pdc_status"] = {
+        "technical_approach": {
+            "tier_1": "RED",
+            "tier_2": "GREEN",
+            "red_items": ["TRL justification missing"],
+        }
+    }
     enforcement_context["state"] = state
     enforcement_context["proposal_dir"] = str(proposal_dir)
 
@@ -146,16 +156,28 @@ def audit_file_has_timestamp(proposal_dir):
 @then("a warning is logged about the audit write failure")
 def audit_write_failure_warning(enforcement_context: dict[str, Any]):
     """Verify a warning was produced about audit write failure."""
-    result = enforcement_context["result"]
-    # Implementation will add warning about audit write failure
-    pass
+    warnings = enforcement_context.get("captured_warnings", [])
+    assert len(warnings) >= 1, (
+        "Expected at least one warning about audit write failure, got none"
+    )
+    warning_messages = [r.getMessage() for r in warnings]
+    assert any("audit" in msg.lower() for msg in warning_messages), (
+        f"Expected warning mentioning 'audit'. Got: {warning_messages}"
+    )
 
 
 @then("the audit entry includes all block reasons")
 def audit_has_all_reasons(in_memory_audit_log):
-    """Verify audit entry includes all block reasons."""
+    """Verify audit entry includes all block reasons -- multiple messages."""
     entries = in_memory_audit_log.entries
-    assert len(entries) >= 1
+    block_entries = [e for e in entries if e.get("decision") == "block"]
+    assert len(block_entries) >= 1, (
+        f"Expected at least one block audit entry. Got: {entries}"
+    )
+    messages = block_entries[0].get("messages", [])
+    assert len(messages) >= 2, (
+        f"Expected multiple block reasons in audit entry. Got: {messages}"
+    )
 
 
 @then("each proposal has its own audit entry")

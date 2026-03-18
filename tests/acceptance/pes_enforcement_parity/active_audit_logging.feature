@@ -37,7 +37,6 @@ Feature: Active Audit Logging
 
   # --- Error Path Scenarios ---
 
-  @skip
   Scenario: Audit logging failure does not block the enforcement decision
     Given Phil's proposal "AF243-001" is in Wave 4 drafting with all prerequisites met
     And the audit directory is not writable
@@ -45,10 +44,9 @@ Feature: Active Audit Logging
     Then the action is allowed
     And a warning is logged about the audit write failure
 
-  @skip
   Scenario: Audit entry captures multiple block reasons when several rules trigger
     Given Phil's proposal "AF243-001" is submitted and near deadline
-    When Phil attempts any action on the proposal
+    When Phil attempts to begin Wave 5 work
     Then the action is blocked
     And the audit entry includes all block reasons
 

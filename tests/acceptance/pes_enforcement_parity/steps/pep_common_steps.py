@@ -252,13 +252,19 @@ def audit_dir_missing(proposal_dir):
 
 
 @given("the audit directory is not writable")
-def audit_dir_not_writable(proposal_dir):
-    """Mark audit directory as read-only."""
-    import os
-    import stat
+def audit_dir_not_writable(proposal_dir, enforcement_context):
+    """Replace audit directory with a path that will fail on write.
+
+    On Windows, chmod does not prevent owner writes, so we use an
+    invalid path that causes a real write failure.
+    """
+    import shutil
 
     audit_dir = proposal_dir / ".sbir" / "audit"
-    audit_dir.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    if audit_dir.exists():
+        shutil.rmtree(audit_dir)
+    # Use a path under a non-existent drive to guarantee write failure
+    enforcement_context["unwritable_audit_dir"] = "Z:\\nonexistent\\audit"
 
 
 # ---------------------------------------------------------------------------
@@ -356,12 +362,79 @@ def agent_completes_work(
 def use_drafting_tool(
     enforcement_engine,
     enforcement_context: dict[str, Any],
+    pes_config_path,
+    in_memory_audit_log,
 ):
-    """Invoke engine.evaluate() with a Wave 4 drafting tool."""
+    """Invoke engine.evaluate() with a Wave 4 drafting tool.
+
+    When 'unwritable_audit_dir' is set in context, creates a fresh engine
+    whose file adapter points to a path that will fail on write.
+    """
     state = enforcement_context["state"]
-    result = enforcement_engine.evaluate(state, tool_name="draft_section")
-    enforcement_context["result"] = result
+    unwritable = enforcement_context.get("unwritable_audit_dir")
+
+    if unwritable:
+        import logging
+
+        from pes.adapters.file_audit_adapter import FileAuditAdapter
+        from pes.adapters.json_rule_adapter import JsonRuleAdapter
+        from pes.domain.engine import EnforcementEngine
+        from pes.ports.audit_port import AuditLogger
+
+        file_logger = FileAuditAdapter(unwritable)
+
+        class _TeeAuditLogger(AuditLogger):
+            def __init__(self, mem: AuditLogger, file: AuditLogger) -> None:
+                self._mem = mem
+                self._file = file
+
+            def log(self, entry: dict) -> None:
+                self._mem.log(entry)
+                self._file.log(entry)
+
+        tee = _TeeAuditLogger(in_memory_audit_log, file_logger)
+        rule_loader = JsonRuleAdapter(str(pes_config_path))
+        engine = EnforcementEngine(rule_loader, tee)
+
+        # Capture warnings for assertion
+        with _capture_warnings() as caught:
+            result = engine.evaluate(state, tool_name="draft_section")
+        enforcement_context["result"] = result
+        enforcement_context["captured_warnings"] = caught
+    else:
+        result = enforcement_engine.evaluate(state, tool_name="draft_section")
+        enforcement_context["result"] = result
+
     return enforcement_context
+
+
+def _capture_warnings():
+    """Context manager that captures logging warnings."""
+    import logging
+
+    class _WarningCapture(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.records: list[logging.LogRecord] = []
+
+        def emit(self, record):
+            self.records.append(record)
+
+    handler = _WarningCapture()
+    handler.setLevel(logging.WARNING)
+
+    class _Ctx:
+        def __enter__(self_):
+            logger = logging.getLogger("pes.domain.engine")
+            logger.addHandler(handler)
+            logger.setLevel(logging.WARNING)
+            return handler.records
+
+        def __exit__(self_, *args):
+            logger = logging.getLogger("pes.domain.engine")
+            logger.removeHandler(handler)
+
+    return _Ctx()
 
 
 @when(

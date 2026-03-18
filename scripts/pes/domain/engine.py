@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -14,6 +15,8 @@ from pes.domain.submission_immutability import SubmissionImmutabilityEvaluator
 from pes.domain.wave_rules import WaveOrderingEvaluator
 from pes.ports.audit_port import AuditLogger
 from pes.ports.rule_port import RuleLoader
+
+logger = logging.getLogger(__name__)
 
 
 class EnforcementEngine:
@@ -41,7 +44,7 @@ class EnforcementEngine:
         """
         messages = self._session_checker.check(state, proposal_dir=proposal_dir)
         result = EnforcementResult(decision=Decision.ALLOW, messages=messages)
-        self._audit_logger.log({
+        self._safe_audit_log({
             "timestamp": datetime.now(UTC).isoformat(),
             "event": "session_start",
             "decision": result.decision.value.lower(),
@@ -66,7 +69,7 @@ class EnforcementEngine:
 
         result = EnforcementResult(decision=decision, messages=block_messages)
 
-        self._audit_logger.log({
+        self._safe_audit_log({
             "timestamp": datetime.now(UTC).isoformat(),
             "event": "evaluate",
             "decision": result.decision.value.lower(),
@@ -76,6 +79,18 @@ class EnforcementEngine:
         })
 
         return result
+
+    def _safe_audit_log(self, entry: dict[str, Any]) -> None:
+        """Log audit entry, suppressing write failures with a warning."""
+        try:
+            self._audit_logger.log(entry)
+        except Exception:
+            logger.warning(
+                "Audit write failed for event=%s decision=%s -- "
+                "enforcement decision was not affected",
+                entry.get("event", "unknown"),
+                entry.get("decision", "unknown"),
+            )
 
     def _rule_triggers(
         self, rule: EnforcementRule, state: dict[str, Any], tool_name: str

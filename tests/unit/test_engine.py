@@ -3,7 +3,7 @@
 Tests invoke through the EnforcementEngine public API with fake adapters
 at port boundaries (RuleLoader, AuditLogger). No mocks inside the hexagon.
 
-Test Budget: 7 behaviors x 2 = 14 max unit tests
+Test Budget: 9 behaviors x 2 = 18 max unit tests
 """
 
 from __future__ import annotations
@@ -38,6 +38,13 @@ class FakeAuditLogger(AuditLogger):
 
     def log(self, entry: dict[str, Any]) -> None:
         self.entries.append(entry)
+
+
+class FailingAuditLogger(AuditLogger):
+    """Audit logger that raises on every log call -- simulates I/O failure."""
+
+    def log(self, entry: dict[str, Any]) -> None:
+        raise OSError("Audit directory not writable")
 
 
 # --- Fixtures ---
@@ -186,3 +193,57 @@ class TestEnforcementEngineAuditLogging:
         assert entry["decision"] == "allow"
         assert entry["event"] == "session_start"
         assert "proposal_id" in entry
+
+
+class TestEnforcementEngineNonBlockingAudit:
+    """Audit write failures must not block enforcement decisions."""
+
+    def test_evaluate_returns_correct_decision_when_audit_fails(
+        self, clean_state: dict[str, Any]
+    ) -> None:
+        rules = [_wave_ordering_rule()]
+        engine = EnforcementEngine(FakeRuleLoader(rules), FailingAuditLogger())
+        result = engine.evaluate(clean_state, tool_name="wave_1_strategy")
+        assert result.decision == Decision.ALLOW
+
+    def test_session_start_returns_result_when_audit_fails(
+        self, clean_state: dict[str, Any]
+    ) -> None:
+        engine = EnforcementEngine(FakeRuleLoader(), FailingAuditLogger())
+        result = engine.check_session_start(clean_state)
+        assert result.decision == Decision.ALLOW
+        assert result.messages == []
+
+
+class TestEnforcementEngineMultiReasonBlock:
+    """Audit entry for multi-rule blocks includes all block reasons."""
+
+    def test_audit_entry_captures_all_block_reasons(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        wave_rule = _wave_ordering_rule()
+        submission_rule = EnforcementRule(
+            rule_id="submission-immutability",
+            description="Block writes to submitted proposal",
+            rule_type="submission_immutability",
+            condition={"requires_immutable": True},
+            message="Proposal is submitted. Artifacts are read-only.",
+        )
+        state = {
+            "schema_version": "1.0.0",
+            "proposal_id": "test-uuid-003",
+            "go_no_go": "pending",
+            "current_wave": 1,
+            "waves": {"0": {"status": "active", "completed_at": None}},
+            "topic": {"deadline": "2026-04-15"},
+            "submission": {"status": "submitted", "immutable": True},
+        }
+        engine = EnforcementEngine(
+            FakeRuleLoader([wave_rule, submission_rule]), audit_logger
+        )
+        result = engine.evaluate(state, tool_name="wave_1_strategy")
+        assert result.decision == Decision.BLOCK
+        assert len(result.messages) >= 2
+        # Audit entry should have all reasons
+        assert len(audit_logger.entries) == 1
+        assert len(audit_logger.entries[0]["messages"]) >= 2
