@@ -235,6 +235,72 @@ def proposal_clean_workspace(
     enforcement_context["proposal_dir"] = str(proposal_dir)
 
 
+@given(
+    parsers.parse(
+        'Phil\'s proposal "{topic_id}" has a clean workspace'
+        " with no crash signals"
+    ),
+)
+def proposal_clean_workspace_no_crash(
+    base_proposal_state: dict[str, Any],
+    enforcement_context: dict[str, Any],
+    proposal_dir,
+    topic_id: str,
+):
+    """Set up proposal with clean workspace, explicitly no crash signals."""
+    state = base_proposal_state.copy()
+    state["topic"]["id"] = topic_id
+    enforcement_context["state"] = state
+    enforcement_context["proposal_dir"] = str(proposal_dir)
+
+
+@given(
+    parsers.parse(
+        'Phil\'s previous session for proposal "{topic_id}" left'
+        " {count:d} crash signal files"
+    ),
+)
+def proposal_with_multiple_crash_signals(
+    base_proposal_state: dict[str, Any],
+    enforcement_context: dict[str, Any],
+    proposal_dir,
+    topic_id: str,
+    count: int,
+):
+    """Set up proposal with multiple crash signal files."""
+    import json as _json
+
+    state = base_proposal_state.copy()
+    state["topic"]["id"] = topic_id
+    enforcement_context["state"] = state
+    enforcement_context["proposal_dir"] = str(proposal_dir)
+
+    sbir_dir = proposal_dir / ".sbir"
+    crash_files = []
+    for i in range(count):
+        signal = sbir_dir / f"session-crash-{i}.signal"
+        signal.write_text(_json.dumps({
+            "session_id": f"prev-session-{i:03d}",
+            "timestamp": "2026-03-17T14:30:00Z",
+            "reason": "unexpected_termination",
+        }))
+        crash_files.append(signal)
+    enforcement_context["crash_signal_files"] = crash_files
+
+
+@given("the crash signal file is read-only")
+def crash_signal_read_only(enforcement_context: dict[str, Any]):
+    """Make the crash signal file read-only to simulate a locked file."""
+    import os
+    import stat
+    from pathlib import Path
+
+    crash_signal = enforcement_context.get("crash_signal_file")
+    if crash_signal:
+        os.chmod(str(crash_signal), stat.S_IREAD)
+        enforcement_context["crash_signal_read_only"] = True
+
+
 @given("active audit logging is enabled in the configuration")
 def audit_logging_enabled(enforcement_context: dict[str, Any]):
     """Precondition: active audit logging is enabled in pes-config.json."""
@@ -716,9 +782,60 @@ def session_not_blocked(enforcement_context: dict[str, Any]):
 
 
 @then("no cleanup actions are performed")
-def no_cleanup_performed(enforcement_context: dict[str, Any]):
+def no_cleanup_performed(enforcement_context: dict[str, Any], in_memory_audit_log):
     """Verify no cleanup was needed for clean workspace."""
-    pass
+    entries = in_memory_audit_log.entries
+    cleanup_entries = [
+        e for e in entries if e.get("event") == "crash_signal_cleanup"
+    ]
+    assert len(cleanup_entries) == 0, (
+        f"Expected no cleanup entries but found: {cleanup_entries}"
+    )
+
+
+@then(parsers.parse("all {count:d} crash signals are removed"))
+def all_crash_signals_removed(
+    enforcement_context: dict[str, Any],
+    count: int,
+):
+    """Verify all crash signal files have been cleaned up."""
+    crash_files = enforcement_context.get("crash_signal_files", [])
+    assert len(crash_files) == count
+    for f in crash_files:
+        assert not f.exists(), f"Crash signal file still exists at {f}"
+
+
+@then("each cleanup is recorded in the audit trail")
+def each_cleanup_audited(
+    enforcement_context: dict[str, Any],
+    in_memory_audit_log,
+):
+    """Verify each crash signal cleanup was individually audited."""
+    crash_files = enforcement_context.get("crash_signal_files", [])
+    entries = in_memory_audit_log.entries
+    cleanup_entries = [
+        e for e in entries if e.get("event") == "crash_signal_cleanup"
+    ]
+    assert len(cleanup_entries) >= len(crash_files), (
+        f"Expected {len(crash_files)} cleanup audit entries, "
+        f"got {len(cleanup_entries)}. Entries: {entries}"
+    )
+
+
+@then("Phil sees a warning that the crash signal could not be removed")
+def warning_crash_signal_locked(enforcement_context: dict[str, Any]):
+    """Verify a warning message about unremovable crash signal."""
+    result = enforcement_context["result"]
+    warning_msgs = [
+        m for m in result.messages if "could not be removed" in m.lower()
+        or "unable to remove" in m.lower()
+        or "locked" in m.lower()
+        or "permission" in m.lower()
+    ]
+    assert len(warning_msgs) >= 1, (
+        f"Expected warning about unremovable crash signal. "
+        f"Messages: {result.messages}"
+    )
 
 
 @then("no post-action validation is performed")

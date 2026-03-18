@@ -32,14 +32,12 @@ Feature: Session Start Housekeeping
 
   # --- Error Path Scenarios ---
 
-  @skip
   Scenario: Multiple crash signals are cleaned up in a single session start
     Given Phil's previous session for proposal "AF243-001" left 3 crash signal files
     When Phil starts a new session
     Then all 3 crash signals are removed
     And each cleanup is recorded in the audit trail
 
-  @skip
   Scenario: Session start succeeds even when crash signal file is locked
     Given Phil's previous session for proposal "AF243-001" ended abnormally leaving a crash signal
     And the crash signal file is read-only
@@ -47,7 +45,6 @@ Feature: Session Start Housekeeping
     Then Phil sees a warning that the crash signal could not be removed
     And the session continues without blocking
 
-  @skip
   Scenario: Session start succeeds when no crash signals exist
     Given Phil's proposal "AF243-001" has a clean workspace with no crash signals
     When Phil starts a new session

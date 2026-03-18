@@ -8,6 +8,7 @@ from typing import Any
 
 from pes.domain.corpus_integrity import CorpusIntegrityEvaluator
 from pes.domain.deadline_blocking import DeadlineBlockingEvaluator
+from pes.domain.housekeeping import CrashSignalCleaner
 from pes.domain.pdc_gate import PdcGateEvaluator
 from pes.domain.rules import Decision, EnforcementResult, EnforcementRule
 from pes.domain.session_checker import SessionChecker
@@ -31,6 +32,7 @@ class EnforcementEngine:
         self._submission_evaluator = SubmissionImmutabilityEvaluator()
         self._corpus_evaluator = CorpusIntegrityEvaluator()
         self._session_checker = SessionChecker()
+        self._crash_cleaner = CrashSignalCleaner()
 
     def check_session_start(
         self,
@@ -39,10 +41,35 @@ class EnforcementEngine:
     ) -> EnforcementResult:
         """Run integrity check at session startup.
 
+        Performs crash signal cleanup, then runs session integrity checks.
         Returns ALLOW with warning messages for issues found.
         Returns ALLOW with no messages for clean state.
         """
-        messages = self._session_checker.check(state, proposal_dir=proposal_dir)
+        messages: list[str] = []
+
+        # Crash signal housekeeping
+        if proposal_dir:
+            cleanup_results = self._crash_cleaner.clean(proposal_dir)
+            for cleanup in cleanup_results:
+                self._safe_audit_log({
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "event": "crash_signal_cleanup",
+                    "file": cleanup["file"],
+                    "status": cleanup["status"],
+                    "proposal_id": state.get("proposal_id", "unknown"),
+                })
+                if cleanup["status"] == "failed":
+                    reason = cleanup.get("reason", "unknown error")
+                    messages.append(
+                        f"Crash signal '{cleanup['file']}' could not be removed: "
+                        f"{reason}"
+                    )
+
+        # Existing integrity checks
+        messages.extend(
+            self._session_checker.check(state, proposal_dir=proposal_dir)
+        )
+
         result = EnforcementResult(decision=Decision.ALLOW, messages=messages)
         self._safe_audit_log({
             "timestamp": datetime.now(UTC).isoformat(),
