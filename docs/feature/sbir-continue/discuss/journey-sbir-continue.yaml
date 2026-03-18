@@ -1,0 +1,429 @@
+journey:
+  name: "SBIR Continue"
+  goal: "Detect where the user left off in the SBIR proposal lifecycle and resume from that point"
+  persona: "Phil Santos -- small business engineer, 2-3 proposals/year, CLI-native"
+
+  emotional_arc:
+    start: "Uncertain -- 'Where was I? What do I do next?'"
+    middle: "Oriented -- 'I see where I am and what remains'"
+    end: "Confident -- 'I know what to do and I am doing it'"
+
+  state_detection_priority:
+    - check: "no_profile_and_no_state"
+      meaning: "First-time user, nothing configured"
+      route: "setup"
+    - check: "profile_exists_but_setup_incomplete"
+      meaning: "Started setup but did not finish"
+      route: "resume_setup"
+    - check: "profile_exists_no_proposal_state"
+      meaning: "Setup complete, no active proposal"
+      route: "start_proposal"
+    - check: "proposal_archived_or_no_go"
+      meaning: "Proposal was declined or archived"
+      route: "start_new_proposal"
+    - check: "all_waves_completed"
+      meaning: "Lifecycle complete including debrief"
+      route: "lifecycle_complete"
+    - check: "wave_8_submitted_wave_9_pending"
+      meaning: "Submitted but debrief not done"
+      route: "post_submission"
+    - check: "current_wave_completed_next_not_started"
+      meaning: "Between waves -- gate approved"
+      route: "start_next_wave"
+    - check: "current_wave_active"
+      meaning: "Mid-wave with incomplete tasks"
+      route: "resume_wave"
+
+steps:
+  - id: 1
+    name: "No Setup Detected"
+    trigger: "No company profile AND no proposal state"
+    command: "Suggests /sbir:setup"
+
+    tui_mockup: |
+      +-- /sbir:continue ------------------------------------------+
+      |                                                             |
+      |  SBIR Proposal Plugin                                       |
+      |  =====================                                      |
+      |                                                             |
+      |  No configuration detected. Let's get you set up.           |
+      |                                                             |
+      |  The setup wizard will:                                     |
+      |    - Check prerequisites (Python, Git)                      |
+      |    - Create your company profile                            |
+      |    - Optionally ingest past proposals                       |
+      |    - Configure API keys                                     |
+      |                                                             |
+      |  Estimated time: 10-15 minutes                              |
+      |                                                             |
+      |  Run:  /sbir:setup                                          |
+      |                                                             |
+      +-------------------------------------------------------------+
+
+    shared_artifacts: []
+
+    emotional_state:
+      entry: "Uncertain, possibly confused"
+      exit: "Welcomed, knows what to do next"
+
+    integration_checkpoint: |
+      Profile check: ~/.sbir/company-profile.json must not exist
+      State check: .sbir/proposal-state.json must not exist
+
+    gherkin: |
+      Scenario: First-time user with no configuration
+        Given Phil Santos has installed the SBIR plugin
+        And no company profile exists at ~/.sbir/company-profile.json
+        And no proposal state exists at .sbir/proposal-state.json
+        When Phil runs /sbir:continue
+        Then the system displays a welcome message explaining setup
+        And suggests running /sbir:setup
+        And does not display any error messages
+
+  - id: 2
+    name: "Partial Setup Detected"
+    trigger: "Profile exists but corpus or API key missing"
+    command: "Offers resume setup or skip to proposal"
+
+    tui_mockup: |
+      +-- /sbir:continue ------------------------------------------+
+      |                                                             |
+      |  Setup Status:                                              |
+      |    [ok] Prerequisites (Python ${python_version})            |
+      |    [ok] Company profile (${company_name})                   |
+      |    [--] Corpus (${corpus_status})                           |
+      |    [--] GEMINI_API_KEY (${api_key_status})                  |
+      |                                                             |
+      |  Setup is usable but incomplete.                            |
+      |                                                             |
+      |  Options:                                                   |
+      |    (c) continue setup   -- resume from first gap            |
+      |    (s) skip to proposal -- start a proposal now             |
+      |    (q) quit                                                 |
+      |                                                             |
+      +-------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "company_name"
+        source: "~/.sbir/company-profile.json -> company_name"
+        displayed_as: "${company_name}"
+        consumers: ["step 2 display", "step 3 display"]
+      - name: "corpus_status"
+        source: ".sbir/corpus/ directory listing"
+        displayed_as: "${corpus_status}"
+        consumers: ["step 2 display"]
+      - name: "api_key_status"
+        source: "GEMINI_API_KEY environment variable"
+        displayed_as: "${api_key_status}"
+        consumers: ["step 2 display"]
+
+    emotional_state:
+      entry: "Uncertain about prior progress"
+      exit: "Reassured -- prior work recognized"
+
+    integration_checkpoint: |
+      Profile must parse as valid JSON with company_name field
+      Corpus check: count files in .sbir/corpus/
+      API key check: GEMINI_API_KEY env var presence
+
+    gherkin: |
+      Scenario: User with profile but no corpus
+        Given Phil Santos has a company profile for "Pacific Systems Engineering"
+        And no corpus documents have been ingested
+        And no GEMINI_API_KEY is configured
+        When Phil runs /sbir:continue
+        Then the system displays setup status with profile marked as ok
+        And corpus is marked as incomplete
+        And offers options to continue setup or skip to proposal
+
+  - id: 3
+    name: "No Active Proposal"
+    trigger: "Setup complete, no .sbir/proposal-state.json"
+    command: "Suggests /sbir:solicitation find or /sbir:proposal new"
+
+    tui_mockup: |
+      +-- /sbir:continue ------------------------------------------+
+      |                                                             |
+      |  Profile: ${company_name}                                   |
+      |  Corpus:  ${document_count} documents indexed               |
+      |                                                             |
+      |  No active proposal found.                                  |
+      |                                                             |
+      |  Ready to start:                                            |
+      |    /sbir:solicitation find              -- discover topics  |
+      |    /sbir:proposal new <solicitation>    -- start a proposal |
+      |                                                             |
+      +-------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "company_name"
+        source: "~/.sbir/company-profile.json -> company_name"
+        displayed_as: "${company_name}"
+        consumers: ["step 3 display"]
+      - name: "document_count"
+        source: ".sbir/corpus/ file count or proposal-state.json -> corpus.document_count"
+        displayed_as: "${document_count}"
+        consumers: ["step 3 display"]
+
+    emotional_state:
+      entry: "Ready but directionless"
+      exit: "Guided to concrete next step"
+
+    integration_checkpoint: |
+      Profile must exist and be valid
+      Corpus count accurate (match filesystem to state if state exists)
+
+    gherkin: |
+      Scenario: Setup complete with no active proposal
+        Given Phil Santos has a complete setup with 12 corpus documents
+        And no proposal state file exists
+        When Phil runs /sbir:continue
+        Then the system displays profile name and corpus count
+        And suggests solicitation find and proposal new commands
+
+  - id: 4
+    name: "Mid-Wave Resume"
+    trigger: "Active wave with incomplete tasks"
+    command: "Shows within-wave progress and suggests next task"
+
+    tui_mockup: |
+      +-- /sbir:continue ------------------------------------------+
+      |                                                             |
+      |  SBIR Proposal: ${topic_id}                                 |
+      |  ${topic_title}                                             |
+      |  =====================================================      |
+      |  Wave ${current_wave}: ${wave_name}                         |
+      |  Deadline: ${deadline} (${days_remaining} days)             |
+      |                                                             |
+      |  Wave ${current_wave} Progress:                             |
+      |    ${task_checklist}                                         |
+      |                                                             |
+      |  Suggested next action:                                     |
+      |    ${suggested_command}                                      |
+      |    ${action_description}                                     |
+      |                                                             |
+      +-------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "topic_id"
+        source: ".sbir/proposal-state.json -> topic.id"
+        displayed_as: "${topic_id}"
+        consumers: ["step 4-8 displays"]
+      - name: "topic_title"
+        source: ".sbir/proposal-state.json -> topic.title"
+        displayed_as: "${topic_title}"
+        consumers: ["step 4-8 displays"]
+      - name: "current_wave"
+        source: ".sbir/proposal-state.json -> current_wave"
+        displayed_as: "${current_wave}"
+        consumers: ["step 4-8 displays", "task resolution logic"]
+      - name: "wave_name"
+        source: "wave-agent-mapping skill -> wave definitions"
+        displayed_as: "${wave_name}"
+        consumers: ["step 4-8 displays"]
+      - name: "deadline"
+        source: ".sbir/proposal-state.json -> topic.deadline"
+        displayed_as: "${deadline}"
+        consumers: ["step 4-8 displays"]
+      - name: "days_remaining"
+        source: "computed: topic.deadline - current_date"
+        displayed_as: "${days_remaining}"
+        consumers: ["step 4-8 displays"]
+      - name: "task_checklist"
+        source: "computed: wave-specific state fields"
+        displayed_as: "${task_checklist}"
+        consumers: ["step 4 display"]
+      - name: "suggested_command"
+        source: "computed: first incomplete task -> command mapping"
+        displayed_as: "${suggested_command}"
+        consumers: ["step 4-6 displays"]
+
+    emotional_state:
+      entry: "Uncertain about within-wave progress"
+      exit: "In control -- clear picture of remaining work"
+
+    integration_checkpoint: |
+      proposal-state.json must exist and parse correctly
+      current_wave must be valid (0-9)
+      Wave-specific fields must be consistent with wave number
+      Deadline must be parseable ISO 8601
+
+    gherkin: |
+      Scenario: Mid-wave with partial completion
+        Given Phil Santos has proposal AF243-001 active in Wave 1
+        And the compliance matrix has 24 items extracted
+        And TPOC questions are generated but call is pending
+        And the strategy brief has not been started
+        When Phil runs /sbir:continue
+        Then the system displays Wave 1 progress with compliance as complete
+        And TPOC as pending call
+        And strategy brief as not started
+        And suggests running /sbir:proposal wave strategy
+
+  - id: 5
+    name: "Between Waves"
+    trigger: "Current wave completed, next wave not started"
+    command: "Celebrates completion and suggests next wave"
+
+    tui_mockup: |
+      +-- /sbir:continue ------------------------------------------+
+      |                                                             |
+      |  SBIR Proposal: ${topic_id}                                 |
+      |  ${topic_title}                                             |
+      |  =====================================================      |
+      |  Deadline: ${deadline} (${days_remaining} days)             |
+      |                                                             |
+      |  Wave Progress:                                             |
+      |    ${wave_progress_list}                                    |
+      |                                                             |
+      |  ${completed_wave_name} completed.                          |
+      |                                                             |
+      |  Next: Wave ${next_wave} -- ${next_wave_name}               |
+      |    ${next_wave_description}                                  |
+      |                                                             |
+      |  Suggested next action:                                     |
+      |    ${suggested_command}                                      |
+      |                                                             |
+      +-------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "wave_progress_list"
+        source: "computed: all waves.{N}.status values"
+        displayed_as: "${wave_progress_list}"
+        consumers: ["step 5 display"]
+      - name: "next_wave"
+        source: "computed: current_wave + 1"
+        displayed_as: "${next_wave}"
+        consumers: ["step 5 display"]
+      - name: "next_wave_name"
+        source: "wave-agent-mapping skill -> wave definitions[next_wave]"
+        displayed_as: "${next_wave_name}"
+        consumers: ["step 5 display"]
+
+    emotional_state:
+      entry: "Accomplished from completing a wave"
+      exit: "Excited about the next phase"
+
+    integration_checkpoint: |
+      Current wave status must be "completed"
+      Exit gate must be approved (PES state)
+      Next wave must be "not_started"
+
+    gherkin: |
+      Scenario: Between waves with gate approved
+        Given Phil Santos has proposal AF243-001
+        And Wave 1 status is completed with strategy approved
+        And Wave 2 status is not_started
+        When Phil runs /sbir:continue
+        Then the system displays wave progress with Wave 1 marked complete
+        And describes Wave 2 (Research)
+        And suggests running /sbir:proposal wave research
+
+  - id: 6
+    name: "Post-Submission"
+    trigger: "Wave 8 completed, Wave 9 not started"
+    command: "Guides to debrief or new proposal"
+
+    tui_mockup: |
+      +-- /sbir:continue ------------------------------------------+
+      |                                                             |
+      |  SBIR Proposal: ${topic_id}                                 |
+      |  ${topic_title}                                             |
+      |  =====================================================      |
+      |                                                             |
+      |  Proposal submitted.                                        |
+      |                                                             |
+      |  When you receive evaluator feedback:                       |
+      |    /sbir:proposal debrief ingest <feedback-file>            |
+      |                                                             |
+      |  Or start a new proposal:                                   |
+      |    /sbir:proposal new <solicitation>                        |
+      |                                                             |
+      +-------------------------------------------------------------+
+
+    shared_artifacts: []
+
+    emotional_state:
+      entry: "Accomplished from submission"
+      exit: "Closure with clear forward path"
+
+    integration_checkpoint: |
+      Wave 8 status must be "completed"
+      Submission verification checkpoint must be approved
+
+    gherkin: |
+      Scenario: Post-submission with debrief pending
+        Given Phil Santos has proposal AF243-001
+        And Wave 8 (Submission) is completed
+        And Wave 9 (Post-Submission) is not_started
+        When Phil runs /sbir:continue
+        Then the system confirms proposal is submitted
+        And suggests debrief ingestion when feedback arrives
+        And offers starting a new proposal
+
+  - id: 7
+    name: "Lifecycle Complete"
+    trigger: "All waves including Wave 9 completed"
+    command: "Suggests starting new proposal"
+
+    tui_mockup: |
+      +-- /sbir:continue ------------------------------------------+
+      |                                                             |
+      |  SBIR Proposal: ${topic_id}                                 |
+      |  ${topic_title}                                             |
+      |  =====================================================      |
+      |                                                             |
+      |  Proposal lifecycle complete.                               |
+      |  All 10 waves finished. Debrief archived.                   |
+      |                                                             |
+      |  Start a new proposal:                                      |
+      |    /sbir:solicitation find              -- discover topics  |
+      |    /sbir:proposal new <solicitation>    -- start fresh      |
+      |                                                             |
+      +-------------------------------------------------------------+
+
+    shared_artifacts: []
+
+    emotional_state:
+      entry: "Satisfied with completed lifecycle"
+      exit: "Ready for next opportunity"
+
+    integration_checkpoint: |
+      All waves 0-9 must have status "completed" or "skipped"
+
+    gherkin: |
+      Scenario: Fully completed lifecycle
+        Given Phil Santos has proposal AF243-001
+        And all waves 0 through 9 are completed
+        When Phil runs /sbir:continue
+        Then the system confirms lifecycle is complete
+        And suggests starting a new proposal
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "topic_id"
+      must_match_across: [4, 5, 6, 7]
+      failure_message: "Topic ID must come from proposal-state.json consistently"
+    - artifact: "company_name"
+      must_match_across: [2, 3]
+      failure_message: "Company name must come from company-profile.json consistently"
+    - artifact: "current_wave"
+      must_match_across: [4, 5]
+      failure_message: "Wave number must match proposal-state.json current_wave field"
+    - artifact: "wave_name"
+      must_match_across: [4, 5]
+      failure_message: "Wave name must match wave-agent-mapping skill definitions"
+
+  cli_vocabulary:
+    command_pattern: "/sbir:command or /sbir:proposal subcommand"
+    verified_commands:
+      - "/sbir:setup"
+      - "/sbir:continue"
+      - "/sbir:solicitation find"
+      - "/sbir:proposal new"
+      - "/sbir:proposal status"
+      - "/sbir:proposal wave strategy"
+      - "/sbir:proposal wave research"
+      - "/sbir:proposal draft <section>"
+      - "/sbir:proposal iterate <section>"
+      - "/sbir:proposal debrief ingest <path>"

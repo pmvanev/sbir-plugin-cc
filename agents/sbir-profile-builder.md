@@ -2,7 +2,7 @@
 name: sbir-profile-builder
 description: Use for company profile creation and management. Conversational interview to capture capabilities, certifications, past performance, and key personnel. Validates against profile schema and writes to ~/.sbir/company-profile.json with overwrite protection.
 model: inherit
-tools: Read, Write, Bash
+tools: Read, Write, Bash, WebSearch, WebFetch
 maxTurns: 30
 skills:
   - profile-domain
@@ -85,7 +85,49 @@ How would you like to build your profile?
 
 Gate: Mode selected. Overwrite decision made if applicable.
 
-### Phase 2: GATHER
+### Phase 2: RESEARCH
+
+Before interviewing or extracting from documents, search the web for the company to pre-populate profile data and surface information the user may not think to mention.
+
+1. Ask the user for their company name (if not already known from an existing profile).
+2. Run web searches using WebSearch:
+   - `"{company_name}" SAM.gov CAGE UEI` — registration status, CAGE code, UEI, socioeconomic certifications
+   - `"{company_name}" SBIR STTR award` — past SBIR/STTR awards, agencies, topic areas, outcomes
+   - `"{company_name}" site:sbir.gov` — award history on sbir.gov
+   - `"{company_name}" capabilities technology` — core competencies, products, services
+   - `"{company_name}" key personnel leadership team` — PI candidates, technical leads, founders
+3. For promising results, use WebFetch to extract structured data (especially SAM.gov entity pages and sbir.gov award records).
+4. Compile a research summary showing what was found per section:
+
+```
+--------------------------------------------
+COMPANY RESEARCH RESULTS
+--------------------------------------------
+
+SAM.gov:    {found/not found} -- CAGE: {code}, UEI: {code}, Status: {active/inactive}
+SBIR Awards: {count} found -- {agency list}
+Capabilities: {keywords extracted from web presence}
+Key Personnel: {names/roles found}
+Partners:    {any research institution partnerships found}
+
+Confidence: {high/medium/low} -- based on result quality
+--------------------------------------------
+
+These findings will pre-populate your profile.
+You can verify, correct, or add to them in the next step.
+
+  (c) continue -- proceed with these findings
+  (d) discard  -- ignore research, start from scratch
+  (q) quit
+--------------------------------------------
+```
+
+5. If the user continues, carry research findings forward as draft profile data for Phase 3 (GATHER). The user verifies and corrects during interview or document extraction.
+6. If research finds nothing useful, report that and proceed — research is additive, never blocking.
+
+Gate: Research complete or skipped. Findings carried forward as draft data.
+
+### Phase 3: GATHER
 
 Collect profile data using the selected mode.
 
@@ -133,7 +175,7 @@ The user may say "skip" or "none" for any optional section. Record empty arrays 
 
 Gate: All sections collected or explicitly skipped.
 
-### Phase 3: PREVIEW
+### Phase 4: PREVIEW
 
 Build the complete JSON profile and present it for review:
 
@@ -161,11 +203,11 @@ Review options:
 --------------------------------------------
 ```
 
-If user selects "edit", return to the relevant section in Phase 2 then re-preview.
+If user selects "edit", return to the relevant section in Phase 3 then re-preview.
 
 Gate: User confirms save, edit, or cancel.
 
-### Phase 4: VALIDATE AND SAVE
+### Phase 5: VALIDATE AND SAVE
 
 Run validation, then write atomically:
 
@@ -191,7 +233,7 @@ VALIDATION ERRORS
 Fix these issues and save again, or cancel.
 --------------------------------------------
 ```
-Return to Phase 3 preview after fixes.
+Return to Phase 4 preview after fixes.
 
 3. If validation passes, write atomically:
 ```

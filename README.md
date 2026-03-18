@@ -18,19 +18,19 @@ All interaction happens in the Claude Code CLI. State persists as local JSON fil
 
 ## Getting Started
 
-After installing, run the setup wizard:
-
 ```bash
 cd my-proposal-project
 /sbir:setup
 ```
 
-The wizard guides you through everything interactively:
+The setup wizard detects your environment and adapts. First-time users build everything from scratch; returning users can keep their existing profile and corpus or update them.
 
-1. **Prerequisites check** — verifies Python 3.12+, Git, and Claude Code with pass/fail indicators
-2. **Company profile** — builds your profile via document extraction, guided interview, or both (delegates to the profile builder agent)
-3. **Corpus ingestion** — helps you locate past proposals, debriefs, and capability documents, then ingests them
-4. **API key setup** (optional) — walks you through configuring Gemini for concept figure generation in Wave 5
+The wizard walks you through:
+
+1. **Prerequisites check** — verifies Python 3.12+, Git, and Claude Code
+2. **Company profile** — creates a new profile (via document extraction, guided interview, or both) or offers to keep/update an existing one
+3. **Corpus ingestion** — locates past proposals, debriefs, and capability documents
+4. **API key setup** (optional) — configures Gemini for concept figure generation in Wave 5
 5. **Validation** — re-checks everything and displays a unified status summary
 6. **Next steps** — tells you exactly what command to run next
 
@@ -59,44 +59,18 @@ When setup completes, you'll see:
   Next: /sbir:solicitation find
 ```
 
-### Find Solicitations
-
-```bash
-/sbir:solicitation find                              # All open topics, ranked by fit
-/sbir:solicitation find --agency "Air Force" --phase I  # Filter by agency/phase
-```
-
-The topic-scout scores every open topic against your company profile and returns a ranked shortlist with go/evaluate/no-go recommendations.
-
-### Start a Proposal
-
-```bash
-/sbir:proposal new AF263-042                  # From ranked results
-/sbir:proposal new ./solicitations/topic.pdf  # From a PDF you already have
-```
-
-## Returning Users (Second+ Proposal)
-
-Your company profile at `~/.sbir/company-profile.json` carries over automatically. Run `/sbir:setup` in your new project directory — it detects your existing profile and offers to keep, update, or start fresh. Corpus from previous projects can be re-ingested or pointed at the same directory.
-
-```bash
-cd my-new-proposal-project
-/sbir:setup                                    # Detects existing profile, sets up corpus
-/sbir:solicitation find --agency "Navy"         # Search with enriched corpus
-/sbir:proposal new N261-095                     # Start the new proposal
-```
-
-Each completed proposal enriches the corpus. Fit scoring improves with more past performance data, the writer pulls better exemplars, and the reviewer cross-references debrief patterns.
+Your company profile at `~/.sbir/company-profile.json` carries over across projects. Each completed proposal enriches the corpus — fit scoring improves with more past performance data, the writer pulls better exemplars, and the reviewer cross-references debrief patterns.
 
 ## The 10-Wave Lifecycle
 
 Each wave produces specific artifacts and ends with a human checkpoint (approve / revise / skip). PES enforces wave ordering — you cannot skip ahead without completing prerequisites.
 
-### Wave 0: Intelligence & Fit
+### Wave 0: Setup, Intelligence & Fit
 
-Score topics against your company profile. Optionally generate candidate technical approaches.
+Set up your environment (profile, corpus), then score topics against your company profile. Optionally generate candidate technical approaches.
 
 ```bash
+/sbir:setup                                # First-time setup or re-run to update config
 /sbir:solicitation find                    # Search and rank open topics
 /sbir:proposal new <topic-or-file>         # Start proposal, Go/No-Go checkpoint
 /sbir:proposal shape                       # Generate 3-5 candidate approaches (optional)
