@@ -13,7 +13,7 @@ All interaction happens in the Claude Code CLI. State persists as local JSON fil
 ## Install
 
 ```bash
-claude plugin install github:pmvanev/sbir-plugin-cc
+/plugin install sbir@pmvanev-plugins
 ```
 
 ## Getting Started

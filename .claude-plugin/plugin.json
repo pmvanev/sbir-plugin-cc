@@ -1,6 +1,8 @@
 {
   "name": "sbir",
   "description": "SBIR/STTR Proposal Writing Plugin for Claude Code",
-  "author": "pmvanev",
+  "author": {
+    "name": "Phil Van Every"
+  },
   "version": "0.1.0"
 }
