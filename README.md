@@ -4,7 +4,7 @@ A multi-agent Claude Code plugin that guides you through the full SBIR/STTR prop
 
 All interaction happens in the Claude Code CLI. State persists as local JSON files. No web UI, no server, no database.
 
-Built with [nWave](https://github.com/nwave-ai/nwave-marketplace) — agents and skills created via `nw:forge`, development driven by nWave's wave-based methodology (`nw:discuss` → `nw:design` → `nw:distill` → `nw:deliver`). The Proposal Enforcement System (PES) is inspired by nWave's Design Enforcement System (DES).
+Built with [nWave](https://github.com/nwave-ai/nwave) — agents and skills created via `nw:forge`, development driven by nWave's wave-based methodology (`nw:discuss` → `nw:design` → `nw:distill` → `nw:deliver`). The Proposal Enforcement System (PES) is inspired by nWave's Design Enforcement System (DES).
 
 ## Prerequisites
 
@@ -281,7 +281,7 @@ Lessons and debrief data feed back into the corpus for future proposals.
 
 The PES is a Python-based guardrail system that validates every action against proposal lifecycle rules. It runs automatically via Claude Code hooks — you never invoke it directly, but it prevents mistakes like skipping waves, drafting before strategy approval, or modifying a submitted proposal.
 
-Inspired by nWave's [Design Enforcement System (DES)](https://github.com/nwave-ai/nwave-marketplace), which enforces wave ordering in software development workflows. PES adapts the same concept for the SBIR proposal domain.
+Inspired by nWave's [Design Enforcement System (DES)](https://github.com/nwave-ai/nwave), which enforces wave ordering in software development workflows. PES adapts the same concept for the SBIR proposal domain.
 
 ### How it works
 
