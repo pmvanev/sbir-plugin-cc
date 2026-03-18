@@ -142,7 +142,7 @@ def test_deadline_blocking_triggers_block_on_non_essential_wave_at_critical_thre
     assert result.decision == Decision.BLOCK
     assert len(result.messages) == 1
     # Verify audit recorded the block
-    assert audit_logger.entries[0]["decision"] == "BLOCK"
+    assert audit_logger.entries[0]["decision"] == "block"
 
 
 # ---------------------------------------------------------------------------

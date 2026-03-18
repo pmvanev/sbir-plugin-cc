@@ -8,7 +8,6 @@ Feature: Active Audit Logging
 
   # --- Happy Path Scenarios ---
 
-  @skip
   Scenario: Allowed action is recorded in the audit log
     Given Phil's proposal "AF243-001" is in Wave 4 drafting with all prerequisites met
     When Phil uses a drafting tool
@@ -16,7 +15,6 @@ Feature: Active Audit Logging
     And the audit log contains an entry with decision "allow"
     And the audit entry includes the proposal identifier "AF243-001"
 
-  @skip
   Scenario: Blocked action is recorded with the block reason
     Given Phil's proposal "AF243-001" is in Wave 5 but pre-draft checklist items are incomplete
     When Phil attempts to begin Wave 5 work
@@ -24,14 +22,12 @@ Feature: Active Audit Logging
     And the audit log contains an entry with decision "block"
     And the audit entry includes the block reason
 
-  @skip
   Scenario: Session start integrity check is recorded
     Given Phil's proposal "AF243-001" has a clean workspace
     When Phil starts a new session
     Then the audit log contains an entry for session start
     And the audit entry includes the proposal identifier "AF243-001"
 
-  @skip
   Scenario: Audit entries are written to the audit directory on disk
     Given Phil's proposal "AF243-001" is in Wave 4 drafting with all prerequisites met
     And active audit logging is enabled in the configuration

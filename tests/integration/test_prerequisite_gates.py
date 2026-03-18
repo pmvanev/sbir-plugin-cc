@@ -219,7 +219,7 @@ def test_block_decision_produces_audit_entry(
     # Verify audit entry
     assert len(audit_logger.entries) == 1
     entry = audit_logger.entries[0]
-    assert entry["decision"] == "BLOCK"
+    assert entry["decision"] == "block"
     assert entry["tool_name"] == tool_name
     assert entry["proposal_id"] == "test-proposal-001"
     # Rule ID appears in messages (engine includes rule message which contains rule context)

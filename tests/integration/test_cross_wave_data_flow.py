@@ -227,5 +227,5 @@ def test_wave_9_debrief_accesses_submission_and_outcome_data() -> None:
 
     # Audit entry confirms successful evaluation
     assert len(audit_logger.entries) == 1
-    assert audit_logger.entries[0]["decision"] == "ALLOW"
+    assert audit_logger.entries[0]["decision"] == "allow"
     assert audit_logger.entries[0]["proposal_id"] == "test-proposal-001"

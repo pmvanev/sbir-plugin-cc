@@ -349,7 +349,7 @@ class TestWaveBlockAuditLogging:
         assert len(audit.entries) == 1
         entry = audit.entries[0]
         assert "timestamp" in entry
-        assert entry["decision"] == "BLOCK"
+        assert entry["decision"] == "block"
 
 
 # --- C3: Wave 8 sign-off gate ---

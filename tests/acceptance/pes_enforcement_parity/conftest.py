@@ -130,13 +130,34 @@ def in_memory_audit_log():
 
 
 @pytest.fixture()
-def enforcement_engine(pes_config_path, in_memory_audit_log):
-    """EnforcementEngine wired with real JsonRuleAdapter and real config."""
+def enforcement_engine(pes_config_path, in_memory_audit_log, proposal_dir):
+    """EnforcementEngine wired with real JsonRuleAdapter, in-memory + file audit.
+
+    Uses a tee logger that writes to both in-memory (for assertions) and
+    file-based adapter (for disk persistence scenarios).
+    """
+    from pes.adapters.file_audit_adapter import FileAuditAdapter
     from pes.adapters.json_rule_adapter import JsonRuleAdapter
     from pes.domain.engine import EnforcementEngine
+    from pes.ports.audit_port import AuditLogger
 
+    audit_dir = str(proposal_dir / ".sbir" / "audit")
+    file_logger = FileAuditAdapter(audit_dir)
+
+    class _TeeAuditLogger(AuditLogger):
+        """Writes to both in-memory and file loggers."""
+
+        def __init__(self, mem: AuditLogger, file: AuditLogger) -> None:
+            self._mem = mem
+            self._file = file
+
+        def log(self, entry: dict[str, Any]) -> None:
+            self._mem.log(entry)
+            self._file.log(entry)
+
+    tee_logger = _TeeAuditLogger(in_memory_audit_log, file_logger)
     rule_loader = JsonRuleAdapter(str(pes_config_path))
-    return EnforcementEngine(rule_loader, in_memory_audit_log)
+    return EnforcementEngine(rule_loader, tee_logger)
 
 
 # ---------------------------------------------------------------------------

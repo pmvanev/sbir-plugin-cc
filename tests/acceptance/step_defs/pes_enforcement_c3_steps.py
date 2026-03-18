@@ -349,7 +349,7 @@ def verify_write_blocked():
 def verify_blocked_in_audit(in_memory_audit_log):
     """Verify blocked attempt is logged."""
     assert len(in_memory_audit_log.entries) > 0
-    assert in_memory_audit_log.entries[-1]["decision"] == "BLOCK"
+    assert in_memory_audit_log.entries[-1]["decision"] == "block"
 
 
 @then("the read proceeds normally")

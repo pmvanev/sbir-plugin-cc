@@ -273,7 +273,7 @@ def verify_audit_log(in_memory_audit_log):
     assert len(in_memory_audit_log.entries) > 0
     entry = in_memory_audit_log.entries[-1]
     assert "timestamp" in entry
-    assert entry["decision"] == "BLOCK"
+    assert entry["decision"] == "block"
 
 
 @then("the new rule is evaluated alongside existing rules")

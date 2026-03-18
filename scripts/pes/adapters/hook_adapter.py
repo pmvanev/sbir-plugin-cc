@@ -8,19 +8,14 @@ from __future__ import annotations
 
 from typing import Any
 
+import os
+
+from pes.adapters.file_audit_adapter import FileAuditAdapter
 from pes.adapters.json_rule_adapter import JsonRuleAdapter
 from pes.adapters.json_state_adapter import JsonStateAdapter
 from pes.domain.engine import EnforcementEngine
 from pes.domain.rules import Decision
 from pes.domain.state import StateNotFoundError
-from pes.ports.audit_port import AuditLogger
-
-
-class _NullAuditLogger(AuditLogger):
-    """No-op audit logger for when no audit path is configured."""
-
-    def log(self, entry: dict[str, Any]) -> None:
-        pass
 
 
 def process_hook_event(
@@ -40,7 +35,8 @@ def process_hook_event(
     """
     event = hook_input.get("event", "")
     rule_loader = JsonRuleAdapter(config_path)
-    audit_logger = _NullAuditLogger()
+    audit_dir = os.path.join(state_dir, "audit")
+    audit_logger = FileAuditAdapter(audit_dir)
     engine = EnforcementEngine(rule_loader, audit_logger)
 
     if event == "SessionStart":

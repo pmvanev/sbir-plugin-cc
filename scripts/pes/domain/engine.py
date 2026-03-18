@@ -44,7 +44,7 @@ class EnforcementEngine:
         self._audit_logger.log({
             "timestamp": datetime.now(UTC).isoformat(),
             "event": "session_start",
-            "decision": result.decision.value,
+            "decision": result.decision.value.lower(),
             "proposal_id": state.get("proposal_id", "unknown"),
             "messages": messages,
         })
@@ -69,7 +69,7 @@ class EnforcementEngine:
         self._audit_logger.log({
             "timestamp": datetime.now(UTC).isoformat(),
             "event": "evaluate",
-            "decision": result.decision.value,
+            "decision": result.decision.value.lower(),
             "tool_name": tool_name,
             "proposal_id": state.get("proposal_id", "unknown"),
             "messages": block_messages,

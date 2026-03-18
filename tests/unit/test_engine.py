@@ -150,25 +150,39 @@ class TestEnforcementEngineEvaluate:
 class TestEnforcementEngineAuditLogging:
     """Audit logging of enforcement decisions."""
 
-    def test_block_decision_recorded_with_timestamp(
-        self, audit_logger: FakeAuditLogger, pending_state: dict[str, Any]
+    @pytest.mark.parametrize(
+        "state_fixture,tool,expected_decision",
+        [
+            ("pending_state", "wave_1_strategy", "block"),
+            ("clean_state", "wave_1_strategy", "allow"),
+        ],
+    )
+    def test_audit_entry_records_lowercase_decision_with_required_fields(
+        self,
+        audit_logger: FakeAuditLogger,
+        state_fixture: str,
+        tool: str,
+        expected_decision: str,
+        request,
     ) -> None:
+        state = request.getfixturevalue(state_fixture)
         rules = [_wave_ordering_rule()]
         engine = EnforcementEngine(FakeRuleLoader(rules), audit_logger)
-        engine.evaluate(pending_state, tool_name="wave_1_strategy")
+        engine.evaluate(state, tool_name=tool)
         assert len(audit_logger.entries) == 1
         entry = audit_logger.entries[0]
-        assert entry["decision"] == "BLOCK"
+        assert entry["decision"] == expected_decision
         assert "timestamp" in entry
-        assert entry["tool_name"] == "wave_1_strategy"
+        assert "proposal_id" in entry
+        assert entry["tool_name"] == tool
 
-    def test_allow_decision_recorded_with_timestamp(
+    def test_session_start_audit_entry_has_lowercase_decision(
         self, audit_logger: FakeAuditLogger, clean_state: dict[str, Any]
     ) -> None:
-        rules = [_wave_ordering_rule()]
-        engine = EnforcementEngine(FakeRuleLoader(rules), audit_logger)
-        engine.evaluate(clean_state, tool_name="wave_1_strategy")
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        engine.check_session_start(clean_state)
         assert len(audit_logger.entries) == 1
         entry = audit_logger.entries[0]
-        assert entry["decision"] == "ALLOW"
-        assert "timestamp" in entry
+        assert entry["decision"] == "allow"
+        assert entry["event"] == "session_start"
+        assert "proposal_id" in entry

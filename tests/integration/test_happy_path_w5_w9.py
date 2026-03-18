@@ -154,7 +154,7 @@ def test_proposal_transitions_from_wave_5_through_wave_9_without_block() -> None
     # Verify audit trail: 5 transitions, all ALLOW
     assert len(audit_logger.entries) == 5
     for entry in audit_logger.entries:
-        assert entry["decision"] == "ALLOW"
+        assert entry["decision"] == "allow"
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ def test_audit_logger_records_allow_entry_per_wave_transition() -> None:
 
     assert len(audit_logger.entries) == 5
     for i, entry in enumerate(audit_logger.entries):
-        assert entry["decision"] == "ALLOW"
+        assert entry["decision"] == "allow"
         assert entry["event"] == "evaluate"
         assert "timestamp" in entry
         assert entry["proposal_id"] == "test-proposal-001"

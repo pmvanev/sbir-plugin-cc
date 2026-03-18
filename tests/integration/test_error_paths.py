@@ -136,7 +136,7 @@ def test_wave_2_to_5_skip_blocked_by_wave_ordering_not_pdc_gate() -> None:
     # Audit entry confirms wave_ordering origin
     assert len(audit_logger.entries) == 1
     entry = audit_logger.entries[0]
-    assert entry["decision"] == "BLOCK"
+    assert entry["decision"] == "block"
     assert entry["messages"] == result.messages
 
 
