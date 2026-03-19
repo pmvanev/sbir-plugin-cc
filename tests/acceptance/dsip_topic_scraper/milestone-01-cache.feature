@@ -9,7 +9,6 @@ Feature: Topic Cache with TTL-Based Freshness
   # --- US-DSIP-003 Cache: Happy Path ---
 
   # Happy path: cache write after enrichment
-  @skip
   Scenario: Cache enriched topic data after enrichment completes
     Given 42 topics have been enriched with descriptions and metadata
     When the cache writes the enriched topic data
@@ -19,7 +18,6 @@ Feature: Topic Cache with TTL-Based Freshness
     And the cache file includes enrichment completeness metrics
 
   # Happy path: cache freshness check within TTL
-  @skip
   Scenario: Cache recognized as fresh within the TTL window
     Given the cache was written 12 hours ago
     And the TTL is configured as 24 hours
@@ -40,7 +38,6 @@ Feature: Topic Cache with TTL-Based Freshness
   # --- US-DSIP-003 Cache: Edge Cases ---
 
   # Edge: cache stale after TTL expires
-  @skip
   Scenario: Cache recognized as stale after TTL window expires
     Given the cache was written 36 hours ago
     And the TTL is configured as 24 hours
@@ -56,7 +53,6 @@ Feature: Topic Cache with TTL-Based Freshness
     And a fresh fetch is initiated for Navy topics
 
   # Edge: atomic cache write survives interruption
-  @skip
   Scenario: Cache write uses atomic temp-backup-rename pattern
     Given 42 topics are ready to be cached
     When the cache writes the enriched topic data

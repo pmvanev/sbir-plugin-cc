@@ -1,0 +1,128 @@
+{
+  "roadmap": {
+    "project_id": "dsip-topic-scraper",
+    "created_at": "2026-03-19T16:10:00Z",
+    "total_steps": 5,
+    "phases": 3
+  },
+  "validation": {
+    "status": "approved",
+    "approved_at": "2026-03-19T16:10:00Z"
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Enrichment Infrastructure",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Topic enrichment port and adapter",
+          "description": "Driven port for per-topic detail fetching. Adapter downloads topic PDFs from DSIP API and extracts description, submission instructions, component instructions, Q&A text using pypdf.",
+          "criteria": [
+            "Enrichment port accepts topic IDs and returns per-topic detail data",
+            "Each enriched topic includes description, submission_instructions, component_instructions, and qa fields when available",
+            "Individual topic enrichment failures logged without stopping batch",
+            "Completeness metrics reported: description/instruction/Q&A counts vs total",
+            "Progress callback invoked per topic during enrichment",
+            "Rate limiting: configurable delay between per-topic requests"
+          ],
+          "files_to_modify": [
+            "scripts/pes/ports/topic_enrichment_port.py",
+            "scripts/pes/adapters/dsip_enrichment_adapter.py"
+          ],
+          "time_estimate": "2h",
+          "dependencies": [],
+          "scenarios": ["milestone-01-enrichment:all", "walking-skeleton:WS-1"]
+        },
+        {
+          "id": "01-02",
+          "name": "Topic cache port and adapter with TTL",
+          "description": "Driven port for topic data caching. Adapter persists enriched topics to .sbir/dsip_topics.json with TTL-based freshness check and atomic writes.",
+          "criteria": [
+            "Cache persists enriched topic data with scrape_date and source metadata",
+            "Freshness check returns stale when cache exceeds configurable TTL hours",
+            "Cache write uses atomic temp-backup-rename pattern",
+            "Missing or corrupt cache file handled gracefully (returns None)",
+            "Cache schema includes scrape_date, source, ttl_hours, total_topics, enrichment_completeness, topics array"
+          ],
+          "files_to_modify": [
+            "scripts/pes/ports/topic_cache_port.py",
+            "scripts/pes/adapters/json_topic_cache_adapter.py"
+          ],
+          "time_estimate": "1.5h",
+          "dependencies": [],
+          "scenarios": ["milestone-01-cache:all", "walking-skeleton:WS-3"]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Pipeline Integration",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "FinderService enrichment orchestration",
+          "description": "Extend FinderService with search_and_enrich() that orchestrates cache check, fetch, pre-filter, enrichment, cache write, and returns enriched candidates for scoring.",
+          "criteria": [
+            "Fresh cache returns cached topics without re-fetching",
+            "Stale or missing cache triggers fetch + pre-filter + enrichment pipeline",
+            "Pre-filtered candidates enriched before return",
+            "Enriched results persisted to cache after enrichment",
+            "Partial enrichment failures produce usable results with completeness report in messages",
+            "Existing search() and search_and_filter() remain backward-compatible"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/finder_service.py",
+            "scripts/pes/domain/topic_enrichment.py"
+          ],
+          "time_estimate": "2h",
+          "dependencies": ["01-01", "01-02"],
+          "scenarios": ["milestone-02-pipeline:all", "walking-skeleton:WS-2"]
+        },
+        {
+          "id": "02-02",
+          "name": "Structural change detection and diagnostics",
+          "description": "Detect DSIP API response schema changes in enrichment adapter. Save diagnostic data. Produce what/why/do error messages.",
+          "criteria": [
+            "Missing expected keys in enrichment response detected and reported",
+            "Raw response saved to .sbir/dsip_debug_response.json on structural change",
+            "Error messages follow what/why/do pattern with --file fallback suggestion",
+            "Retry with exponential backoff on transient failures",
+            "Timeout configurable per request"
+          ],
+          "files_to_modify": [
+            "scripts/pes/adapters/dsip_enrichment_adapter.py",
+            "scripts/pes/domain/finder_service.py"
+          ],
+          "time_estimate": "1.5h",
+          "dependencies": ["01-01"],
+          "scenarios": ["milestone-02-resilience:all"]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Agent and Skill Integration",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Topic scout agent workflow and DSIP enrichment skill",
+          "description": "Update topic scout agent to include cache check and enrichment in Phase 1 (INGEST). New DSIP enrichment skill with topic detail structure knowledge. Enriched descriptions used in semantic scoring.",
+          "criteria": [
+            "Agent checks cache freshness before fetching",
+            "Agent reports enrichment completeness after enrichment phase",
+            "Enriched descriptions available for LLM semantic scoring",
+            "DSIP enrichment skill loadable by topic scout agent"
+          ],
+          "files_to_modify": [
+            "agents/sbir-topic-scout.md",
+            "skills/sbir-topic-scout/dsip-enrichment.md"
+          ],
+          "time_estimate": "1h",
+          "dependencies": ["02-01"],
+          "scenarios": ["walking-skeleton:all"]
+        }
+      ]
+    }
+  ]
+}
