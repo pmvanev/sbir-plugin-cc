@@ -24,6 +24,14 @@ from tests.acceptance.dsip_topic_scraper.steps.scraper_common_steps import *  # 
 scenarios("../milestone-01-enrichment.feature")
 
 
+def _get_enrichment_entry(scraper_context: dict[str, Any]) -> dict[str, Any]:
+    """Get or create the enrichment data entry for the last candidate topic."""
+    topic_id = scraper_context["candidate_ids"][-1]
+    enrichment_data = scraper_context.setdefault("enrichment_data", {})
+    enrichment_data.setdefault(topic_id, {})
+    return enrichment_data[topic_id]
+
+
 # --- Fixtures ---
 
 
@@ -52,28 +60,22 @@ def topic_has_description_of_length(
     scraper_context: dict[str, Any],
 ):
     """Configure enrichment data with a description of specified length."""
-    topic_id = scraper_context["candidate_ids"][-1]
-    enrichment_data = scraper_context.setdefault("enrichment_data", {})
-    enrichment_data[topic_id] = enrichment_data.get(topic_id, {})
-    enrichment_data[topic_id]["description"] = "x" * length
+    entry = _get_enrichment_entry(scraper_context)
+    entry["description"] = "x" * length
 
 
 @given("the topic detail document contains submission instructions")
 def topic_has_instructions(scraper_context: dict[str, Any]):
     """Configure enrichment data with submission instructions."""
-    topic_id = scraper_context["candidate_ids"][-1]
-    enrichment_data = scraper_context.setdefault("enrichment_data", {})
-    enrichment_data[topic_id] = enrichment_data.get(topic_id, {})
-    enrichment_data[topic_id]["instructions"] = "Standard DoD SBIR submission instructions."
+    entry = _get_enrichment_entry(scraper_context)
+    entry["instructions"] = "Standard DoD SBIR submission instructions."
 
 
 @given(parsers.parse("the topic detail document contains {count:d} Q&A entries"))
 def topic_has_qa_entries(count: int, scraper_context: dict[str, Any]):
     """Configure enrichment data with Q&A entries."""
-    topic_id = scraper_context["candidate_ids"][-1]
-    enrichment_data = scraper_context.setdefault("enrichment_data", {})
-    enrichment_data[topic_id] = enrichment_data.get(topic_id, {})
-    enrichment_data[topic_id]["qa_entries"] = [
+    entry = _get_enrichment_entry(scraper_context)
+    entry["qa_entries"] = [
         {"question": f"Question {i}?", "answer": f"Answer {i}."}
         for i in range(1, count + 1)
     ]
@@ -82,24 +84,20 @@ def topic_has_qa_entries(count: int, scraper_context: dict[str, Any]):
 @given("the topic detail document has zero Q&A entries")
 def topic_has_no_qa(scraper_context: dict[str, Any]):
     """Configure enrichment data with empty Q&A."""
-    topic_id = scraper_context["candidate_ids"][-1]
-    enrichment_data = scraper_context.setdefault("enrichment_data", {})
-    enrichment_data[topic_id] = enrichment_data.get(topic_id, {})
-    enrichment_data[topic_id]["qa_entries"] = []
+    entry = _get_enrichment_entry(scraper_context)
+    entry["qa_entries"] = []
 
 
 @given(parsers.parse("the topic detail document includes {component} component instructions"))
 def topic_has_component_instructions(component: str, scraper_context: dict[str, Any]):
     """Configure enrichment data with component-specific instructions."""
-    topic_id = scraper_context["candidate_ids"][-1]
-    enrichment_data = scraper_context.setdefault("enrichment_data", {})
-    enrichment_data[topic_id] = enrichment_data.get(topic_id, {})
-    enrichment_data[topic_id]["component_instructions"] = (
+    entry = _get_enrichment_entry(scraper_context)
+    entry["component_instructions"] = (
         f"{component} component-specific submission instructions."
     )
     # Ensure general instructions also present (scenario expects both)
-    if "instructions" not in enrichment_data[topic_id]:
-        enrichment_data[topic_id]["instructions"] = "Standard DoD SBIR submission instructions."
+    if "instructions" not in entry:
+        entry["instructions"] = "Standard DoD SBIR submission instructions."
 
 
 @given(parsers.parse("{count:d} topics are queued for enrichment"))

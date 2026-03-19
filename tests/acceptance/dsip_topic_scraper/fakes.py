@@ -8,9 +8,6 @@ Fakes provided:
 - InMemoryTopicEnrichmentAdapter: simulates per-topic PDF enrichment
 - InMemoryTopicCacheAdapter: simulates file-based topic cache with TTL
 
-Note: TopicEnrichmentPort and TopicCachePort are not yet implemented
-in production code. These fakes define the expected interface and will
-be updated when the ports are created in DELIVER step 01-01 and 01-02.
 """
 
 from __future__ import annotations
@@ -204,7 +201,7 @@ class InMemoryTopicEnrichmentAdapter(TopicEnrichmentPort):
 
 
 class InMemoryTopicCacheAdapter:
-    """In-memory fake for TopicCachePort (not yet in production code).
+    """In-memory fake for TopicCachePort.
 
     Simulates file-based topic cache with TTL freshness check.
     """

@@ -9,12 +9,14 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from pes.domain.keyword_prefilter import KeywordPreFilter
 from pes.domain.topic_enrichment import combine_topics_with_enrichment, completeness_report
 from pes.ports.finder_results_port import FinderResultsPort
+from pes.ports.topic_enrichment_port import TopicEnrichmentPort
 from pes.ports.topic_fetch_port import FetchResult, TopicFetchPort
 
 logger = logging.getLogger(__name__)
@@ -51,7 +53,7 @@ class FinderService:
         profile: dict[str, Any] | None = None,
         results_port: FinderResultsPort | None = None,
         diagnostic_dir: Path | None = None,
-        enrichment_port: Any | None = None,
+        enrichment_port: TopicEnrichmentPort | None = None,
         cache_port: Any | None = None,
     ) -> None:
         self._topic_fetch = topic_fetch
@@ -68,6 +70,16 @@ class FinderService:
         ("past_performance", "past performance"),
         ("key_personnel", "key personnel"),
     ]
+
+    @property
+    def _company_name(self) -> str | None:
+        """Extract company name from profile, or None if no profile."""
+        return self._profile.get("company_name", "") if self._profile else None
+
+    @property
+    def _capabilities(self) -> list[str]:
+        """Extract capabilities from profile, or empty list if no profile."""
+        return self._profile.get("capabilities", []) if self._profile else []
 
     def search(
         self,
@@ -100,9 +112,7 @@ class FinderService:
                 "No company profile: scoring accuracy severely degraded"
             )
 
-        company_name = (
-            self._profile.get("company_name", "") if self._profile else None
-        )
+        company_name = self._company_name
 
         # Check for incomplete profile sections
         if self._profile is not None:
@@ -201,9 +211,7 @@ class FinderService:
             })
 
         messages: list[str] = []
-        company_name = (
-            self._profile.get("company_name", "") if self._profile else None
-        )
+        company_name = self._company_name
 
         if fetch_result.error and not fetch_result.topics:
             return SearchResult(
@@ -218,14 +226,11 @@ class FinderService:
             )
 
         # Filter phase
-        capabilities = (
-            self._profile.get("capabilities", []) if self._profile else []
-        )
 
         if on_progress is not None:
             on_progress({"phase": "filter", "status": "started"})
 
-        filter_result = self._prefilter.filter(fetch_result.topics, capabilities)
+        filter_result = self._prefilter.filter(fetch_result.topics, self._capabilities)
 
         if on_progress is not None:
             on_progress({
@@ -273,9 +278,7 @@ class FinderService:
             SearchResult with enriched candidates and completeness messages.
         """
         messages: list[str] = []
-        company_name = (
-            self._profile.get("company_name", "") if self._profile else None
-        )
+        company_name = self._company_name
 
         # Step 1: Check cache freshness
         if self._cache_port is not None and self._cache_port.is_fresh(ttl_hours):
@@ -311,10 +314,7 @@ class FinderService:
             )
 
         # Step 3: Pre-filter
-        capabilities = (
-            self._profile.get("capabilities", []) if self._profile else []
-        )
-        filter_result = self._prefilter.filter(fetch_result.topics, capabilities)
+        filter_result = self._prefilter.filter(fetch_result.topics, self._capabilities)
         messages.extend(filter_result.warnings)
 
         candidates = filter_result.candidates
@@ -342,8 +342,6 @@ class FinderService:
 
             # Step 5: Write to cache
             if self._cache_port is not None:
-                from datetime import datetime
-
                 metadata = {
                     "scrape_date": datetime.now().isoformat(),
                     "source": fetch_result.source,

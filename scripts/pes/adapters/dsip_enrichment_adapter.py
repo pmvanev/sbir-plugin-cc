@@ -99,9 +99,7 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
                     "topic_id": topic_id,
                     "error": f"document download failed: {exc}",
                 })
-                if on_progress is not None:
-                    on_progress(progress)
-                self._rate_limit_delay(i, len(topic_ids))
+                self._notify_and_delay(on_progress, progress, i, len(topic_ids))
                 continue
 
             try:
@@ -113,9 +111,7 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
                     "topic_id": topic_id,
                     "error": f"extraction failed: {exc}",
                 })
-                if on_progress is not None:
-                    on_progress(progress)
-                self._rate_limit_delay(i, len(topic_ids))
+                self._notify_and_delay(on_progress, progress, i, len(topic_ids))
                 continue
 
             progress["status"] = "ok"
@@ -131,10 +127,7 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
             instr_count += 1 if data.get("instructions") else 0
             qa_count += 1 if data.get("qa_entries") else 0
 
-            if on_progress is not None:
-                on_progress(progress)
-
-            self._rate_limit_delay(i, len(topic_ids))
+            self._notify_and_delay(on_progress, progress, i, len(topic_ids))
 
         return EnrichmentResult(
             enriched=enriched,
@@ -277,6 +270,18 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
                 })
 
         return entries
+
+    def _notify_and_delay(
+        self,
+        on_progress: Any | None,
+        progress: dict[str, Any],
+        index: int,
+        total: int,
+    ) -> None:
+        """Send progress callback and apply rate limiting delay."""
+        if on_progress is not None:
+            on_progress(progress)
+        self._rate_limit_delay(index, total)
 
     def _rate_limit_delay(self, index: int, total: int) -> None:
         """Apply rate limiting delay between requests (skip after last)."""
