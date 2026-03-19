@@ -1,0 +1,197 @@
+journey:
+  name: "Partnership-Aware AI Suggestions"
+  goal: "Integrate partner profiles into existing agents to produce partnership-aware scoring, approaches, strategy, and drafting"
+  persona: "Phil Santos -- engineer, partner profiles on file, working on partnered STTR proposal"
+  job_stories:
+    - JS-1  # Repeat Partner Proposal Content
+    - JS-3  # Partner-Aware Topic Scoring
+
+  emotional_arc:
+    start: "Hopeful but skeptical (will partner data actually improve suggestions?)"
+    middle: "Surprised and delighted (it used actual partner capabilities)"
+    end: "Trusting (the AI understands the partnership)"
+
+steps:
+  - id: 1
+    name: "Partnership-Aware Topic Scoring"
+    command: "/solicitation-find (enhanced)"
+
+    tui_mockup: |
+      +-- Solicitation Scoring (Partnership-Aware) -------------+
+      | Topic ${topic_id}: ${topic_title}                       |
+      | Type: ${program_type}                                   |
+      |                                                         |
+      |                  You Only    + ${partner}    Delta       |
+      | SME              ${sme_solo}  ${sme_pair}   ${sme_d}    |
+      | Past Perf        ${pp_solo}   ${pp_pair}    ${pp_d}     |
+      | Certifications   ${cert_solo} ${cert_pair}  ${cert_d}   |
+      | Eligibility      ${elig_solo} ${elig_pair}  ${elig_d}   |
+      | STTR             ${sttr_solo} ${sttr_pair}  ${sttr_d}   |
+      | -----------------------------------------------         |
+      | Composite:       ${comp_solo} ${comp_pair}  ${comp_d}   |
+      | Recommendation:  ${rec_solo}  ${rec_pair}               |
+      |                                                         |
+      | ${elevation_note}                                       |
+      +---------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "company_profile"
+        source: "~/.sbir/company-profile.json"
+        displayed_as: "${sme_solo}, ${pp_solo}, etc."
+        consumers:
+          - "Step 1: Solo scoring column"
+          - "Step 2: Approach generation"
+          - "Step 3: Strategy brief"
+
+      - name: "partner_profile"
+        source: "~/.sbir/partners/${partner_slug}.json"
+        displayed_as: "${sme_pair}, ${pp_pair}, etc."
+        consumers:
+          - "Step 1: Partnership scoring column"
+          - "Step 2: Approach generation"
+          - "Step 3: Strategy brief teaming section"
+          - "Step 4: Section drafting"
+
+    emotional_state:
+      entry: "Scanning, evaluating"
+      exit: "Excited -- found opportunities elevated by partnership"
+
+    integration_checkpoint: |
+      Partner profiles must be discoverable by topic-scout agent.
+      Scoring must show BOTH solo and partnership columns.
+      Delta column must highlight significant elevations.
+
+  - id: 2
+    name: "Partnership-Aware Approach Generation"
+    command: "/proposal-shape (enhanced)"
+
+    tui_mockup: |
+      +-- Approach Selection (Partnership-Aware) ---------------+
+      | Topic: ${topic_id} -- ${topic_title}                    |
+      | Partnership: ${company_name} + ${partner_name}          |
+      |                                                         |
+      | APPROACH 1: ${approach_name} (RECOMMENDED)              |
+      |   Score: ${score}/10                                    |
+      |   Leverages: ${partner_capabilities_used}               |
+      |   Work split: ${partner_name} leads ${partner_tasks}    |
+      |     (${partner_percent}%), you lead ${your_tasks}       |
+      |     (${your_percent}%)                                  |
+      |   Facility: ${partner_facilities_used}                  |
+      |                                                         |
+      | Select: (1) (2) (3) (e)dit (q)uit                      |
+      +---------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "approach_brief"
+        source: "artifacts/wave-0-go-nogo/approach-brief.md"
+        displayed_as: "Approach details with partnership attribution"
+        consumers:
+          - "Step 3: Strategy brief references selected approach"
+          - "Step 4: Drafting references approach and work split"
+
+    emotional_state:
+      entry: "Evaluating options"
+      exit: "Confident in selection -- approaches grounded in real capabilities"
+
+    integration_checkpoint: |
+      Solution shaper must load partner profile alongside company profile.
+      Approaches must explicitly reference partner capabilities.
+      Work split percentages must be STTR-compliant (partner >= 30% for STTR).
+
+  - id: 3
+    name: "Partnership-Aware Strategy Brief"
+    command: "/proposal-wave-strategy (enhanced)"
+
+    tui_mockup: |
+      +-- Strategy Brief: Teaming Section ----------------------+
+      | ## 3. Teaming Strategy                                  |
+      |                                                         |
+      | ### 3.1 Partnership Structure                           |
+      | ${company_name} (prime) + ${partner_name}               |
+      | (${partner_type}). ${partner_name} performs              |
+      | ${partner_percent}% of Phase I work.                    |
+      |                                                         |
+      | ### 3.2 Capability Complementarity                      |
+      | ${complementarity_matrix}                               |
+      |                                                         |
+      | ### 3.3 Work Split                                      |
+      | ${company_name}: ${your_tasks}                          |
+      |   (${pi_name}, PI -- ${pi_expertise})                   |
+      | ${partner_name}: ${partner_tasks}                       |
+      |   (${copi_name}, Co-PI -- ${copi_expertise})            |
+      |                                                         |
+      | ### 3.4 Facilities                                      |
+      | ${partner_name}: ${partner_facilities}                  |
+      | ${company_name}: ${your_facilities}                     |
+      |                                                         |
+      | [Source: ${partner_slug}.json + company-profile.json]   |
+      +---------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "strategy_brief"
+        source: "artifacts/wave-1-strategy/strategy-brief.md"
+        displayed_as: "Teaming section with partner data"
+        consumers:
+          - "Step 4: Drafting references strategy brief"
+          - "/proposal-draft: writer uses teaming section as source"
+
+    emotional_state:
+      entry: "Focused on strategy"
+      exit: "Delighted -- teaming section auto-generated with real data"
+
+    integration_checkpoint: |
+      Strategist must read partner profile for teaming section.
+      Personnel names must match between partner profile and strategy brief.
+      Work split percentages must be consistent with approach brief.
+
+  - id: 4
+    name: "Partnership-Aware Section Drafting"
+    command: "/proposal-draft (enhanced)"
+
+    tui_mockup: |
+      +-- Draft: Technical Approach (Partnership-Aware) --------+
+      | Section references partner data:                        |
+      |                                                         |
+      | "...${partner_name} brings extensive experience in      |
+      | ${partner_capabilities} through their                   |
+      | ${partner_facilities}. ${copi_name} will lead the       |
+      | ${partner_tasks} effort, leveraging their expertise     |
+      | in ${copi_expertise}..."                                |
+      |                                                         |
+      | [Partner data source: ${partner_slug}.json]             |
+      +---------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "draft_sections"
+        source: "artifacts/wave-4-draft/"
+        displayed_as: "Proposal sections with partnership content"
+        consumers:
+          - "/proposal-iterate: revision cycle"
+          - "/proposal-wave-final-review: final review"
+
+    emotional_state:
+      entry: "Writing"
+      exit: "Trusting -- draft reads like a real partnership, not boilerplate"
+
+    integration_checkpoint: |
+      Writer must reference partner profile for capability claims.
+      Personnel names in draft must match partner profile exactly.
+      Facility claims must trace to partner profile facilities field.
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "partner_profile"
+      must_match_across: [1, 2, 3, 4]
+      failure_message: "Partner profile must be the single source of truth across all consuming agents"
+
+    - artifact: "work_split_percentages"
+      must_match_across: [2, 3, 4]
+      failure_message: "Work split must be consistent from approach brief through strategy to draft"
+
+    - artifact: "personnel_names"
+      must_match_across: [3, 4]
+      failure_message: "Partner personnel names must be identical in strategy brief and proposal draft"
+
+    - artifact: "partner_capabilities"
+      must_match_across: [1, 2, 3, 4]
+      failure_message: "Capability claims must trace to partner profile keywords"
