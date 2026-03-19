@@ -3,7 +3,10 @@
 Tests invoke through the EnforcementEngine driving port with fake adapters
 at port boundaries (RuleLoader, AuditLogger). No mocks inside the hexagon.
 
-Test Budget: 4 behaviors x 2 = 8 max unit tests
+Targeted domain tests (B5-B8) test PostActionValidator directly for
+mutation coverage.
+
+Test Budget: 8 behaviors x 2 = 16 max unit tests
 """
 
 from __future__ import annotations
@@ -193,3 +196,172 @@ class TestPostActionStateFileVerification:
         entry = audit_logger.entries[-1]
         assert entry["event"] == "post_action"
         assert entry["decision"] == "allow"
+
+
+# =============================================================================
+# Targeted domain tests for mutation coverage
+# =============================================================================
+# These test PostActionValidator directly to catch fine-grained mutations
+# that the EnforcementEngine driving-port tests miss.
+
+import json
+
+from pes.domain.post_action_validator import PostActionValidator, WAVE_DIR_NAMES
+
+
+# --- B5: _check_artifact_placement with correct/incorrect wave dirs ---
+
+
+class TestArtifactPlacementDirect:
+
+    def test_correct_wave_dir_returns_no_warnings(self) -> None:
+        validator = PostActionValidator()
+        state = {"current_wave": 3}
+        result = validator._check_artifact_placement(
+            state, "artifacts/wave-3-outline/draft.md"
+        )
+        assert result == []
+
+    @pytest.mark.parametrize("current_wave,expected_dir", [
+        (0, "wave-0-discovery"),
+        (1, "wave-1-strategy"),
+        (2, "wave-2-research"),
+        (3, "wave-3-outline"),
+        (4, "wave-4-drafting"),
+        (5, "wave-5-visuals"),
+        (6, "wave-6-format"),
+        (7, "wave-7-review"),
+        (8, "wave-8-submission"),
+        (9, "wave-9-learning"),
+    ])
+    def test_wave_dir_names_are_correct(self, current_wave: int, expected_dir: str) -> None:
+        assert WAVE_DIR_NAMES[current_wave] == expected_dir
+
+    def test_wrong_wave_dir_returns_warning_with_both_dirs(self) -> None:
+        validator = PostActionValidator()
+        state = {"current_wave": 4}
+        result = validator._check_artifact_placement(
+            state, "artifacts/wave-3-outline/draft.md"
+        )
+        assert len(result) == 1
+        assert "wave-3-outline" in result[0]
+        assert "wave-4-drafting" in result[0]
+
+    def test_no_wave_dir_in_path_returns_no_warnings(self) -> None:
+        validator = PostActionValidator()
+        state = {"current_wave": 4}
+        result = validator._check_artifact_placement(
+            state, "artifacts/some-other-dir/file.md"
+        )
+        assert result == []
+
+    def test_backslash_paths_normalized(self) -> None:
+        validator = PostActionValidator()
+        state = {"current_wave": 4}
+        result = validator._check_artifact_placement(
+            state, "artifacts\\wave-4-drafting\\file.md"
+        )
+        assert result == []
+
+    def test_unknown_wave_uses_fallback_dir_name(self) -> None:
+        validator = PostActionValidator()
+        state = {"current_wave": 99}
+        result = validator._check_artifact_placement(
+            state, "artifacts/wave-99-unknown/file.md"
+        )
+        assert len(result) == 1
+
+
+# --- B6: _check_state_wellformed with valid/invalid/missing JSON ---
+
+
+class TestStateFileWellformedDirect:
+
+    def test_valid_json_returns_no_warnings(self, tmp_path) -> None:
+        state_file = tmp_path / "proposal-state.json"
+        state_file.write_text(json.dumps({"key": "value"}))
+
+        validator = PostActionValidator()
+        result = validator._check_state_file(str(state_file))
+        assert result == []
+
+    def test_invalid_json_returns_malformed_warning(self, tmp_path) -> None:
+        state_file = tmp_path / "proposal-state.json"
+        state_file.write_text("{not valid json")
+
+        validator = PostActionValidator()
+        result = validator._check_state_file(str(state_file))
+        assert len(result) == 1
+        assert "malformed" in result[0].lower()
+
+    def test_missing_file_returns_not_found_warning(self, tmp_path) -> None:
+        validator = PostActionValidator()
+        result = validator._check_state_file(str(tmp_path / "nonexistent.json"))
+        assert len(result) == 1
+        assert "not found" in result[0].lower()
+
+
+# --- B7: _check_artifact_exists with existing/missing files ---
+
+
+class TestArtifactExistsDirect:
+
+    def test_existing_file_returns_no_warnings(self, tmp_path) -> None:
+        f = tmp_path / "artifact.md"
+        f.write_text("content")
+
+        validator = PostActionValidator()
+        result = validator._check_artifact_exists(str(f))
+        assert result == []
+
+    def test_missing_absolute_file_returns_warning(self, tmp_path) -> None:
+        missing = str(tmp_path / "nonexistent.md")
+
+        validator = PostActionValidator()
+        result = validator._check_artifact_exists(missing)
+        assert len(result) == 1
+        assert "not created" in result[0].lower()
+
+    def test_relative_path_skips_existence_check(self) -> None:
+        validator = PostActionValidator()
+        result = validator._check_artifact_exists("relative/path/file.md")
+        assert result == []
+
+
+# --- B8: validate() orchestration ---
+
+
+class TestValidateOrchestration:
+
+    def test_non_write_tool_returns_no_warnings(self) -> None:
+        validator = PostActionValidator()
+        result = validator.validate(
+            {"current_wave": 4}, "Read", {"file_path": "anything"}
+        )
+        assert result == []
+
+    @pytest.mark.parametrize("tool_name", ["Write", "Edit"])
+    def test_write_tools_trigger_validation(self, tool_name: str, tmp_path) -> None:
+        validator = PostActionValidator()
+        missing = str(tmp_path / "artifacts" / "wave-4-drafting" / "missing.md")
+        result = validator.validate(
+            {"current_wave": 4}, tool_name, {"file_path": missing}
+        )
+        assert len(result) >= 1
+
+    def test_state_file_validation_triggered_by_filename(self, tmp_path) -> None:
+        state_file = tmp_path / "proposal-state.json"
+        state_file.write_text("{bad json")
+
+        validator = PostActionValidator()
+        result = validator.validate(
+            {"current_wave": 0}, "Write", {"file_path": str(state_file)}
+        )
+        assert any("malformed" in m.lower() for m in result)
+
+    def test_non_artifact_non_state_write_returns_no_warnings(self) -> None:
+        validator = PostActionValidator()
+        result = validator.validate(
+            {"current_wave": 4}, "Write", {"file_path": "some/regular/file.md"}
+        )
+        assert result == []
