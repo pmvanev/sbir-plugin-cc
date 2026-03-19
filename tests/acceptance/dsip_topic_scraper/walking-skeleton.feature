@@ -5,7 +5,7 @@ Feature: DSIP Topic Scraper Walking Skeleton
 
   # Walking Skeleton 1: Fetch topics from DSIP, pre-filter, enrich, and see enriched candidates
   # Validates: DSIP source -> pre-filter -> enrichment -> candidate list with completeness report
-  @walking_skeleton @skip
+  @walking_skeleton
   Scenario: Proposal writer discovers and enriches DSIP topics for evaluation
     Given Phil has a company profile for "Radiant Defense Systems, LLC" with capabilities "directed energy", "RF power systems", "thermal management"
     And the topic source has 247 open topics for the current solicitation cycle

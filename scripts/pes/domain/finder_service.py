@@ -41,8 +41,8 @@ class SearchResult:
 class FinderService:
     """Application service for solicitation topic discovery.
 
-    Driving port: search(), search_with_document()
-    Driven ports: TopicFetchPort (topic source)
+    Driving port: search(), search_and_filter(), search_and_enrich()
+    Driven ports: TopicFetchPort, TopicEnrichmentPort, TopicCachePort
     """
 
     def __init__(
@@ -51,12 +51,16 @@ class FinderService:
         profile: dict[str, Any] | None = None,
         results_port: FinderResultsPort | None = None,
         diagnostic_dir: Path | None = None,
+        enrichment_port: Any | None = None,
+        cache_port: Any | None = None,
     ) -> None:
         self._topic_fetch = topic_fetch
         self._profile = profile
         self._results_port = results_port
         self._diagnostic_dir = diagnostic_dir
         self._prefilter = KeywordPreFilter()
+        self._enrichment_port = enrichment_port
+        self._cache_port = cache_port
 
     # Profile sections that trigger per-section warnings when missing.
     _OPTIONAL_SECTIONS: list[tuple[str, str]] = [
@@ -245,6 +249,135 @@ class FinderService:
             messages=messages,
             total_fetched=len(fetch_result.topics),
             candidates_count=len(filter_result.candidates),
+            eliminated_count=filter_result.eliminated_count,
+        )
+
+    def search_and_enrich(
+        self,
+        filters: dict[str, str] | None = None,
+        *,
+        ttl_hours: int = 24,
+        on_progress: Any | None = None,
+    ) -> SearchResult:
+        """Fetch, pre-filter, enrich, and cache topics.
+
+        Orchestrates: cache check -> if fresh return cached -> else fetch ->
+        pre-filter -> enrich -> combine -> cache write -> return.
+
+        Args:
+            filters: Optional filters (agency, phase, etc.).
+            ttl_hours: Cache freshness window in hours.
+            on_progress: Optional callback for progress updates.
+
+        Returns:
+            SearchResult with enriched candidates and completeness messages.
+        """
+        messages: list[str] = []
+        company_name = (
+            self._profile.get("company_name", "") if self._profile else None
+        )
+
+        # Step 1: Check cache freshness
+        if self._cache_port is not None and self._cache_port.is_fresh(ttl_hours):
+            cached = self._cache_port.read()
+            if cached is not None:
+                cached_topics = cached.get("topics", [])
+                return SearchResult(
+                    topics=cached_topics,
+                    total=len(cached_topics),
+                    source=cached.get("source", ""),
+                    company_name=company_name,
+                    messages=["Using cached enriched data"],
+                    total_fetched=cached.get("total_topics", len(cached_topics)),
+                    candidates_count=len(cached_topics),
+                )
+
+        # Step 2: Fetch
+        fetch_result: FetchResult = self._topic_fetch.fetch(
+            filters=filters,
+            on_progress=on_progress,
+        )
+
+        if fetch_result.error and not fetch_result.topics:
+            return SearchResult(
+                source=fetch_result.source,
+                error=fetch_result.error,
+                company_name=company_name,
+                filters_applied=filters or {},
+                messages=["topic source unavailable"],
+                total_fetched=0,
+                candidates_count=0,
+                eliminated_count=0,
+            )
+
+        # Step 3: Pre-filter
+        capabilities = (
+            self._profile.get("capabilities", []) if self._profile else []
+        )
+        filter_result = self._prefilter.filter(fetch_result.topics, capabilities)
+        messages.extend(filter_result.warnings)
+
+        candidates = filter_result.candidates
+
+        # Step 4: Enrich
+        if self._enrichment_port is not None and candidates:
+            candidate_ids = [c.get("topic_id", "") for c in candidates]
+            enrichment_result = self._enrichment_port.enrich(
+                topic_ids=candidate_ids,
+                on_progress=on_progress,
+            )
+
+            # Step 4a: Combine candidates with enrichment data
+            combined = combine_topics_with_enrichment(
+                candidates, enrichment_result.enriched
+            )
+
+            # Step 4b: Completeness report
+            messages.extend(
+                completeness_report(
+                    enrichment_result.completeness,
+                    enrichment_result.errors,
+                )
+            )
+
+            # Step 5: Write to cache
+            if self._cache_port is not None:
+                from datetime import datetime
+
+                metadata = {
+                    "scrape_date": datetime.now().isoformat(),
+                    "source": fetch_result.source,
+                    "ttl_hours": ttl_hours,
+                    "total_topics": len(fetch_result.topics),
+                    "enrichment_completeness": enrichment_result.completeness,
+                    "filters_applied": filters or {},
+                }
+                self._cache_port.write(combined, metadata)
+
+            return SearchResult(
+                topics=combined,
+                total=len(fetch_result.topics),
+                source=fetch_result.source,
+                partial=fetch_result.partial,
+                company_name=company_name,
+                filters_applied=filters or {},
+                messages=messages,
+                total_fetched=len(fetch_result.topics),
+                candidates_count=len(combined),
+                eliminated_count=filter_result.eliminated_count,
+            )
+
+        # No enrichment port: return pre-filtered candidates as-is
+        return SearchResult(
+            topics=candidates,
+            total=len(fetch_result.topics),
+            source=fetch_result.source,
+            partial=fetch_result.partial,
+            company_name=company_name,
+            filters_applied=filters or {},
+            messages=messages,
+            total_fetched=len(fetch_result.topics),
+            candidates_count=len(candidates),
             eliminated_count=filter_result.eliminated_count,
         )
 

@@ -28,6 +28,7 @@ from tests.acceptance.dsip_topic_scraper.steps.scraper_common_steps import *  # 
 
 # Link to feature files
 scenarios("../milestone-02-pipeline.feature")
+scenarios("../walking-skeleton.feature")
 
 
 # --- Fixtures ---
@@ -243,24 +244,44 @@ def topic_scored(
 # --- When steps ---
 
 
-@when("Phil searches for matching solicitation topics with enrichment")
-def phil_searches_with_enrichment(scraper_context: dict[str, Any]):
-    """Phil invokes the finder with enrichment enabled."""
+def _run_search_and_enrich(
+    scraper_context: dict[str, Any],
+    filters: dict[str, str] | None = None,
+) -> None:
+    """Shared helper: build FinderService and run search_and_enrich."""
     ts = scraper_context.get("topic_source", {})
-    adapter = InMemoryTopicFetchAdapter(
+    fetch_adapter = InMemoryTopicFetchAdapter(
         topics=ts.get("topics", []),
         available=ts.get("available", True),
         rate_limit_after=ts.get("rate_limit_after"),
     )
+    enrichment_data = scraper_context.get("enrichment_data", {})
+    enrichment_adapter = InMemoryTopicEnrichmentAdapter(
+        enrichment_data=enrichment_data,
+        failing_topics=scraper_context.get("failing_topics", []),
+    )
+    cache_adapter = InMemoryTopicCacheAdapter()
     profile = scraper_context.get("profile")
-    service = FinderService(topic_fetch=adapter, profile=profile)
-    result = service.search_and_filter()
+    service = FinderService(
+        topic_fetch=fetch_adapter,
+        profile=profile,
+        enrichment_port=enrichment_adapter,
+        cache_port=cache_adapter,
+    )
+    result = service.search_and_enrich(filters=filters)
     scraper_context["search_result"] = result
+    scraper_context["cache_adapter"] = cache_adapter
     scraper_context["result"] = {
         "messages": result.messages,
         "topics": result.topics,
         "total": result.total,
     }
+
+
+@when("Phil searches for matching solicitation topics with enrichment")
+def phil_searches_with_enrichment(scraper_context: dict[str, Any]):
+    """Phil invokes the finder with enrichment enabled (no agency filter)."""
+    _run_search_and_enrich(scraper_context)
 
 
 @when("Phil searches for matching solicitation topics")
@@ -290,22 +311,12 @@ def phil_searches_topics(scraper_context: dict[str, Any]):
     }
 
 
-@when(parsers.parse("Phil searches for {agency} topics with enrichment"))
+@when(parsers.re(
+    r"Phil searches for (?P<agency>(?!matching solicitation)[\w ]+?) topics with enrichment"
+))
 def phil_searches_agency_with_enrichment(agency: str, scraper_context: dict[str, Any]):
     """Phil invokes the finder with agency filter and enrichment."""
-    ts = scraper_context.get("topic_source", {})
-    adapter = InMemoryTopicFetchAdapter(
-        topics=ts.get("topics", []),
-        available=ts.get("available", True),
-    )
-    profile = scraper_context.get("profile")
-    service = FinderService(topic_fetch=adapter, profile=profile)
-    result = service.search_and_filter(filters={"agency": agency})
-    scraper_context["search_result"] = result
-    scraper_context["result"] = {
-        "messages": result.messages,
-        "topics": result.topics,
-    }
+    _run_search_and_enrich(scraper_context, filters={"agency": agency})
 
 
 @when("the finder fetches topic metadata")
@@ -576,5 +587,30 @@ def n_candidates_from_total(count: int, total: int, scraper_context: dict[str, A
 
 @then("enriched topics are cached for reuse within 24 hours")
 def topics_cached(scraper_context: dict[str, Any]):
-    """Verify cache write (placeholder for DELIVER implementation)."""
-    pass
+    """Verify cache write after enrichment."""
+    cache_adapter = scraper_context.get("cache_adapter")
+    assert cache_adapter is not None, "No cache adapter found"
+    assert cache_adapter.exists(), "Cache was not written"
+    assert cache_adapter.is_fresh(24), "Cache is not fresh within 24 hours"
+
+
+@then("each candidate topic includes a description with at least 500 characters")
+def each_candidate_has_long_description(scraper_context: dict[str, Any]):
+    """Verify every candidate topic has a description >= 500 chars."""
+    result = scraper_context.get("search_result")
+    assert result is not None, "No search result"
+    for topic in result.topics:
+        desc = topic.get("description", "")
+        assert len(desc) >= 500, (
+            f"Topic {topic.get('topic_id')} description is {len(desc)} chars, need >= 500"
+        )
+
+
+@then(parsers.parse('the enrichment report shows "{report}"'))
+def enrichment_report_shows(report: str, scraper_context: dict[str, Any]):
+    """Verify enrichment report in search_and_enrich messages."""
+    result = scraper_context.get("search_result")
+    assert result is not None, "No search result"
+    assert any(report in m for m in result.messages), (
+        f"Expected '{report}' in messages: {result.messages}"
+    )

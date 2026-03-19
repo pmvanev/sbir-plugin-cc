@@ -13,11 +13,14 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from tests.acceptance.dsip_topic_scraper.fakes import InMemoryTopicEnrichmentAdapter
+from tests.acceptance.dsip_topic_scraper.fakes import (
+    InMemoryTopicCacheAdapter,
+    InMemoryTopicEnrichmentAdapter,
+    InMemoryTopicFetchAdapter,
+)
 from tests.acceptance.dsip_topic_scraper.steps.scraper_common_steps import *  # noqa: F403
 
 # Link to feature files
-scenarios("../walking-skeleton.feature")
 scenarios("../milestone-01-enrichment.feature")
 
 
@@ -112,10 +115,8 @@ def each_topic_has_detail_document(scraper_context: dict[str, Any]):
     scraper_context.setdefault("enrichment_data", {})
 
 
-@given("each candidate topic has a downloadable description document")
-def each_candidate_has_description(scraper_context: dict[str, Any]):
-    """All candidate topics have downloadable description documents."""
-    scraper_context.setdefault("enrichment_data", {})
+# Step "each candidate topic has a downloadable description document"
+# is defined in scraper_common_steps.py (imported via *)
 
 
 @given(parsers.parse('topic "{topic_id}" has an unparseable detail document'))

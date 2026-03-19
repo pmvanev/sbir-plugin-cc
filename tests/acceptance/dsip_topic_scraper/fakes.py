@@ -163,9 +163,21 @@ class InMemoryTopicEnrichmentAdapter(TopicEnrichmentPort):
             else:
                 data = self._enrichment_data.get(topic_id, {})
                 progress["status"] = "ok"
+                default_desc = (
+                    f"Background: This topic ({topic_id}) seeks innovative approaches "
+                    f"to advance defense capabilities. Phase I will demonstrate feasibility "
+                    f"of the proposed concept through modeling, simulation, and limited "
+                    f"prototyping. Phase II will develop a working prototype suitable for "
+                    f"field evaluation. The expected TRL entry is 3 with TRL 5 exit. "
+                    f"References include prior SBIR work in related areas. Proposers "
+                    f"should demonstrate relevant domain expertise and access to "
+                    f"necessary test facilities. Additional detail on requirements "
+                    f"and evaluation criteria is provided in the full solicitation "
+                    f"document available through the DSIP portal."
+                )
                 enriched.append({
                     "topic_id": topic_id,
-                    "description": data.get("description", f"Description for {topic_id}"),
+                    "description": data.get("description", default_desc),
                     "instructions": data.get("instructions"),
                     "component_instructions": data.get("component_instructions"),
                     "qa_entries": data.get("qa_entries", []),
