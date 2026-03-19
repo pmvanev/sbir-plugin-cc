@@ -1,0 +1,158 @@
+journey:
+  name: "DSIP Topic Scraping and Scoring"
+  goal: "Automatically discover, enrich, and score all DoD SBIR/STTR topics from the DSIP portal"
+  persona: "Phil Santos -- small business engineer, 2-3 proposals/year, CLI-native"
+
+  emotional_arc:
+    start: "Curious and hopeful -- starting a new proposal cycle"
+    middle: "Engaged and watchful during scraping, building to thorough and informed"
+    end: "Confident and empowered -- all data in hand for decisions"
+
+  trigger:
+    command: "/solicitation find"
+    context: "Beginning of proposal cycle; user wants to discover available DoD topics"
+
+steps:
+  - id: 1
+    name: "Validate DSIP Access"
+    command: "/solicitation find (internal: connect to DSIP)"
+
+    shared_artifacts:
+      - name: "company_profile"
+        source: "~/.sbir/company-profile.json"
+        displayed_as: "${company_capabilities}"
+        consumers:
+          - "Step 2 (pre-filter keywords)"
+          - "Step 4 (fit scoring)"
+      - name: "dsip_api_endpoint"
+        source: "scraper configuration"
+        displayed_as: "${dsip_base_url}/topics/api/public/topics/search"
+        consumers:
+          - "Step 2 (API call)"
+
+    emotional_state:
+      entry: "Curious, hopeful"
+      exit: "Reassured (success) or warned with guidance (failure)"
+
+    integration_checkpoint: |
+      DSIP API endpoint is reachable.
+      Company profile loaded successfully.
+      Search parameters validated (agency, phase, status filters).
+
+    error_paths:
+      - condition: "DSIP portal unreachable"
+        message: "WHAT: Cannot connect to DSIP API | WHY: Portal down or network issue | DO: Use --file with downloaded BAA PDF"
+      - condition: "Company profile missing"
+        message: "Search runs in degraded mode with reduced scoring accuracy"
+
+  - id: 2
+    name: "Fetch Topic Metadata via API"
+    command: "Internal: paginated API calls to DSIP search endpoint"
+
+    shared_artifacts:
+      - name: "dsip_raw_topics"
+        source: "DSIP API response (data[] array)"
+        displayed_as: "${topic_count} topics fetched"
+        consumers:
+          - "Step 3 (enrichment input)"
+          - ".sbir/dsip_topics.json (cache)"
+      - name: "search_parameters"
+        source: "User flags + defaults"
+        displayed_as: "status=${status_filter}, component=${agency_filter}"
+        consumers:
+          - "API request body"
+
+    emotional_state:
+      entry: "Anticipating results"
+      exit: "Engaged -- seeing data arrive progressively"
+
+    integration_checkpoint: |
+      API response contains expected 'total' and 'data' keys.
+      Pagination completes (all pages fetched or partial failure reported).
+      Topic count matches reported total.
+
+    error_paths:
+      - condition: "API response format changed"
+        message: "WHAT: Unexpected API response structure | WHY: DSIP may have updated their API | DO: Check for scraper updates or use --file fallback"
+      - condition: "Partial page failure"
+        message: "Partial results available. Proceed with captured data, report missing count."
+
+  - id: 3
+    name: "Enrich Topics with Details"
+    command: "Internal: per-topic detail fetching (descriptions, instructions, Q&A)"
+
+    shared_artifacts:
+      - name: "enriched_topics"
+        source: "DSIP topic detail pages / API detail endpoints"
+        displayed_as: "${enriched_count}/${total_count} topics enriched"
+        consumers:
+          - "Step 4 (scoring input)"
+          - ".sbir/dsip_topics.json (cached output)"
+      - name: "enrichment_completeness"
+        source: "Computed during enrichment"
+        displayed_as: "Descriptions: ${desc_count} | Instructions: ${instr_count} | Q&A: ${qa_count}"
+        consumers:
+          - "Step 4 (scoring confidence)"
+          - "User output (completeness report)"
+
+    emotional_state:
+      entry: "Watchful, patient (longer step)"
+      exit: "Thorough, informed"
+
+    integration_checkpoint: |
+      Each enriched topic has: description (required), instructions (optional), Q&A (optional).
+      Completeness metrics computed and reported.
+      Failed enrichments logged with topic IDs for retry.
+
+    error_paths:
+      - condition: "Topic detail page structure changed"
+        message: "Description extraction failed for N topics. Metadata still available."
+      - condition: "Rate limiting from DSIP"
+        message: "Throttled by DSIP portal. Captured N of M topics. Retry remaining later."
+
+  - id: 4
+    name: "Score and Rank Topics"
+    command: "Internal: delegates to existing TopicScoringService"
+
+    shared_artifacts:
+      - name: "scored_topics"
+        source: "TopicScoringService.score_batch() output"
+        displayed_as: "Ranked table with GO/EVALUATE/NO-GO"
+        consumers:
+          - ".sbir/finder-results.json"
+          - "User display (ranked table)"
+          - "pursue command (topic selection)"
+      - name: "finder_results"
+        source: ".sbir/finder-results.json"
+        displayed_as: "Results saved to .sbir/finder-results.json"
+        consumers:
+          - "pursue <topic-id> command"
+          - "/proposal new (pre-loaded TopicInfo)"
+
+    emotional_state:
+      entry: "Anticipating verdicts"
+      exit: "Confident, empowered to make decisions"
+
+    integration_checkpoint: |
+      All pre-filtered topics scored with five-dimension breakdown.
+      Disqualified topics separated with reasons.
+      Results persisted to finder-results.json.
+      Pursue flow available for top-scored topics.
+
+    error_paths:
+      - condition: "No topics match company capabilities"
+        message: "No topics matched your capability profile. Try broadening search or updating profile."
+      - condition: "Scoring service unavailable"
+        message: "Topic data fetched but scoring failed. Data cached in .sbir/dsip_topics.json for retry."
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "company_profile"
+      must_match_across: [1, 4]
+      failure_message: "Company profile used for pre-filtering must be same as used for scoring"
+    - artifact: "dsip_raw_topics"
+      must_match_across: [2, 3]
+      failure_message: "Topics fetched in step 2 must be the same set enriched in step 3"
+    - artifact: "enriched_topics"
+      must_match_across: [3, 4]
+      failure_message: "Enriched topic data must flow completely into scoring pipeline"
