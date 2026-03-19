@@ -94,6 +94,9 @@ def topic_has_component_instructions(component: str, scraper_context: dict[str, 
     enrichment_data[topic_id]["component_instructions"] = (
         f"{component} component-specific submission instructions."
     )
+    # Ensure general instructions also present (scenario expects both)
+    if "instructions" not in enrichment_data[topic_id]:
+        enrichment_data[topic_id]["instructions"] = "Standard DoD SBIR submission instructions."
 
 
 @given(parsers.parse("{count:d} topics are queued for enrichment"))
@@ -117,23 +120,35 @@ def each_candidate_has_description(scraper_context: dict[str, Any]):
 
 @given(parsers.parse('topic "{topic_id}" has an unparseable detail document'))
 def topic_has_unparseable_document(topic_id: str, scraper_context: dict[str, Any]):
-    """Mark a topic as having extraction failure."""
+    """Mark a topic as having extraction failure and inject into candidate list."""
     failing = scraper_context.setdefault("failing_topics", [])
     failing.append(topic_id)
+    # Inject topic_id into candidate list (replace last generic ID) so adapter processes it
+    candidates = scraper_context.get("candidate_ids", [])
+    if topic_id not in candidates and candidates:
+        candidates[-1] = topic_id
 
 
 @given(parsers.parse('the detail document for topic "{topic_id}" is not downloadable'))
 def topic_document_not_downloadable(topic_id: str, scraper_context: dict[str, Any]):
-    """Mark a topic as having download failure."""
+    """Mark a topic as having download failure and inject into candidate list."""
     download_failures = scraper_context.setdefault("download_failure_topics", [])
     download_failures.append(topic_id)
+    # Inject topic_id into candidate list (replace last generic ID) so adapter processes it
+    candidates = scraper_context.get("candidate_ids", [])
+    if topic_id not in candidates and candidates:
+        candidates[-1] = topic_id
 
 
 @given(parsers.parse('the detail document for topic "{topic_id}" takes longer than the timeout'))
 def topic_document_timeout(topic_id: str, scraper_context: dict[str, Any]):
-    """Mark a topic as timing out during enrichment."""
+    """Mark a topic as timing out during enrichment and inject into candidate list."""
     timeout_topics = scraper_context.setdefault("timeout_topics", [])
     timeout_topics.append(topic_id)
+    # Inject topic_id into candidate list (replace last generic ID) so adapter processes it
+    candidates = scraper_context.get("candidate_ids", [])
+    if topic_id not in candidates and candidates:
+        candidates[-1] = topic_id
 
 
 @given(parsers.parse("{count:d} topics were enriched"))
@@ -175,7 +190,7 @@ def enrich_single_topic(topic_id: str, scraper_context: dict[str, Any]):
     result = adapter.enrich([topic_id])
     scraper_context["enrichment_result"] = result
     scraper_context["current_topic_result"] = (
-        result["enriched"][0] if result["enriched"] else None
+        result.enriched[0] if result.enriched else None
     )
 
 
@@ -215,8 +230,8 @@ def enriched_topic_has_description(min_len: int, scraper_context: dict[str, Any]
     """Verify enriched topic has a description of minimum length."""
     topic = scraper_context.get("current_topic_result")
     if topic is None:
-        result = scraper_context.get("enrichment_result", {})
-        enriched = result.get("enriched", [])
+        result = scraper_context.get("enrichment_result")
+        enriched = result.enriched if result else []
         assert len(enriched) > 0, "No enriched topics found"
         topic = enriched[0]
     assert len(topic.get("description", "")) >= min_len, (
@@ -261,8 +276,8 @@ def enriched_topic_empty_qa(scraper_context: dict[str, Any]):
 @then("this is not treated as an error or warning")
 def not_treated_as_error(scraper_context: dict[str, Any]):
     """Verify no errors recorded for this topic."""
-    result = scraper_context.get("enrichment_result", {})
-    errors = result.get("errors", [])
+    result = scraper_context.get("enrichment_result")
+    errors = result.errors if result else []
     topic_id = scraper_context.get("candidate_ids", [""])[-1]
     topic_errors = [e for e in errors if e.get("topic_id") == topic_id]
     assert len(topic_errors) == 0, f"Unexpected errors for {topic_id}: {topic_errors}"
@@ -297,8 +312,8 @@ def progress_reported_per_topic(scraper_context: dict[str, Any]):
 def n_topics_enriched(count: int, scraper_context: dict[str, Any]):
     """Verify count of successfully enriched topics."""
     result = scraper_context["enrichment_result"]
-    assert len(result["enriched"]) == count, (
-        f"Expected {count} enriched, got {len(result['enriched'])}"
+    assert len(result.enriched) == count, (
+        f"Expected {count} enriched, got {len(result.enriched)}"
     )
 
 
@@ -306,7 +321,7 @@ def n_topics_enriched(count: int, scraper_context: dict[str, Any]):
 def n_descriptions_captured(count: int, scraper_context: dict[str, Any]):
     """Verify count of topics with descriptions."""
     result = scraper_context["enrichment_result"]
-    assert result["completeness"]["descriptions"] == count
+    assert result.completeness["descriptions"] == count
 
 
 @then(parsers.parse('enrichment completeness reports "{report}"'))
@@ -315,7 +330,7 @@ def enrichment_completeness_report(report: str, scraper_context: dict[str, Any])
     result = scraper_context.get("enrichment_result")
     completeness = scraper_context.get("completeness")
     if completeness is None and result is not None:
-        completeness = result.get("completeness", {})
+        completeness = result.completeness
     assert completeness is not None, "No completeness data found"
     # Build expected report string and verify parts match
     # e.g., "Descriptions: 42/42" or "Descriptions: 42/42 | Instructions: 38/42 | Q&A: 29/42"
@@ -345,7 +360,7 @@ def per_topic_status_in_cache(scraper_context: dict[str, Any]):
 def topic_logged_extraction_failure(topic_id: str, scraper_context: dict[str, Any]):
     """Verify extraction failure is logged for specific topic."""
     result = scraper_context["enrichment_result"]
-    errors = result.get("errors", [])
+    errors = result.errors
     topic_errors = [e for e in errors if e.get("topic_id") == topic_id]
     assert len(topic_errors) > 0, f"No error logged for {topic_id}"
     assert "extraction" in topic_errors[0].get("error", "").lower()
@@ -363,7 +378,7 @@ def topic_metadata_preserved(topic_id: str, scraper_context: dict[str, Any]):
 def topic_logged_download_failure(topic_id: str, scraper_context: dict[str, Any]):
     """Verify download failure is logged for specific topic."""
     result = scraper_context["enrichment_result"]
-    errors = result.get("errors", [])
+    errors = result.errors
     topic_errors = [e for e in errors if e.get("topic_id") == topic_id]
     assert len(topic_errors) > 0, f"No error logged for {topic_id}"
     assert "download" in topic_errors[0].get("error", "").lower()
@@ -374,7 +389,7 @@ def enrichment_continues(scraper_context: dict[str, Any]):
     """Verify enrichment continued past failures."""
     result = scraper_context["enrichment_result"]
     total = len(scraper_context.get("candidate_ids", []))
-    processed = len(result["enriched"]) + len(result["errors"])
+    processed = len(result.enriched) + len(result.errors)
     assert processed == total, f"Expected {total} processed, got {processed}"
 
 
@@ -382,7 +397,7 @@ def enrichment_continues(scraper_context: dict[str, Any]):
 def topic_skipped_timeout(topic_id: str, scraper_context: dict[str, Any]):
     """Verify timeout is logged for specific topic."""
     result = scraper_context["enrichment_result"]
-    errors = result.get("errors", [])
+    errors = result.errors
     topic_errors = [e for e in errors if e.get("topic_id") == topic_id]
     assert len(topic_errors) > 0, f"No error logged for {topic_id}"
     assert "timeout" in topic_errors[0].get("error", "").lower()
@@ -393,7 +408,7 @@ def remaining_topics_complete(scraper_context: dict[str, Any]):
     """Verify remaining topics enriched despite timeout."""
     result = scraper_context["enrichment_result"]
     total = len(scraper_context.get("candidate_ids", []))
-    processed = len(result["enriched"]) + len(result["errors"])
+    processed = len(result.enriched) + len(result.errors)
     assert processed == total
 
 
@@ -401,8 +416,8 @@ def remaining_topics_complete(scraper_context: dict[str, Any]):
 def completeness_reflects_skip(scraper_context: dict[str, Any]):
     """Verify completeness metrics account for skipped topic."""
     result = scraper_context["enrichment_result"]
-    total = result["completeness"]["total"]
-    desc = result["completeness"]["descriptions"]
+    total = result.completeness["total"]
+    desc = result.completeness["descriptions"]
     assert desc < total, "Expected descriptions < total due to skip"
 
 
@@ -411,7 +426,7 @@ def enrichment_report_shows(report: str, scraper_context: dict[str, Any]):
     """Verify enrichment report content."""
     result = scraper_context.get("enrichment_result")
     if result:
-        completeness = result.get("completeness", {})
+        completeness = result.completeness
         total = completeness.get("total", 0)
         desc = completeness.get("descriptions", 0)
         assert f"{desc}/{total}" in report or completeness is not None

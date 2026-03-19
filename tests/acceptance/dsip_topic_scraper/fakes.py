@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from pes.ports.topic_enrichment_port import EnrichmentResult, TopicEnrichmentPort
 from pes.ports.topic_fetch_port import FetchResult, TopicFetchPort
 
 
@@ -102,8 +103,8 @@ class InMemoryTopicFetchAdapter(TopicFetchPort):
         )
 
 
-class InMemoryTopicEnrichmentAdapter:
-    """In-memory fake for TopicEnrichmentPort (not yet in production code).
+class InMemoryTopicEnrichmentAdapter(TopicEnrichmentPort):
+    """In-memory fake for TopicEnrichmentPort.
 
     Simulates per-topic PDF enrichment with configurable failures,
     timeouts, and content variations.
@@ -126,14 +127,8 @@ class InMemoryTopicEnrichmentAdapter:
         self,
         topic_ids: list[str],
         on_progress: Any | None = None,
-    ) -> dict[str, Any]:
-        """Enrich topics and return enrichment result.
-
-        Returns:
-            Dict with 'enriched' (list of enriched topic data),
-            'errors' (list of error records),
-            'completeness' (dict of counts).
-        """
+    ) -> EnrichmentResult:
+        """Enrich topics and return enrichment result."""
         enriched: list[dict[str, Any]] = []
         errors: list[dict[str, Any]] = []
         desc_count = 0
@@ -184,16 +179,16 @@ class InMemoryTopicEnrichmentAdapter:
             if on_progress is not None:
                 on_progress(progress)
 
-        return {
-            "enriched": enriched,
-            "errors": errors,
-            "completeness": {
+        return EnrichmentResult(
+            enriched=enriched,
+            errors=errors,
+            completeness={
                 "descriptions": desc_count,
                 "instructions": instr_count,
                 "qa": qa_count,
                 "total": len(topic_ids),
             },
-        }
+        )
 
 
 class InMemoryTopicCacheAdapter:

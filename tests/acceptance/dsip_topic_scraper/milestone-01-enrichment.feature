@@ -9,7 +9,6 @@ Feature: Topic Enrichment with Descriptions, Instructions, and Q&A
   # --- US-DSIP-002: Happy Path ---
 
   # Happy path: full enrichment of a single topic
-  @skip
   Scenario: Enrich topic with full description, instructions, and Q&A
     Given topic "AF263-042" was identified as a candidate
     And the topic detail document contains a 1847-character description
@@ -22,7 +21,6 @@ Feature: Topic Enrichment with Descriptions, Instructions, and Q&A
     And the topic's Q&A count is 3
 
   # Happy path: batch enrichment with progress
-  @skip
   Scenario: Enrich batch of candidate topics with progress indication
     Given 42 topics are queued for enrichment
     And each topic has a downloadable detail document
@@ -32,7 +30,6 @@ Feature: Topic Enrichment with Descriptions, Instructions, and Q&A
     And enrichment completeness reports "Descriptions: 42/42"
 
   # Happy path: completeness metrics across all content types
-  @skip
   Scenario: Report enrichment completeness metrics after batch enrichment
     Given 42 topics were enriched
     And 42 have descriptions, 38 have instructions, and 29 have Q&A entries
@@ -43,7 +40,6 @@ Feature: Topic Enrichment with Descriptions, Instructions, and Q&A
   # --- US-DSIP-002: Edge Cases ---
 
   # Edge: topic with no Q&A entries
-  @skip
   Scenario: Handle topic with no Q&A entries gracefully
     Given topic "MDA263-009" was identified as a candidate
     And the topic detail document has zero Q&A entries
@@ -53,7 +49,6 @@ Feature: Topic Enrichment with Descriptions, Instructions, and Q&A
     And this is not treated as an error or warning
 
   # Edge: topic with component-specific instructions
-  @skip
   Scenario: Capture component-specific instructions when available
     Given topic "AF263-042" was identified as a candidate
     And the topic detail document includes Air Force component instructions
@@ -64,7 +59,6 @@ Feature: Topic Enrichment with Descriptions, Instructions, and Q&A
   # --- US-DSIP-002: Error Paths ---
 
   # Error: description extraction fails for one topic
-  @skip
   Scenario: Continue enrichment after individual topic extraction failure
     Given 42 topics are queued for enrichment
     And topic "N261-099" has an unparseable detail document
@@ -75,7 +69,6 @@ Feature: Topic Enrichment with Descriptions, Instructions, and Q&A
     And enrichment completeness reports "Descriptions: 41/42"
 
   # Error: detail document download fails for one topic
-  @skip
   Scenario: Handle topic detail download failure without stopping batch
     Given 42 topics are queued for enrichment
     And the detail document for topic "CBD263-003" is not downloadable
@@ -85,7 +78,6 @@ Feature: Topic Enrichment with Descriptions, Instructions, and Q&A
     And enrichment continues for remaining topics
 
   # Error: enrichment timeout for slow topic
-  @skip
   Scenario: Enrichment times out for a slow topic without blocking others
     Given 42 topics are queued for enrichment
     And the detail document for topic "DTRA263-011" takes longer than the timeout
