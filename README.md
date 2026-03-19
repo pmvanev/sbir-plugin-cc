@@ -96,9 +96,15 @@ Your company profile at `~/.sbir/company-profile.json` carries over across proje
             Fix & rerun          Build profile
                                       |
                               /sbir:solicitation find
+                             (shows partnership scoring
+                              when partner profiles exist)
                                       |
                               Pick a topic
                                       |
+                            STTR topic? ──YES──> /sbir:proposal partner-setup
+                              |                  /sbir:proposal partner-screen (optional)
+                              NO                        |
+                              |   <─────────────────────+
                          /sbir:proposal new <topic>
                                       |
                                Go / No-Go?
@@ -161,12 +167,15 @@ Each wave produces specific artifacts and ends with a human checkpoint. PES enfo
 
 ### Wave 0: Setup, Intelligence & Fit
 
-Set up your environment (profile, corpus), then score topics against your company profile. Optionally generate candidate technical approaches.
+Set up your environment (profile, corpus, partner profiles), then score topics against your company profile. Optionally generate candidate technical approaches.
 
 ```bash
 /sbir:setup                                # First-time setup or re-run to update config
-/sbir:solicitation find                    # Search and rank open topics
+/sbir:proposal partner-setup               # Create a research institution partner profile
+/sbir:proposal partner-screen "MIT"        # Screen a new potential partner for readiness
+/sbir:solicitation find                    # Search and rank open topics (partnership-aware)
 /sbir:proposal new <topic-or-file>         # Start proposal, Go/No-Go checkpoint
+/sbir:proposal partner-set cu-boulder      # Designate partner for active proposal
 /sbir:proposal shape                       # Generate 3-5 candidate approaches (optional)
 /sbir:continue                             # Pick up where you left off (works in any wave)
 ```
@@ -312,15 +321,16 @@ Hook protocol: JSON on stdin/stdout, exit codes 0 (allow), 1 (block with explana
 
 ## Agents
 
-17 specialized agents collaborate across the lifecycle. Each agent owns a specific domain and is dispatched by the orchestrator based on proposal state.
+18 specialized agents collaborate across the lifecycle. Each agent owns a specific domain and is dispatched by the orchestrator based on proposal state.
 
 | Agent | Waves | What it does |
 |-------|-------|-------------|
 | **setup-wizard** | Pre | Orchestrates first-time setup: prerequisites, profile, corpus, API key, validation. Detects existing config and adapts for returning users. |
 | **profile-builder** | Pre | Builds company profile via web research (SAM.gov, sbir.gov, company site), document extraction, and guided interview. Explains how each field affects fit scoring. |
+| **partner-builder** | Pre,0 | Creates and manages research institution partner profiles. Conversational interview with web research, schema validation, combined capability analysis. Also supports readiness screening mode for evaluating new potential partners. |
 | **quality-discoverer** | Pre | Extracts writing quality intelligence from past proposals and evaluator feedback. Builds preferences, winning patterns, and quality profile artifacts that downstream agents consume. |
 | **corpus-librarian** | 0,1,3,4,9 | Indexes past proposals, debriefs, and capability documents. Provides wave-aware retrieval: fit exemplars in Wave 0, section structures in Wave 3, tone references in Wave 4. Manages corpus image reuse with adapted captions. |
-| **topic-scout** | 0 | Scores open solicitations against company profile using five-dimension fit scoring (subject matter 0.35, past performance 0.25, certifications 0.15, phase eligibility 0.15, STTR 0.10). Detects disqualifiers: clearance gaps, missing STTR partner, expired deadlines. |
+| **topic-scout** | 0 | Scores open solicitations against company profile using five-dimension fit scoring (subject matter 0.35, past performance 0.25, certifications 0.15, phase eligibility 0.15, STTR 0.10). Partnership-aware: when partner profiles exist, shows dual-column scoring (solo vs. partnership) with delta and recommendation elevation. Detects disqualifiers: clearance gaps, missing STTR partner, expired deadlines. |
 | **solution-shaper** | 0 | Generates 3-5 candidate technical approaches post-Go decision. Scores each against personnel alignment, past performance, technical readiness, solicitation fit, and commercialization potential with traceability to specific people and contracts. |
 | **compliance-sheriff** | 1,6,7 | Extracts every SHALL, FORMAT, and implicit requirement from the solicitation into a living compliance matrix. Preserves original contractual wording. Flags ambiguities as TPOC question opportunities. Runs final compliance audit in Wave 7. |
 | **tpoc-analyst** | 1 | Generates 7-15 strategically sequenced TPOC questions (opener → core → strategic → closer) with rationale. After the call, ingests notes and produces delta analysis: clarifications, expansions, contradictions, and confirmations against the solicitation. |
@@ -356,6 +366,9 @@ my-proposal-project/
 
 ~/.sbir/
   company-profile.json           # Global company profile (shared across all proposals)
+  partners/                      # Research institution partner profiles (one JSON per partner)
+    cu-boulder.json              # Partner profile: capabilities, personnel, facilities, STTR eligibility
+    swri.json
   quality-preferences.json       # Writing style preferences (tone, detail, evidence style)
   winning-patterns.json          # Proposal ratings and winning practices by agency
   writing-quality-profile.json   # Evaluator feedback patterns by agency and section
@@ -368,6 +381,9 @@ my-proposal-project/
 | `/sbir:setup` | Pre | Guided first-time setup (profile, corpus, API key, validation) |
 | `/sbir:proposal profile setup` | Pre | Create company profile (standalone) |
 | `/sbir:proposal profile update` | Pre | Update company profile |
+| `/sbir:proposal partner-setup` | Pre | Create or update a research institution partner profile |
+| `/sbir:proposal partner-set <slug>` | 0+ | Designate a partner for the active proposal |
+| `/sbir:proposal partner-screen <name>` | Pre | Screen a potential partner for readiness (5 signals) |
 | `/sbir:proposal corpus add <dir>` | Pre | Ingest past proposals and documents (standalone) |
 | `/sbir:proposal quality discover` | Pre | Build writing quality intelligence from past proposals |
 | `/sbir:proposal quality update` | Pre | Update quality artifacts from new debrief data |
