@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from pes.domain.agent_wave_mapping import is_agent_authorized_for_wave, is_agent_recognized
 from pes.domain.corpus_integrity import CorpusIntegrityEvaluator
 from pes.domain.deadline_blocking import DeadlineBlockingEvaluator
 from pes.domain.post_action_validator import PostActionValidator
@@ -157,6 +158,81 @@ class EnforcementEngine:
             "file_path": artifact_info.get("file_path", ""),
         })
 
+        return result
+
+    def check_agent_dispatch(
+        self,
+        state: dict[str, Any] | None,
+        agent_name: str,
+    ) -> EnforcementResult:
+        """Verify an agent is authorized for the current proposal wave.
+
+        Returns BLOCK if no active proposal, agent is unrecognized,
+        or agent is not authorized for the current wave.
+        Returns ALLOW with audit entry for authorized dispatch.
+        """
+        if state is None or "proposal_id" not in state:
+            result = EnforcementResult(
+                decision=Decision.BLOCK,
+                messages=["no active proposal for agent dispatch"],
+            )
+            self._safe_audit_log({
+                "timestamp": datetime.now(UTC).isoformat(),
+                "event": "agent_dispatch",
+                "decision": "block",
+                "agent_name": agent_name,
+                "proposal_id": "unknown",
+                "messages": result.messages,
+            })
+            return result
+
+        proposal_id = state.get("proposal_id", "unknown")
+        current_wave = state.get("current_wave", -1)
+
+        if not is_agent_recognized(agent_name):
+            result = EnforcementResult(
+                decision=Decision.BLOCK,
+                messages=[f"{agent_name} is not a recognized agent"],
+            )
+            self._safe_audit_log({
+                "timestamp": datetime.now(UTC).isoformat(),
+                "event": "agent_dispatch",
+                "decision": "block",
+                "agent_name": agent_name,
+                "wave": current_wave,
+                "proposal_id": proposal_id,
+                "messages": result.messages,
+            })
+            return result
+
+        if not is_agent_authorized_for_wave(agent_name, current_wave):
+            result = EnforcementResult(
+                decision=Decision.BLOCK,
+                messages=[
+                    f"{agent_name} is not authorized for Wave {current_wave}"
+                ],
+            )
+            self._safe_audit_log({
+                "timestamp": datetime.now(UTC).isoformat(),
+                "event": "agent_dispatch",
+                "decision": "block",
+                "agent_name": agent_name,
+                "wave": current_wave,
+                "proposal_id": proposal_id,
+                "messages": result.messages,
+            })
+            return result
+
+        result = EnforcementResult(decision=Decision.ALLOW)
+        self._safe_audit_log({
+            "timestamp": datetime.now(UTC).isoformat(),
+            "event": "agent_dispatch",
+            "decision": "allow",
+            "agent_name": agent_name,
+            "wave": current_wave,
+            "proposal_id": proposal_id,
+            "messages": [],
+        })
         return result
 
     def _safe_audit_log(self, entry: dict[str, Any]) -> None:

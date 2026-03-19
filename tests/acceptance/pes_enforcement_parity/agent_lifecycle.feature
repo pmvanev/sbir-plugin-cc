@@ -9,7 +9,6 @@ Feature: Agent Lifecycle Tracking
 
   # --- Happy Path Scenarios ---
 
-  @skip
   Scenario: Writer agent is allowed for Wave 4 drafting
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When the writer agent is dispatched for Wave 4 work
@@ -33,7 +32,6 @@ Feature: Agent Lifecycle Tracking
 
   # --- Error Path Scenarios ---
 
-  @skip
   Scenario: Researcher agent is blocked from Wave 4 drafting work
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When the researcher agent is dispatched for Wave 4 work
@@ -48,14 +46,12 @@ Feature: Agent Lifecycle Tracking
     Then the agent dispatch is blocked
     And Phil sees "writer is not authorized for Wave 2" in the block reason
 
-  @skip
   Scenario: Unknown agent name is blocked from any wave
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When an unrecognized agent "rogue-agent" is dispatched
     Then the agent dispatch is blocked
     And Phil sees "rogue-agent is not a recognized agent" in the block reason
 
-  @skip
   Scenario: Agent dispatch is blocked when no proposal is active
     Given no proposal session is active
     When the writer agent is dispatched

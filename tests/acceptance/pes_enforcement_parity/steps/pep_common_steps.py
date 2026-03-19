@@ -383,17 +383,11 @@ def dispatch_agent_for_wave(
     agent_name: str,
     wave_num: int,
 ):
-    """Invoke agent lifecycle check through the engine driving port.
-
-    This will call a new engine method (to be implemented) for agent dispatch
-    verification, checking agent is authorized for the current wave.
-    """
+    """Invoke agent dispatch verification through the engine driving port."""
     state = enforcement_context["state"]
     enforcement_context["dispatched_agent"] = agent_name
     enforcement_context["dispatched_wave"] = wave_num
-    # Agent dispatch check will be a new engine method -- acceptance test drives creation
-    # For walking skeleton: invoke evaluate with agent context
-    result = enforcement_engine.evaluate(state, tool_name=f"agent_dispatch_{agent_name}")
+    result = enforcement_engine.check_agent_dispatch(state, agent_name)
     enforcement_context["result"] = result
     return enforcement_context
 
@@ -539,7 +533,7 @@ def dispatch_unknown_agent(
     """Invoke agent dispatch check with an unknown agent name."""
     state = enforcement_context["state"]
     enforcement_context["dispatched_agent"] = agent_name
-    result = enforcement_engine.evaluate(state, tool_name=f"agent_dispatch_{agent_name}")
+    result = enforcement_engine.check_agent_dispatch(state, agent_name)
     enforcement_context["result"] = result
     return enforcement_context
 
@@ -553,8 +547,8 @@ def dispatch_writer_no_proposal(
     enforcement_context: dict[str, Any],
 ):
     """Invoke agent dispatch with no active proposal."""
-    state = enforcement_context.get("state") or {}
-    result = enforcement_engine.evaluate(state, tool_name="agent_dispatch_writer")
+    state = enforcement_context.get("state")
+    result = enforcement_engine.check_agent_dispatch(state, "writer")
     enforcement_context["result"] = result
     return enforcement_context
 
@@ -645,9 +639,22 @@ def verification_audited(in_memory_audit_log):
 def agent_activation_audited(in_memory_audit_log):
     """Verify an audit entry was recorded for agent activation."""
     entries = in_memory_audit_log.entries
-    assert len(entries) >= 1, (
-        f"Expected audit entry for agent activation. Got: {entries}"
+    agent_entries = [e for e in entries if e.get("event") == "agent_dispatch"]
+    assert len(agent_entries) >= 1, (
+        f"Expected agent_dispatch audit entry. Got: {entries}"
     )
+    assert agent_entries[0]["decision"] == "allow"
+
+
+@then("the rejected dispatch is recorded in the audit trail")
+def rejected_dispatch_audited(in_memory_audit_log):
+    """Verify an audit entry was recorded for the rejected agent dispatch."""
+    entries = in_memory_audit_log.entries
+    agent_entries = [e for e in entries if e.get("event") == "agent_dispatch"]
+    assert len(agent_entries) >= 1, (
+        f"Expected agent_dispatch audit entry. Got: {entries}"
+    )
+    assert agent_entries[0]["decision"] == "block"
 
 
 @then("the agent deactivation is recorded in the audit trail")

@@ -50,6 +50,10 @@ def process_hook_event(
         tool_name = tool_info.get("name", "")
         return _handle_post_tool_use(engine, state_dir, tool_name, tool_info)
 
+    if event == "SubagentStart":
+        agent_name = hook_input.get("agent_type", "")
+        return _handle_subagent_start(engine, state_dir, agent_name)
+
     return {"exit_code": 0}  # unknown event — allow
 
 
@@ -84,6 +88,27 @@ def _handle_pre_tool_use(
         }
 
     return {"exit_code": 0}  # pre-tool-use allowed
+
+
+def _handle_subagent_start(
+    engine: EnforcementEngine, state_dir: str, agent_name: str
+) -> dict[str, Any]:
+    """Handle SubagentStart event -- agent-wave authorization check."""
+    state_reader = JsonStateAdapter(state_dir)
+    try:
+        state = state_reader.load()
+    except StateNotFoundError:
+        state = None
+
+    result = engine.check_agent_dispatch(state, agent_name)
+
+    if result.decision == Decision.BLOCK:
+        return {
+            "exit_code": 1,
+            "message": "; ".join(result.messages),
+        }
+
+    return {"exit_code": 0}
 
 
 # Tools that only read data -- skip post-action validation entirely
@@ -137,13 +162,14 @@ def main() -> None:
     import sys
 
     if len(sys.argv) < 2:
-        msg = "Usage: hook_adapter <session-start|pre-tool-use|post-tool-use>"
+        msg = "Usage: hook_adapter <session-start|subagent-start|pre-tool-use|post-tool-use>"
         print(json.dumps({"error": msg}))
         sys.exit(2)
 
     subcommand = sys.argv[1]
     event_map = {
         "session-start": "SessionStart",
+        "subagent-start": "SubagentStart",
         "pre-tool-use": "PreToolUse",
         "post-tool-use": "PostToolUse",
     }

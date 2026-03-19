@@ -3,7 +3,7 @@
 Tests invoke through the EnforcementEngine public API with fake adapters
 at port boundaries (RuleLoader, AuditLogger). No mocks inside the hexagon.
 
-Test Budget: 9 behaviors x 2 = 18 max unit tests
+Test Budget: 13 behaviors x 2 = 26 max unit tests
 """
 
 from __future__ import annotations
@@ -264,6 +264,106 @@ class TestEnforcementEngineAppendOnly:
         assert audit_logger.entries[0] == snapshot[0]
         # New entry appended, not inserted
         assert audit_logger.entries[1]["tool_name"] == "tool_b"
+
+
+class TestEnforcementEngineAgentDispatch:
+    """Agent dispatch verification through driving port."""
+
+    @pytest.mark.parametrize(
+        "wave,agent_name",
+        [
+            (0, "corpus-librarian"),
+            (0, "solution-shaper"),
+            (3, "writer"),
+            (4, "writer"),
+            (4, "reviewer"),
+            (6, "compliance-sheriff"),
+            (7, "reviewer"),
+            (9, "debrief-analyst"),
+        ],
+    )
+    def test_authorized_agent_allowed_for_wave(
+        self, audit_logger: FakeAuditLogger, wave: int, agent_name: str
+    ) -> None:
+        state = {
+            "proposal_id": "test-uuid-agent",
+            "current_wave": wave,
+        }
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        result = engine.check_agent_dispatch(state, agent_name)
+        assert result.decision == Decision.ALLOW
+
+    def test_authorized_dispatch_logs_allow_audit_entry(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        state = {"proposal_id": "test-uuid-agent", "current_wave": 4}
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        engine.check_agent_dispatch(state, "writer")
+        assert len(audit_logger.entries) == 1
+        entry = audit_logger.entries[0]
+        assert entry["event"] == "agent_dispatch"
+        assert entry["decision"] == "allow"
+        assert entry["agent_name"] == "writer"
+        assert "timestamp" in entry
+
+    @pytest.mark.parametrize(
+        "wave,agent_name",
+        [
+            (4, "researcher"),
+            (2, "writer"),
+            (0, "writer"),
+            (8, "reviewer"),
+        ],
+    )
+    def test_unauthorized_agent_blocked_with_reason(
+        self, audit_logger: FakeAuditLogger, wave: int, agent_name: str
+    ) -> None:
+        state = {
+            "proposal_id": "test-uuid-agent",
+            "current_wave": wave,
+        }
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        result = engine.check_agent_dispatch(state, agent_name)
+        assert result.decision == Decision.BLOCK
+        msg = result.messages[0]
+        assert agent_name in msg
+        assert str(wave) in msg
+
+    def test_unauthorized_dispatch_logs_block_audit_entry(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        state = {"proposal_id": "test-uuid-agent", "current_wave": 4}
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        engine.check_agent_dispatch(state, "researcher")
+        assert len(audit_logger.entries) == 1
+        entry = audit_logger.entries[0]
+        assert entry["event"] == "agent_dispatch"
+        assert entry["decision"] == "block"
+        assert entry["agent_name"] == "researcher"
+
+    def test_unknown_agent_blocked_as_unrecognized(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        state = {"proposal_id": "test-uuid-agent", "current_wave": 4}
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        result = engine.check_agent_dispatch(state, "rogue-agent")
+        assert result.decision == Decision.BLOCK
+        assert "rogue-agent" in result.messages[0]
+        assert "not a recognized agent" in result.messages[0]
+
+    def test_no_active_proposal_blocks_dispatch(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        result = engine.check_agent_dispatch(None, "writer")
+        assert result.decision == Decision.BLOCK
+        assert "no active proposal" in result.messages[0].lower()
+
+    def test_dispatch_resilient_to_audit_failure(self) -> None:
+        state = {"proposal_id": "test-uuid-agent", "current_wave": 4}
+        engine = EnforcementEngine(FakeRuleLoader(), FailingAuditLogger())
+        result = engine.check_agent_dispatch(state, "writer")
+        assert result.decision == Decision.ALLOW
 
 
 class TestEnforcementEngineMultiReasonBlock:
