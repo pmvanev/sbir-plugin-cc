@@ -3,14 +3,15 @@
 Validates that write operations produced correct results:
 - Artifacts land in the correct wave directory
 - State files are well-formed JSON after writes
+- Artifact files exist after write operations
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Any
-
 
 # Wave number to directory name mapping
 WAVE_DIR_NAMES: dict[int, str] = {
@@ -53,6 +54,8 @@ class PostActionValidator:
         # Check artifact placement if writing to artifacts/ directory
         if "artifacts/" in file_path or "artifacts\\" in file_path:
             messages.extend(self._check_artifact_placement(state, file_path))
+            # Check artifact file exists
+            messages.extend(self._check_artifact_exists(file_path))
 
         # Check state file well-formedness if writing to proposal-state.json
         if file_path.endswith("proposal-state.json"):
@@ -84,10 +87,22 @@ class PostActionValidator:
 
         return []
 
+    def _check_artifact_exists(self, file_path: str) -> list[str]:
+        """Check if an artifact file exists after a write operation.
+
+        Only checks absolute paths -- relative paths from hook protocol
+        cannot be meaningfully verified for existence.
+        """
+        if os.path.isabs(file_path) and not os.path.exists(file_path):
+            return [
+                f"Artifact file not created after write operation: {file_path}"
+            ]
+        return []
+
     def _check_state_file(self, file_path: str) -> list[str]:
         """Check if a state file is well-formed JSON."""
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 json.load(f)
         except FileNotFoundError:
             return [f"State file not found: {file_path}"]

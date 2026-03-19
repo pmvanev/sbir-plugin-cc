@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pytest_bdd import given, parsers, scenarios, then, when
+from pytest_bdd import scenarios, then, when
 
 from tests.acceptance.pes_enforcement_parity.steps.pep_common_steps import *  # noqa: F403
 
@@ -94,12 +94,17 @@ def state_file_corrupted(
 def artifact_missing(
     enforcement_engine,
     enforcement_context: dict[str, Any],
+    proposal_dir,
 ):
     """Invoke post-action check where expected artifact is missing."""
     state = enforcement_context["state"]
+    # Use absolute path -- file does not exist on disk
+    missing_path = str(
+        proposal_dir / "artifacts" / "wave-4-drafting" / "sections" / "nonexistent-section.md"
+    )
     artifact_info = {
         "tool_name": "Write",
-        "file_path": "artifacts/wave-4-drafting/sections/nonexistent-section.md",
+        "file_path": missing_path,
     }
     result = enforcement_engine.check_post_action(state, "Write", artifact_info)
     enforcement_context["result"] = result

@@ -30,21 +30,18 @@ Feature: Post-Action Validation
     And the warning includes the expected directory and actual directory
     And the misplacement is recorded in the audit trail
 
-  @skip
   Scenario: State file is corrupted after a write operation
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When Phil saves the proposal state and the resulting file is malformed
     Then the system warns that the state file appears corrupted
     And the corruption is recorded in the audit trail
 
-  @skip
   Scenario: Artifact file is missing after a reported write
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When Phil completes writing but no artifact file is found
     Then the system warns that the expected artifact was not created
     And the missing artifact is recorded in the audit trail
 
-  @skip
   Scenario: Post-action validation succeeds even when audit directory is missing
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     And the audit directory does not exist
@@ -54,7 +51,6 @@ Feature: Post-Action Validation
 
   # --- Boundary Scenarios ---
 
-  @skip
   Scenario: Read-only tool use does not trigger post-action validation
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     When Phil checks proposal status

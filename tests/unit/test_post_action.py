@@ -3,7 +3,7 @@
 Tests invoke through the EnforcementEngine driving port with fake adapters
 at port boundaries (RuleLoader, AuditLogger). No mocks inside the hexagon.
 
-Test Budget: 3 behaviors x 2 = 6 max unit tests
+Test Budget: 4 behaviors x 2 = 8 max unit tests
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ from pes.domain.engine import EnforcementEngine
 from pes.domain.rules import Decision, EnforcementRule
 from pes.ports.audit_port import AuditLogger
 from pes.ports.rule_port import RuleLoader
-
 
 # --- Fake adapters at port boundaries ---
 
@@ -115,6 +114,41 @@ class TestPostActionArtifactPlacement:
         artifact_info = {
             "tool_name": "Write",
             "file_path": "artifacts/wave-3-outline/technical-approach.md",
+        }
+        engine.check_post_action(wave_4_state, "Write", artifact_info)
+        assert len(audit_logger.entries) >= 1
+        entry = audit_logger.entries[-1]
+        assert entry["event"] == "post_action"
+        assert len(entry.get("messages", [])) >= 1
+
+
+class TestPostActionMissingArtifact:
+    """Verify missing artifact detection through driving port."""
+
+    def test_missing_artifact_returns_allow_with_warning(
+        self, engine: EnforcementEngine, wave_4_state: dict[str, Any],
+        tmp_path,
+    ) -> None:
+        # Use absolute path to a nonexistent file -- triggers existence check
+        missing = str(tmp_path / "artifacts" / "wave-4-drafting" / "sections" / "nonexistent.md")
+        artifact_info = {
+            "tool_name": "Write",
+            "file_path": missing,
+        }
+        result = engine.check_post_action(wave_4_state, "Write", artifact_info)
+        assert result.decision == Decision.ALLOW
+        assert len(result.messages) >= 1
+        combined = " ".join(result.messages).lower()
+        assert "not created" in combined
+
+    def test_missing_artifact_audits_warning(
+        self, engine: EnforcementEngine, wave_4_state: dict[str, Any],
+        audit_logger: FakeAuditLogger, tmp_path,
+    ) -> None:
+        missing = str(tmp_path / "artifacts" / "wave-4-drafting" / "sections" / "nonexistent.md")
+        artifact_info = {
+            "tool_name": "Write",
+            "file_path": missing,
         }
         engine.check_post_action(wave_4_state, "Write", artifact_info)
         assert len(audit_logger.entries) >= 1

@@ -6,9 +6,8 @@ Hook protocol: JSON on stdin, JSON on stdout, exit codes 0=allow, 1=block, 2=rej
 
 from __future__ import annotations
 
-from typing import Any
-
 import os
+from typing import Any
 
 from pes.adapters.file_audit_adapter import FileAuditAdapter
 from pes.adapters.json_rule_adapter import JsonRuleAdapter
@@ -87,18 +86,33 @@ def _handle_pre_tool_use(
     return {"exit_code": 0}  # pre-tool-use allowed
 
 
+# Tools that only read data -- skip post-action validation entirely
+READ_ONLY_TOOLS = {"Read", "Glob", "Grep"}
+
+
 def _handle_post_tool_use(
     engine: EnforcementEngine,
     state_dir: str,
     tool_name: str,
     tool_info: dict[str, Any],
 ) -> dict[str, Any]:
-    """Handle PostToolUse event -- post-action validation."""
+    """Handle PostToolUse event -- post-action validation.
+
+    Skips validation for read-only tools (Read, Glob, Grep).
+    Ensures audit directory exists before validation (infrastructure concern).
+    """
+    if tool_name in READ_ONLY_TOOLS:
+        return {"exit_code": 0}
+
     state_reader = JsonStateAdapter(state_dir)
     try:
         state = state_reader.load()
     except StateNotFoundError:
         return {"exit_code": 0}
+
+    # Ensure audit directory exists (infrastructure concern stays in adapter)
+    audit_dir = os.path.join(state_dir, "audit")
+    os.makedirs(audit_dir, exist_ok=True)
 
     artifact_info = {
         "tool_name": tool_name,
@@ -123,7 +137,8 @@ def main() -> None:
     import sys
 
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "Usage: hook_adapter <session-start|pre-tool-use|post-tool-use>"}))
+        msg = "Usage: hook_adapter <session-start|pre-tool-use|post-tool-use>"
+        print(json.dumps({"error": msg}))
         sys.exit(2)
 
     subcommand = sys.argv[1]
