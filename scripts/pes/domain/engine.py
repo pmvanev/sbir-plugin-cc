@@ -10,9 +10,9 @@ from typing import Any
 from pes.domain.agent_wave_mapping import is_agent_authorized_for_wave, is_agent_recognized
 from pes.domain.corpus_integrity import CorpusIntegrityEvaluator
 from pes.domain.deadline_blocking import DeadlineBlockingEvaluator
-from pes.domain.post_action_validator import PostActionValidator
 from pes.domain.housekeeping import AuditLogRotator, CrashSignalCleaner
 from pes.domain.pdc_gate import PdcGateEvaluator
+from pes.domain.post_action_validator import PostActionValidator
 from pes.domain.rules import Decision, EnforcementResult, EnforcementRule
 from pes.domain.session_checker import SessionChecker
 from pes.domain.submission_immutability import SubmissionImmutabilityEvaluator
@@ -29,15 +29,19 @@ class EnforcementEngine:
     def __init__(self, rule_loader: RuleLoader, audit_logger: AuditLogger) -> None:
         self._rule_loader = rule_loader
         self._audit_logger = audit_logger
-        self._wave_evaluator = WaveOrderingEvaluator()
-        self._pdc_gate_evaluator = PdcGateEvaluator()
-        self._deadline_evaluator = DeadlineBlockingEvaluator()
-        self._submission_evaluator = SubmissionImmutabilityEvaluator()
-        self._corpus_evaluator = CorpusIntegrityEvaluator()
         self._session_checker = SessionChecker()
         self._crash_cleaner = CrashSignalCleaner()
         self._audit_rotator = AuditLogRotator()
         self._post_action_validator = PostActionValidator()
+
+        # Rule evaluators keyed by rule_type for dispatch
+        self._evaluators: dict[str, Any] = {
+            "wave_ordering": WaveOrderingEvaluator(),
+            "pdc_gate": PdcGateEvaluator(),
+            "deadline_blocking": DeadlineBlockingEvaluator(),
+            "submission_immutability": SubmissionImmutabilityEvaluator(),
+            "corpus_integrity": CorpusIntegrityEvaluator(),
+        }
 
     def check_session_start(
         self,
@@ -52,43 +56,10 @@ class EnforcementEngine:
         """
         messages: list[str] = []
 
-        # Crash signal housekeeping
         if proposal_dir:
-            cleanup_results = self._crash_cleaner.clean(proposal_dir)
-            for cleanup in cleanup_results:
-                self._safe_audit_log({
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "event": "crash_signal_cleanup",
-                    "file": cleanup["file"],
-                    "status": cleanup["status"],
-                    "proposal_id": state.get("proposal_id", "unknown"),
-                })
-                if cleanup["status"] == "failed":
-                    reason = cleanup.get("reason", "unknown error")
-                    messages.append(
-                        f"Crash signal '{cleanup['file']}' could not be removed: "
-                        f"{reason}"
-                    )
+            messages.extend(self._clean_crash_signals(proposal_dir, state))
+            self._rotate_audit_logs(proposal_dir, state)
 
-        # Audit log rotation
-        if proposal_dir:
-            audit_dir = str(Path(proposal_dir) / ".sbir" / "audit")
-            rotation_results = self._audit_rotator.rotate(audit_dir)
-            for rotation in rotation_results:
-                event_name = (
-                    "audit_log_size_rotation"
-                    if rotation["action"] == "size_rotation"
-                    else "audit_log_retention_rotation"
-                )
-                self._safe_audit_log({
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "event": event_name,
-                    "action": rotation["action"],
-                    "archive_file": rotation.get("archive_file", ""),
-                    "proposal_id": state.get("proposal_id", "unknown"),
-                })
-
-        # Existing integrity checks
         messages.extend(
             self._session_checker.check(state, proposal_dir=proposal_dir)
         )
@@ -172,68 +143,41 @@ class EnforcementEngine:
         Returns ALLOW with audit entry for authorized dispatch.
         """
         if state is None or "proposal_id" not in state:
-            result = EnforcementResult(
-                decision=Decision.BLOCK,
-                messages=["no active proposal for agent dispatch"],
+            return self._dispatch_result(
+                Decision.BLOCK,
+                ["no active proposal for agent dispatch"],
+                agent_name=agent_name,
+                proposal_id="unknown",
             )
-            self._safe_audit_log({
-                "timestamp": datetime.now(UTC).isoformat(),
-                "event": "agent_dispatch",
-                "decision": "block",
-                "agent_name": agent_name,
-                "proposal_id": "unknown",
-                "messages": result.messages,
-            })
-            return result
 
         proposal_id = state.get("proposal_id", "unknown")
         current_wave = state.get("current_wave", -1)
 
         if not is_agent_recognized(agent_name):
-            result = EnforcementResult(
-                decision=Decision.BLOCK,
-                messages=[f"{agent_name} is not a recognized agent"],
+            return self._dispatch_result(
+                Decision.BLOCK,
+                [f"{agent_name} is not a recognized agent"],
+                agent_name=agent_name,
+                wave=current_wave,
+                proposal_id=proposal_id,
             )
-            self._safe_audit_log({
-                "timestamp": datetime.now(UTC).isoformat(),
-                "event": "agent_dispatch",
-                "decision": "block",
-                "agent_name": agent_name,
-                "wave": current_wave,
-                "proposal_id": proposal_id,
-                "messages": result.messages,
-            })
-            return result
 
         if not is_agent_authorized_for_wave(agent_name, current_wave):
-            result = EnforcementResult(
-                decision=Decision.BLOCK,
-                messages=[
-                    f"{agent_name} is not authorized for Wave {current_wave}"
-                ],
+            return self._dispatch_result(
+                Decision.BLOCK,
+                [f"{agent_name} is not authorized for Wave {current_wave}"],
+                agent_name=agent_name,
+                wave=current_wave,
+                proposal_id=proposal_id,
             )
-            self._safe_audit_log({
-                "timestamp": datetime.now(UTC).isoformat(),
-                "event": "agent_dispatch",
-                "decision": "block",
-                "agent_name": agent_name,
-                "wave": current_wave,
-                "proposal_id": proposal_id,
-                "messages": result.messages,
-            })
-            return result
 
-        result = EnforcementResult(decision=Decision.ALLOW)
-        self._safe_audit_log({
-            "timestamp": datetime.now(UTC).isoformat(),
-            "event": "agent_dispatch",
-            "decision": "allow",
-            "agent_name": agent_name,
-            "wave": current_wave,
-            "proposal_id": proposal_id,
-            "messages": [],
-        })
-        return result
+        return self._dispatch_result(
+            Decision.ALLOW,
+            [],
+            agent_name=agent_name,
+            wave=current_wave,
+            proposal_id=proposal_id,
+        )
 
     def record_agent_stop(
         self,
@@ -260,6 +204,65 @@ class EnforcementEngine:
         })
         return result
 
+    def _clean_crash_signals(
+        self, proposal_dir: str, state: dict[str, Any]
+    ) -> list[str]:
+        """Clean crash signals and return warning messages for failures."""
+        messages: list[str] = []
+        proposal_id = state.get("proposal_id", "unknown")
+        for cleanup in self._crash_cleaner.clean(proposal_dir):
+            self._safe_audit_log({
+                "timestamp": datetime.now(UTC).isoformat(),
+                "event": "crash_signal_cleanup",
+                "file": cleanup["file"],
+                "status": cleanup["status"],
+                "proposal_id": proposal_id,
+            })
+            if cleanup["status"] == "failed":
+                reason = cleanup.get("reason", "unknown error")
+                messages.append(
+                    f"Crash signal '{cleanup['file']}' could not be removed: "
+                    f"{reason}"
+                )
+        return messages
+
+    def _rotate_audit_logs(
+        self, proposal_dir: str, state: dict[str, Any]
+    ) -> None:
+        """Rotate audit logs and record rotation events."""
+        audit_dir = str(Path(proposal_dir) / ".sbir" / "audit")
+        proposal_id = state.get("proposal_id", "unknown")
+        for rotation in self._audit_rotator.rotate(audit_dir):
+            event_name = (
+                "audit_log_size_rotation"
+                if rotation["action"] == "size_rotation"
+                else "audit_log_retention_rotation"
+            )
+            self._safe_audit_log({
+                "timestamp": datetime.now(UTC).isoformat(),
+                "event": event_name,
+                "action": rotation["action"],
+                "archive_file": rotation.get("archive_file", ""),
+                "proposal_id": proposal_id,
+            })
+
+    def _dispatch_result(
+        self,
+        decision: Decision,
+        messages: list[str],
+        **audit_fields: Any,
+    ) -> EnforcementResult:
+        """Build enforcement result and log agent dispatch audit entry."""
+        result = EnforcementResult(decision=decision, messages=messages)
+        self._safe_audit_log({
+            "timestamp": datetime.now(UTC).isoformat(),
+            "event": "agent_dispatch",
+            "decision": decision.value.lower(),
+            "messages": messages,
+            **audit_fields,
+        })
+        return result
+
     def _safe_audit_log(self, entry: dict[str, Any]) -> None:
         """Log audit entry, suppressing write failures with a warning."""
         try:
@@ -276,26 +279,16 @@ class EnforcementEngine:
         self, rule: EnforcementRule, state: dict[str, Any], tool_name: str
     ) -> bool:
         """Check if a single rule triggers given current state and tool."""
-        if rule.rule_type == "wave_ordering":
-            return self._wave_evaluator.triggers(rule, state, tool_name)
-        if rule.rule_type == "pdc_gate":
-            return self._pdc_gate_evaluator.triggers(rule, state, tool_name)
-        if rule.rule_type == "deadline_blocking":
-            return self._deadline_evaluator.triggers(rule, state, tool_name)
-        if rule.rule_type == "submission_immutability":
-            return self._submission_evaluator.triggers(rule, state, tool_name)
-        if rule.rule_type == "corpus_integrity":
-            return self._corpus_evaluator.triggers(rule, state, tool_name)
-        return False
+        evaluator = self._evaluators.get(rule.rule_type)
+        if evaluator is None:
+            return False
+        return evaluator.triggers(rule, state, tool_name)
 
     def _build_message(
         self, rule: EnforcementRule, state: dict[str, Any]
     ) -> str:
         """Build a detailed block message for the given rule."""
-        if rule.rule_type == "pdc_gate":
-            return self._pdc_gate_evaluator.build_block_message(rule, state)
-        if rule.rule_type == "deadline_blocking":
-            return self._deadline_evaluator.build_block_message(rule, state)
-        if rule.rule_type == "submission_immutability":
-            return self._submission_evaluator.build_block_message(rule, state)
+        evaluator = self._evaluators.get(rule.rule_type)
+        if evaluator and hasattr(evaluator, "build_block_message"):
+            return evaluator.build_block_message(rule, state)
         return rule.message

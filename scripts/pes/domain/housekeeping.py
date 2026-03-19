@@ -124,19 +124,36 @@ class AuditLogRotator:
 
     def _rotate_by_retention(self, log_file: Path) -> dict[str, Any] | None:
         """Archive entries older than the retention window."""
-        # Use date comparison (day granularity) so entries from exactly
-        # N days ago are preserved (not archived). Only entries from
-        # strictly more than N calendar days ago are archived.
-        cutoff_date = (datetime.now(UTC) - timedelta(days=self._retention_days)).date()
-
         try:
             raw_lines = log_file.read_text(encoding="utf-8").strip().split("\n")
         except OSError as exc:
             logger.warning("Could not read audit log for rotation: %s", exc)
             return None
 
-        current_entries: list[str] = []
-        archived_entries: list[str] = []
+        cutoff_date = self._retention_cutoff_date()
+        current, archived = self._partition_entries(raw_lines, cutoff_date)
+
+        if not archived:
+            return None
+
+        return self._write_retention_archive(log_file, current, archived)
+
+    def _retention_cutoff_date(self) -> datetime:
+        """Calculate the cutoff date for retention rotation.
+
+        Uses date comparison (day granularity) so entries from exactly
+        N days ago are preserved. Only entries from strictly more than
+        N calendar days ago are archived.
+        """
+        return (datetime.now(UTC) - timedelta(days=self._retention_days)).date()
+
+    @staticmethod
+    def _partition_entries(
+        raw_lines: list[str], cutoff_date: datetime,
+    ) -> tuple[list[str], list[str]]:
+        """Split log lines into current and archived based on cutoff date."""
+        current: list[str] = []
+        archived: list[str] = []
 
         for line in raw_lines:
             if not line.strip():
@@ -149,16 +166,21 @@ class AuditLogRotator:
                     if entry_time.tzinfo is None:
                         entry_time = entry_time.replace(tzinfo=UTC)
                     if entry_time.date() < cutoff_date:
-                        archived_entries.append(line)
+                        archived.append(line)
                         continue
             except (json.JSONDecodeError, ValueError):
                 pass  # Keep unparseable lines in current
-            current_entries.append(line)
+            current.append(line)
 
-        if not archived_entries:
-            return None
+        return current, archived
 
-        # Write archived entries to timestamped archive file
+    @staticmethod
+    def _write_retention_archive(
+        log_file: Path,
+        current_entries: list[str],
+        archived_entries: list[str],
+    ) -> dict[str, Any] | None:
+        """Write archived entries to timestamped file, rewrite active log."""
         timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
         archive_name = f"{log_file.name}.archive.{timestamp}"
         archive_path = log_file.parent / archive_name
@@ -167,7 +189,6 @@ class AuditLogRotator:
             archive_path.write_text(
                 "\n".join(archived_entries) + "\n", encoding="utf-8"
             )
-            # Rewrite active log with only current entries
             log_file.write_text(
                 "\n".join(current_entries) + "\n", encoding="utf-8"
             )
