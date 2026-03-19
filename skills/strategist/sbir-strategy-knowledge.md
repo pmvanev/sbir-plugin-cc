@@ -21,6 +21,22 @@ description: Core domain knowledge for SBIR/STTR strategy brief generation -- te
 ### Assessment Checklist
 Identify capability gaps from compliance matrix | Match gaps to potential partners | Verify partner size status (affects SBC size calculation) | Check organizational conflict of interest | Confirm partner availability and commitment timeline
 
+### Partnership-Aware Teaming Section (when partner designated)
+
+When proposal state has `partner.slug`, read the partner profile from `~/.sbir/partners/{slug}.json` and auto-generate:
+
+1. **Partner identification**: Name, type (university/FFRDC/nonprofit), key personnel with roles and expertise
+2. **Capability complementarity matrix**:
+   - Company-only capabilities (what the SBC brings uniquely)
+   - Partner-only capabilities (what the research institution brings uniquely)
+   - Overlap (shared strengths reinforcing credibility)
+3. **Facilities**: List partner facilities relevant to the solicitation
+4. **Work split**: Recommended percentages (STTR: >= 30% Phase I to research institution, >= 40% Phase II). Reference specific partner capabilities that justify each allocation.
+5. **Past collaboration history**: Any prior joint work from the partner profile's `past_collaborations` field
+6. **Risk factors**: Bandwidth, geographic coordination, IP ownership considerations
+
+Personnel names and facilities MUST match the partner profile exactly -- never fabricate or embellish. If partner profile fields are sparse, use what exists and flag gaps ("Partner facility data not available -- consider updating partner profile").
+
 ## Phase III Transition Pathways
 
 Phase III = commercialization. Two main pathways:

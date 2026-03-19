@@ -74,7 +74,7 @@ Load: `approach-evaluation` -- read it NOW before proceeding.
 Generate 3-5 technically distinct candidate approaches:
 
 1. **Forward mapping**: Map solicitation requirements to known technical approaches in the problem domain. What solutions directly address the stated objectives?
-2. **Reverse mapping**: Map company capabilities, IP, key personnel expertise, and past performance to applicable approaches. What can this team uniquely offer?
+2. **Reverse mapping**: Map company capabilities, IP, key personnel expertise, and past performance to applicable approaches. When a partner is designated in proposal state (`partner.slug`), also read the partner profile from `~/.sbir/partners/{slug}.json` and include partner capabilities, personnel expertise, and facilities in the reverse mapping. What can the combined team uniquely offer?
 3. **Prior art awareness**: Consider established approaches in the domain, including non-obvious combinations, emerging technologies, and approaches from adjacent fields.
 4. Ensure approaches are technically distinct -- not minor variations of the same idea. Each should represent a fundamentally different technical path.
 5. For each approach, document:
@@ -82,6 +82,7 @@ Generate 3-5 technically distinct candidate approaches:
    - Description (2-3 sentences explaining the technical concept)
    - Key technical elements (bulleted list of core technologies/methods)
    - Required capabilities (what skills, equipment, partnerships are needed)
+   - Work split (when partner designated): percentage allocation between SBC and partner with justification. STTR proposals must allocate >= 30% Phase I / >= 40% Phase II to the research institution. Reference specific partner capabilities that justify each allocation.
 
 If fewer than 3 approaches are feasible: proceed with as many as generated and note the narrow solution space.
 
@@ -93,7 +94,7 @@ Score each approach across 5 dimensions (rubrics defined in approach-evaluation 
 
 | Dimension | Weight | Source |
 |-----------|--------|--------|
-| Personnel alignment | 0.25 | company-profile.json `key_personnel.expertise` vs. approach needs |
+| Personnel alignment | 0.25 | company-profile.json + partner profile `key_personnel.expertise` vs. approach needs |
 | Past performance | 0.20 | company-profile.json `past_performance` vs. approach domain |
 | Technical readiness | 0.20 | Estimated TRL for approach given company's current state |
 | Solicitation fit | 0.20 | How directly approach addresses stated objectives and eval criteria |

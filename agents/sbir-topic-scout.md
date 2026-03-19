@@ -128,10 +128,19 @@ Score each topic against the company capability profile. When enriched descripti
 6. Generate recommendation per topic: "go" (composite >= 0.6 with no zero-score dimensions) | "evaluate" (composite 0.3-0.6 or any dimension at 0.0) | "no-go" (composite < 0.3 or disqualifying eligibility issue)
 
 **Batch scoring mode**: Use `TopicScoringService` from `scripts/pes/domain/topic_scoring.py`:
-- `score_batch(topics, profile)` scores all candidates and returns sorted by composite descending
+- `score_batch(topics, profile, partner_profile)` scores all candidates and returns sorted by composite descending
+- When partner profiles exist at `~/.sbir/partners/`, score each topic TWICE: solo and with each partner
 - Disqualifiers (TS clearance gap, STTR without partner) produce immediate NO-GO
 - Missing past performance caps recommendations at EVALUATE (never false NO-GO from data absence)
 - Each `ScoredTopic` includes `key_personnel_match` for detail drilldown
+
+**Partnership-aware scoring**: When partner profiles exist at `~/.sbir/partners/`:
+1. Read all partner profiles from `~/.sbir/partners/*.json`
+2. For each topic, score solo AND with the best-fit partner
+3. Display dual-column results (solo vs. partnership) with delta
+4. Mark recommendation elevations (e.g., EVALUATE -> GO) with ▲ ELEVATED
+5. For STTR topics without any partner, show NO-GO with suggestion: "Run /proposal partner-setup to add a research institution partner"
+6. If no partner profiles exist, score solo only (current behavior -- fully backward compatible)
 
 Gate: All parsed topics scored. Each score includes per-dimension breakdown.
 
@@ -150,7 +159,7 @@ Rank | Topic ID    | Agency    | Title                              | Score | Re
    1 | AF263-042   | Air Force | Compact Directed Energy for C-UAS  | 0.84  | GO       | 2026-05-15
 ```
 
-**Detail drilldown** (per-topic view):
+**Detail drilldown** (per-topic view, solo):
 ```
 Topic: {topic_id} -- {title}
 Agency: {agency} | Phase: {phase} | Deadline: {deadline} ({days} days)
@@ -159,6 +168,21 @@ Recommendation: {go|evaluate|no-go}
 Key Personnel Match: {names from company profile with matching expertise}
 Rationale: {1-2 sentences explaining the recommendation}
 Corpus Exemplars: {count} related past proposals found
+```
+
+**Detail drilldown** (partnership view, when partner profiles exist):
+```
+Topic: {topic_id} -- {title} (STTR)
+Agency: {agency} | Phase: {phase} | Deadline: {deadline} ({days} days)
+           Solo    Partnership ({partner_name})   Delta
+SME:       {solo}  {partner}                      {+/-delta}
+PP:        {solo}  {partner}                       0.00
+Cert:      {solo}  {partner}                       0.00
+Elig:      {solo}  {partner}                       0.00
+STTR:      {solo}  {partner}                      {+/-delta}
+───────────────────────────────────────────────────────────
+Composite: {solo}  {partner}                      {+/-delta}
+Recommend: {solo}  {partner}                      {▲ ELEVATED if changed}
 ```
 
 **Disqualified topics section**:

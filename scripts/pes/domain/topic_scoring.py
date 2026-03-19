@@ -63,6 +63,7 @@ class TopicScoringService:
         self,
         topic: dict[str, Any],
         profile: dict[str, Any],
+        partner_profile: dict[str, Any] | None = None,
     ) -> ScoredTopic:
         """Score a single topic against the company profile.
 
@@ -70,6 +71,8 @@ class TopicScoringService:
             topic: Topic metadata dict with topic_id, title, program,
                    requires_clearance, agency, etc.
             profile: Company profile dict.
+            partner_profile: Optional partner profile dict. When provided,
+                   SME uses combined capabilities and STTR uses partner type.
 
         Returns:
             ScoredTopic with composite score, dimensions, and recommendation.
@@ -77,15 +80,18 @@ class TopicScoringService:
         disqualifiers: list[str] = []
         warnings: list[str] = []
 
-        # Check disqualifiers first
-        disqualifiers.extend(self._check_disqualifiers(topic, profile))
+        # Build effective profile for scoring (merged capabilities when partnered)
+        effective_profile = self._build_effective_profile(profile, partner_profile)
 
-        # Score each dimension
-        sme = self._score_sme(topic, profile)
+        # Check disqualifiers against effective profile
+        disqualifiers.extend(self._check_disqualifiers(topic, effective_profile))
+
+        # Score each dimension using effective profile
+        sme = self._score_sme(topic, effective_profile)
         pp = self._score_past_performance(topic, profile, warnings)
         cert = self._score_certifications(topic, profile)
         elig = self._score_eligibility(topic, profile)
-        sttr = self._score_sttr(topic, profile)
+        sttr = self._score_sttr(topic, effective_profile)
 
         dimensions = {
             "subject_matter": sme,
@@ -97,8 +103,8 @@ class TopicScoringService:
 
         composite = self._compute_composite(dimensions)
 
-        # Match key personnel
-        key_personnel = self._match_key_personnel(topic, profile)
+        # Match key personnel from both company and partner
+        key_personnel = self._match_key_personnel(topic, effective_profile)
 
         # Determine recommendation
         recommendation = self._recommend(
@@ -119,17 +125,19 @@ class TopicScoringService:
         self,
         topics: list[dict[str, Any]],
         profile: dict[str, Any],
+        partner_profile: dict[str, Any] | None = None,
     ) -> list[ScoredTopic]:
         """Score a batch of topics and return sorted by composite descending.
 
         Args:
             topics: List of topic dicts.
             profile: Company profile dict.
+            partner_profile: Optional partner profile for partnership-aware scoring.
 
         Returns:
             List of ScoredTopic sorted by composite_score descending.
         """
-        results = [self.score_topic(t, profile) for t in topics]
+        results = [self.score_topic(t, profile, partner_profile) for t in topics]
         results.sort(key=lambda r: r.composite_score, reverse=True)
         return results
 
@@ -152,6 +160,50 @@ class TopicScoringService:
         return "NO-GO"
 
     # ----- Private scoring methods -----
+
+    def _build_effective_profile(
+        self,
+        profile: dict[str, Any],
+        partner_profile: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Build an effective profile merging company and partner data.
+
+        When a partner is provided, combines capabilities and key_personnel
+        from both entities. Also synthesizes research_institution_partners
+        from the partner profile for STTR scoring.
+
+        Returns a new dict (never mutates the originals).
+        """
+        if partner_profile is None:
+            return profile
+
+        effective = dict(profile)
+
+        # Union of capabilities (deduplicated, case-insensitive, preserving original case)
+        company_caps = profile.get("capabilities", [])
+        partner_caps = partner_profile.get("capabilities", [])
+        seen_lower: set[str] = set()
+        combined_caps: list[str] = []
+        for cap in company_caps + partner_caps:
+            if cap.lower() not in seen_lower:
+                seen_lower.add(cap.lower())
+                combined_caps.append(cap)
+        effective["capabilities"] = combined_caps
+
+        # Merge key personnel
+        company_personnel = profile.get("key_personnel", [])
+        partner_personnel = partner_profile.get("key_personnel", [])
+        effective["key_personnel"] = company_personnel + partner_personnel
+
+        # Synthesize research_institution_partners for STTR scoring
+        partner_type = partner_profile.get("partner_type", "")
+        partner_name = partner_profile.get("partner_name", "")
+        if partner_type and partner_name:
+            effective["research_institution_partners"] = [
+                {"name": partner_name, "type": partner_type}
+            ]
+
+        return effective
 
     def _check_disqualifiers(
         self,

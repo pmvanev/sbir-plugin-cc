@@ -69,7 +69,7 @@ Generate strategy brief with all six required sections:
 
 1. **Technical Approach**: Summarize innovation, map to solicitation needs, identify key requirements from compliance matrix
 2. **TRL Assessment**: Determine current TRL with evidence, identify target TRL from solicitation language, analyze gap feasibility using trl-assessor methodology
-3. **Teaming Strategy**: Identify capability gaps from compliance matrix, assess STTR requirements, recommend team structure
+3. **Teaming Strategy**: When a partner is designated in proposal state (`partner.slug`), read the partner profile from `~/.sbir/partners/{slug}.json` and auto-generate the teaming section: name partner personnel (matching profile exactly), list facilities, show capability complementarity matrix (company-only vs. partner-only vs. overlap), recommend work split percentages (STTR: >= 30% Phase I to research institution). When no partner is designated, identify capability gaps from compliance matrix, assess STTR requirements, recommend team structure
 4. **Phase III Pathway**: Identify transition pathway (government POR, commercial, or both), cite market evidence, connect to agency priorities
 5. **Budget Strategy**: Scaffold cost allocation following agency norms using budget-scaffolder methodology, flag subcontract thresholds, verify rate consistency against company profile
 6. **Risk Assessment**: Identify risks across five categories (technical, schedule, cost, commercialization, team), assign likelihood/impact, propose mitigations

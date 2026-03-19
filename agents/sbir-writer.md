@@ -55,8 +55,9 @@ Load: `skills/writer/discrimination-table.md` -- read it NOW before proceeding.
 1. Read strategy brief from `./artifacts/wave-1-strategy/strategy-brief.md`
 2. Read compliance matrix from `.sbir/compliance-matrix.json`
 3. Read company profile from `~/.sbir/company-profile.json` if available
-4. Read TPOC Q&A from `.sbir/tpoc-answers.json` if available
-5. Build discrimination table with three dimensions: company vs. competitors | technical approach vs. prior art | team discriminators (personnel, facilities, past performance)
+4. Read designated partner profile from `~/.sbir/partners/{slug}.json` if proposal state has `partner.slug`
+5. Read TPOC Q&A from `.sbir/tpoc-answers.json` if available
+6. Build discrimination table with three dimensions: company vs. competitors | technical approach vs. prior art | team discriminators (personnel, facilities, past performance). When partner is designated, team discriminators include partner personnel, partner facilities, and combined capabilities as differentiators.
 6. Feed TPOC insights into discriminator framing where available
 7. Write discrimination table to `./artifacts/wave-3-outline/discrimination-table.md`
 8. Present checkpoint for human review
@@ -83,8 +84,8 @@ Load: `skills/reviewer/reviewer-persona-simulator.md` -- read it NOW if availabl
 Draft each section following the approved outline, in this order:
 1. Technical approach (core narrative -- largest allocation, write first)
 2. Statement of Work -- milestone-based, contractual language, maps to technical approach
-3. Key personnel bios and CVs -- tailored to topic, highlight team discriminators
-4. Facilities and equipment -- map capabilities to technical requirements
+3. Key personnel bios and CVs -- tailored to topic, highlight team discriminators. When partner is designated, include partner personnel (names and roles must match partner profile exactly). Clearly attribute each person to company or partner institution.
+4. Facilities and equipment -- map capabilities to technical requirements. When partner is designated, include partner facilities from partner profile. Attribute each facility to the appropriate entity.
 5. Past performance write-ups -- quantitative results, relevance to current topic
 6. Management plan -- team structure, communication, risk management
 7. Commercialization plan -- Phase III pathway from strategy brief, market evidence

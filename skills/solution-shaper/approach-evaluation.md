@@ -11,20 +11,21 @@ Five dimensions evaluate each candidate approach against the company's specific 
 
 ### 1. Personnel Alignment (default weight: 0.25)
 
-Maps required expertise for the approach to company profile `key_personnel[].expertise`.
+Maps required expertise for the approach to company profile `key_personnel[].expertise`. When a partner is designated, also includes partner profile `key_personnel[].expertise` in the alignment assessment.
 
 | Score Range | Criteria |
 |------------|---------|
-| 0.80-1.00 | Named PI/Co-PI with direct expertise. Multiple team members cover approach needs. Published work or patents in the area. |
-| 0.50-0.70 | Adjacent expertise -- team has related experience, credible pivot with ramp-up. One named person with partial coverage. |
-| 0.20-0.40 | Tangential skills only. Significant expertise gap requiring new hire or teaming partner. |
-| 0.00-0.10 | No relevant personnel. Approach requires capabilities the team does not have. |
+| 0.80-1.00 | Named PI/Co-PI with direct expertise. Multiple team members (company + partner) cover approach needs. Published work or patents in the area. |
+| 0.50-0.70 | Adjacent expertise -- combined team has related experience, credible pivot with ramp-up. One named person with partial coverage. |
+| 0.20-0.40 | Tangential skills only. Significant expertise gap even with partner capabilities. |
+| 0.00-0.10 | No relevant personnel across company or partner. Approach requires capabilities the combined team does not have. |
 
 Scoring guidance:
-- Reference specific personnel by name and expertise keywords
-- Count the number of key personnel whose expertise overlaps the approach's required capabilities
+- Reference specific personnel by name and expertise keywords from both company and partner profiles
+- Count the number of key personnel (company + partner) whose expertise overlaps the approach's required capabilities
 - Weight PI/Co-PI alignment higher than supporting staff
-- Account for teaming partners listed in company profile
+- When partner is designated, include partner personnel in the assessment and note which capabilities come from which entity
+- For STTR proposals, verify that the partner's contributions justify the required work split (>= 30% Phase I)
 
 ### 2. Past Performance (default weight: 0.20)
 

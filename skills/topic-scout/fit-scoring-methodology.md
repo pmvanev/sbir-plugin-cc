@@ -137,6 +137,49 @@ When the company profile is missing or incomplete:
 - Warn that accuracy is degraded
 - Recommend creating profile: "Run /sbir:proposal profile setup to create your company profile."
 
+## Partnership-Aware Scoring
+
+When a partner profile is available (from `~/.sbir/partners/{slug}.json`), display **dual-column scoring** showing both solo and partnership results.
+
+### How Partnership Affects Dimensions
+
+| Dimension | Partnership Effect |
+|-----------|-------------------|
+| SME (0.35) | Union of company + partner capabilities (deduplicated) |
+| Past Performance (0.25) | Company PP only (partner's independent PP is not our data) |
+| Certifications (0.15) | Company certifications only (partner doesn't affect SAM.gov) |
+| Eligibility (0.15) | Company eligibility only (employee count, phase) |
+| STTR (0.10) | Partner type used for STTR research institution check |
+
+### Dual-Column Display Format
+
+When partner profiles exist, show both columns and the delta:
+
+```
+Topic: N244-012 -- Autonomous UUV Navigation and Sensing (STTR)
+           Solo    Partnership   Delta
+SME:       0.12    0.65         +0.53
+PP:        0.30    0.30          0.00
+Cert:      1.00    1.00          0.00
+Elig:      1.00    1.00          0.00
+STTR:      0.00    1.00         +1.00
+─────────────────────────────────────
+Composite: 0.32    0.68         +0.36
+Recommend: EVALUATE GO           ▲ ELEVATED
+```
+
+### Score Delta and Elevation
+
+- **Delta**: partnership_score - solo_score per dimension
+- **Elevation**: When recommendation changes (e.g., EVALUATE -> GO), mark with ▲ ELEVATED
+- **Minimal impact**: When delta < 0.05 on all dimensions, note "Partnership has minimal impact on this topic"
+
+### When to Show Partnership Scoring
+
+- Partner profiles exist at `~/.sbir/partners/` -> always show dual columns
+- No partner profiles -> solo scoring only (current behavior)
+- STTR topic with no partner -> solo column shows NO-GO with disqualifier, suggest `/proposal partner-setup`
+
 ## Recording Scores to State
 
 Map scores to `FitScoring` dataclass (from `scripts/pes/domain/proposal_service.py`):
