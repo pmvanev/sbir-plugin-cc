@@ -6,6 +6,7 @@ tools: Read, Glob, Grep, Bash
 maxTurns: 30
 skills:
   - solicitation-intelligence
+  - dsip-enrichment
   - fit-scoring-methodology
   - finder-batch-scoring
   - proposal-archive-reader
@@ -42,6 +43,7 @@ You MUST load your skill files before beginning any work. Skills encode solicita
 | Phase | Load | Trigger |
 |-------|------|---------|
 | 1 INGEST | `solicitation-intelligence` | Always -- source identification, scraping patterns, format parsing |
+| 1 INGEST | `dsip-enrichment` | Always -- DSIP topic detail structure, completeness assessment |
 | 2 PARSE | `solicitation-intelligence` | Already loaded in Phase 1 |
 | 3 SCORE | `fit-scoring-methodology` | Always -- five-dimension scoring, company profile integration |
 | 3 SCORE | `finder-batch-scoring` | Always -- batch scoring workflow, disqualifiers, ranked output |
@@ -56,15 +58,40 @@ Skills path for shared skills: `skills/corpus-librarian/`
 
 ### Phase 1: INGEST
 Load: `solicitation-intelligence` -- read it NOW before proceeding.
+Load: `dsip-enrichment` -- read it NOW before proceeding.
 
-Identify solicitation sources and gather raw topic data:
-1. Accept input: solicitation URL, local PDF/text file, or directory of solicitations
-2. For URLs: fetch page content using Bash (curl/wget) | extract solicitation text
-3. For local files: read directly using Read tool
-4. For directories: scan for .pdf, .txt, .md files and process each
-5. Validate that extracted text contains identifiable solicitation content
+Identify solicitation sources and gather topic data. For DSIP API sources, check cache freshness and enrich candidates before scoring.
 
-Gate: Raw solicitation text captured from at least one source.
+#### 1a. Cache Check (DSIP API source)
+Before fetching from the DSIP API, check whether cached enriched data is available and fresh:
+1. Call `FinderService.search_and_enrich(filters, ttl_hours=24)` which checks `TopicCachePort.is_fresh(ttl_hours)`
+2. If cache is fresh: present the user with a choice:
+   - **Use cached data**: proceed directly to SCORE phase with cached enriched topics
+   - **Re-scrape**: bypass cache and fetch fresh data from DSIP API
+3. If cache is stale or absent: proceed to fetch and enrich (steps 1b-1d below)
+
+#### 1b. Fetch
+Accept input from one of these sources:
+1. DSIP API: `FinderService.search_and_enrich()` fetches via `TopicFetchPort` with pagination, retry, rate limiting
+2. Local file: solicitation URL, local PDF/text file, or directory of solicitations
+3. For URLs: fetch page content using Bash (curl/wget) | extract solicitation text
+4. For local files: read directly using Read tool
+5. For directories: scan for .pdf, .txt, .md files and process each
+
+#### 1c. Pre-Filter
+After fetching, `FinderService` applies `KeywordPreFilter` using company profile capabilities to reduce candidates from hundreds to tens.
+
+#### 1d. Enrich and Report Completeness
+For DSIP API sources, `FinderService.search_and_enrich()` enriches pre-filtered candidates via `TopicEnrichmentPort`:
+1. Per-topic PDF download extracts: description, submission instructions, component instructions, Q&A entries
+2. Per-topic failures are isolated (logged, do not stop batch)
+3. After enrichment, report completeness metrics to the user:
+   ```
+   Enrichment completeness: Descriptions N/M | Instructions N/M | Q&A N/M
+   ```
+4. Enriched data is automatically cached to `.sbir/dsip_topics.json` with TTL metadata
+
+Gate: Topic data captured from at least one source. For DSIP API sources: enriched candidates with completeness metrics reported.
 
 ### Phase 2: PARSE
 Extract structured metadata from each solicitation into `TopicInfo` format:
@@ -86,13 +113,13 @@ Load: `finder-batch-scoring` -- read it NOW for batch workflow, disqualifiers, a
 Load: `proposal-archive-reader` from `skills/corpus-librarian/` -- read it NOW if corpus exists.
 Load: `win-loss-analyzer` from `skills/corpus-librarian/` -- read it NOW if corpus has outcome data.
 
-Score each parsed topic against the company capability profile:
+Score each topic against the company capability profile. When enriched descriptions are available (from DSIP enrichment in Phase 1), use them for deeper semantic scoring alongside titles.
 
 1. Read `~/.sbir/company-profile.json` for company capabilities, certifications, key personnel, past performance
 2. Read `.sbir/proposal-state.json` for corpus data and prior proposal outcomes
 3. Search corpus for past work matching the topic's agency and technical domain
 4. Score five dimensions (each 0.0 to 1.0):
-   - **Subject matter expertise**: keyword overlap between topic description and company capabilities + corpus technical content
+   - **Subject matter expertise**: keyword overlap between topic description (enriched if available) and company capabilities + corpus technical content. Enriched descriptions provide TRL expectations, teaming requirements, and phase-specific technical detail that titles alone cannot convey.
    - **Past performance relevance**: corpus matches in same agency/domain, weighted by outcome (WIN=1.0, LOSS=0.5, none=0.0)
    - **Certifications**: SAM.gov registration status, socioeconomic certifications (8(a), HUBZone, WOSB, SDVOSB), ITAR clearance if required
    - **Phase eligibility**: prior Phase I award for Phase II topics, employee count limits, revenue thresholds
