@@ -77,6 +77,50 @@
     "research_institution_partners": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "sources": {
+      "type": "object",
+      "properties": {
+        "web_references": {
+          "type": "array",
+          "description": "URLs consulted during profile research phase",
+          "items": {
+            "type": "object",
+            "required": ["url", "label"],
+            "properties": {
+              "url": { "type": "string" },
+              "label": { "type": "string" },
+              "accessed_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "documents_scanned": {
+          "type": "array",
+          "description": "Local file paths provided during profile creation (capability statements, SAM.gov exports, etc.)",
+          "items": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": { "type": "string" },
+              "label": { "type": "string" },
+              "scanned_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "directories_scanned": {
+          "type": "array",
+          "description": "Directory paths scanned during corpus ingestion that contributed to this profile",
+          "items": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": { "type": "string" },
+              "file_count": { "type": "integer" },
+              "scanned_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
     }
   }
 }

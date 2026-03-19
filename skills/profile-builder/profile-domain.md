@@ -43,9 +43,30 @@ The company profile at `~/.sbir/company-profile.json` feeds directly into the fi
       "name": "string",
       "type": "university | federally_funded_rdc | nonprofit_research"
     }
-  ]
+  ],
+  "sources": {
+    "web_references": [
+      { "url": "https://sam.gov/entity/...", "label": "SAM.gov entity page", "accessed_at": "ISO-8601" }
+    ],
+    "documents_scanned": [
+      { "path": "/path/to/capability-statement.pdf", "label": "Capability statement", "scanned_at": "ISO-8601" }
+    ],
+    "directories_scanned": [
+      { "path": "/path/to/past-proposals/", "file_count": 8, "scanned_at": "ISO-8601" }
+    ]
+  }
 }
 ```
+
+## Source Provenance
+
+The `sources` field records where profile data came from. It is populated automatically during research and document extraction phases. Not used for scoring — purely for traceability so the user can revisit original references.
+
+- **web_references**: URLs consulted during Phase 2 (RESEARCH). Includes SAM.gov pages, sbir.gov award records, company websites, LinkedIn pages, etc.
+- **documents_scanned**: Local files the user provided during Phase 3 (GATHER) in document or both mode. Capability statements, SAM.gov exports, past proposal excerpts, etc.
+- **directories_scanned**: Directories scanned during corpus ingestion that fed data into the profile. Records the path and number of files found.
+
+The `sources` field is optional — profiles created before this feature lack it. Agents should handle missing `sources` gracefully.
 
 ## Field-by-Field Fit Scoring Explanations
 

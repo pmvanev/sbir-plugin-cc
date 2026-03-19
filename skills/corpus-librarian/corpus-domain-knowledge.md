@@ -38,6 +38,10 @@ Every `CorpusEntry` carries:
 | `content_hash` | str | SHA-256 hex digest of file bytes |
 | `file_type` | str | Lowercase extension (e.g., `.pdf`) |
 | `size_bytes` | int | File size in bytes |
+| `source_directory` | str | Directory from which this file was ingested (provenance tracking) |
+| `source_url` | str | Original URL if the document was fetched from the web (empty for local files) |
+
+The `IngestionResult` also records `source_directory` — the directory path the user provided during ingestion. This lets the user trace back to the original location of ingested documents.
 
 Extended metadata (tracked in proposal state, not in CorpusEntry):
 

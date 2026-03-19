@@ -89,6 +89,37 @@
     "updated_at": {
       "type": "string",
       "format": "date-time"
+    },
+    "sources": {
+      "type": "object",
+      "properties": {
+        "web_references": {
+          "type": "array",
+          "description": "URLs consulted during partner research phase",
+          "items": {
+            "type": "object",
+            "required": ["url", "label"],
+            "properties": {
+              "url": { "type": "string" },
+              "label": { "type": "string" },
+              "accessed_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "documents_scanned": {
+          "type": "array",
+          "description": "Local file paths provided during partner profile creation",
+          "items": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": { "type": "string" },
+              "label": { "type": "string" },
+              "scanned_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
     }
   }
 }

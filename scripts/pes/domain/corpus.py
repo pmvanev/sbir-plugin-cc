@@ -21,6 +21,8 @@ class CorpusEntry:
     content_hash: str
     file_type: str
     size_bytes: int
+    source_directory: str = ""
+    source_url: str = ""
 
 
 @dataclass
@@ -30,6 +32,7 @@ class IngestionResult:
     new_entries: list[CorpusEntry] = field(default_factory=list)
     skipped_existing: int = 0
     skipped_unsupported: int = 0
+    source_directory: str = ""
     message: str = ""
 
 
@@ -117,6 +120,7 @@ class CorpusIngestionService:
             new_entries=new_entries,
             skipped_existing=skipped_existing,
             skipped_unsupported=unsupported_count,
+            source_directory=str(directory),
         )
         result.message = self._build_message(result)
         return result

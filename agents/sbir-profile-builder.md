@@ -124,8 +124,12 @@ You can verify, correct, or add to them in the next step.
 
 5. If the user continues, carry research findings forward as draft profile data for Phase 3 (GATHER). The user verifies and corrects during interview or document extraction.
 6. If research finds nothing useful, report that and proceed — research is additive, never blocking.
+7. **Record all sources**: Track every URL consulted and every document path provided in a `sources` object on the profile. This provenance data is saved with the profile so the user can revisit original references later. Structure:
+   - `sources.web_references`: array of `{url, label, accessed_at}` for each web page consulted
+   - `sources.documents_scanned`: array of `{path, label, scanned_at}` for each local file the user provided
+   - `sources.directories_scanned`: array of `{path, file_count, scanned_at}` for each directory scanned during corpus ingestion that fed into the profile
 
-Gate: Research complete or skipped. Findings carried forward as draft data.
+Gate: Research complete or skipped. Findings and source references carried forward as draft data.
 
 ### Phase 3: GATHER
 
@@ -140,6 +144,8 @@ Collect profile data using the selected mode.
 - **Unsupported formats**: Report error: "Unsupported file format '{ext}'. Supported formats: PDF (.pdf), text (.txt), Word (.doc/.docx), or URL. Try converting to PDF or pasting the text content directly."
 
 **Extraction merge protocol**: When processing multiple documents, each extraction is merged additively into the draft. Nested structures (like certifications) are deep-merged. Lists (like capabilities) are concatenated with deduplication. Scalars from later documents overwrite earlier values. This ensures no data loss across multiple document sources.
+
+**Source tracking**: Every file path and URL provided in document mode is recorded in `sources.documents_scanned` (for local files) or `sources.web_references` (for URLs). This happens automatically as documents are processed — the user does not need to be asked about it.
 
 **Interview mode**: Walk through sections in order. For each field, explain its fit scoring impact (from profile-domain skill) before asking. Accept the user's input and confirm understanding.
 

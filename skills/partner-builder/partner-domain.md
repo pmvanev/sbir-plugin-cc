@@ -46,6 +46,28 @@ Partner profiles at `~/.sbir/partners/{slug}.json` capture research institution 
 }
 ```
 
+## Source Provenance
+
+The `sources` field records where partner profile data came from. Populated automatically during research and document extraction.
+
+```json
+{
+  "sources": {
+    "web_references": [
+      { "url": "https://www.colorado.edu/lab/...", "label": "CU Boulder research lab page", "accessed_at": "ISO-8601" }
+    ],
+    "documents_scanned": [
+      { "path": "/path/to/partner-capability-brief.pdf", "label": "Partner capability brief", "scanned_at": "ISO-8601" }
+    ]
+  }
+}
+```
+
+- **web_references**: URLs consulted during Phase 2 (RESEARCH). University department pages, faculty profiles, facility descriptions, SBIR award records.
+- **documents_scanned**: Local files the user provided. Partner capability statements, teaming agreement drafts, facility brochures.
+
+The `sources` field is optional — partner profiles created before this feature lack it. Handle missing `sources` gracefully.
+
 ## Field-by-Field Interview Guidance
 
 ### partner_name

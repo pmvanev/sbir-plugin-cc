@@ -125,8 +125,12 @@ You can verify, correct, or add to them in the next step.
 
 5. If the user continues, carry research findings forward as draft data for Phase 3.
 6. If research finds nothing useful, report that and proceed -- research is additive, never blocking.
+7. **Record all sources**: Track every URL consulted and every document path provided in a `sources` object on the profile:
+   - `sources.web_references`: array of `{url, label, accessed_at}` for each web page consulted
+   - `sources.documents_scanned`: array of `{path, label, scanned_at}` for each local file the user provided
+   Source tracking is automatic — record URLs as you fetch them and file paths as the user provides them.
 
-Gate: Research complete or skipped. Findings carried forward as draft data.
+Gate: Research complete or skipped. Findings and source references carried forward as draft data.
 
 ### Phase 3: GATHER
 

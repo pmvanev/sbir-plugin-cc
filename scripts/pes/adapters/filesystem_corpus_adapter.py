@@ -41,6 +41,7 @@ class FilesystemCorpusAdapter(CorpusScanner):
                 content_hash=content_hash,
                 file_type=file_path.suffix.lower(),
                 size_bytes=len(content),
+                source_directory=str(directory),
             ))
 
         return entries
