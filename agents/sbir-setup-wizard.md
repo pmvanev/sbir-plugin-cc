@@ -56,9 +56,14 @@ Estimated time: 10-15 minutes
 1. Check Python version via Bash (use `python --version` first, fall back to `python3 --version`)
 2. Check Git version via Bash (`git --version`)
 3. Claude Code authentication: always passes (user is interacting with you)
-4. Display results using `[ok]` / `[!!]` indicators with version numbers
-5. If any prerequisite fails: display fix instructions and halt. "Fix the issues above, then run /sbir:setup again."
-6. If all pass: display "All prerequisites met" and offer (c) continue or (q) quit
+4. Check LaTeX compiler via Bash (use detection commands from setup-domain skill). LaTeX is optional -- missing LaTeX does not halt setup, but the result is recorded for the validation summary and format selection guidance.
+5. Display results using `[ok]` / `[!!]` / `[--]` indicators with version numbers
+6. If any required prerequisite fails (Python, Git): display fix instructions and halt. "Fix the issues above, then run /sbir:setup again."
+7. If LaTeX is missing: display `[--]  LaTeX not found (optional -- needed for LaTeX output format)` and offer to help install it:
+   - (i) install -- display platform-specific installation instructions from setup-domain skill
+   - (s) skip -- continue without LaTeX (DOCX format will be the only option)
+   - (q) quit
+8. If all pass: display "All prerequisites met" and offer (c) continue or (q) quit
 
 Gate: All prerequisites pass. User confirms continue.
 
@@ -142,6 +147,7 @@ Re-verify all configuration and display unified checklist:
 
 1. Re-run all checks (do not trust prior step results -- re-verify):
    - Python version, Git version, Claude Code auth
+   - LaTeX compiler availability
    - Profile existence and key fields (company name, SAM.gov status, capability count)
    - Corpus document count
    - GEMINI_API_KEY presence
@@ -149,7 +155,8 @@ Re-verify all configuration and display unified checklist:
 3. Compute overall status: READY or READY (with warnings)
 4. SAM.gov inactive: `[!!] SAM.gov not active -- all topics will be NO-GO until fixed`
 5. Empty corpus: `[--] No documents indexed -- add with /sbir:proposal corpus add`
-6. GEMINI_API_KEY absent: `[--] Not configured (optional -- Wave 5 only)`
+6. LaTeX absent: `[--] LaTeX not found -- DOCX format only. Install for LaTeX output support.`
+7. GEMINI_API_KEY absent: `[--] Not configured (optional -- Wave 5 only)`
 
 Gate: Validation complete. Status computed.
 

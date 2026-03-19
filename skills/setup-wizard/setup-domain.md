@@ -32,6 +32,18 @@ Extract version (e.g., "git version 2.44.0" -> 2.44.0).
 - Fail: `[!!]  Git not found`
 - Fix: "Install Git from https://git-scm.com/downloads. On Windows, ensure Git is added to PATH."
 
+### LaTeX Compiler (optional)
+
+```bash
+pdflatex --version 2>&1 || xelatex --version 2>&1 || lualatex --version 2>&1
+```
+
+Check for any of: pdflatex, xelatex, lualatex. Extract engine name and version from output.
+- Pass: `[ok]  LaTeX ({engine} {version})`
+- Absent: `[--]  LaTeX not found (optional -- needed for LaTeX output format)`
+- Fix: offer platform-specific install instructions (see LaTeX Installation section below)
+- Note: LaTeX is only needed if the user wants LaTeX output format instead of DOCX. It is NOT a required prerequisite -- missing LaTeX does not halt setup.
+
 ### Claude Code Authentication
 
 Claude Code is authenticated if the agent is running (the user is interacting with you). This check always passes in normal operation.
@@ -91,6 +103,55 @@ if [ -n "$GEMINI_API_KEY" ]; then echo "detected"; else echo "not_set"; fi
    - Bash: `echo 'export GEMINI_API_KEY="your-key"' >> ~/.bashrc && source ~/.bashrc`
    - PowerShell: `[System.Environment]::SetEnvironmentVariable('GEMINI_API_KEY', 'your-key', 'User')`
 5. Restart terminal
+
+## LaTeX Installation Instructions
+
+Display when user selects (i) install during prerequisite check:
+
+### Windows
+
+```
+Option A: MiKTeX (recommended for Windows)
+  1. Download from https://miktex.org/download
+  2. Run the installer, select "Install missing packages on-the-fly: Yes"
+  3. Restart your terminal
+  4. Verify: pdflatex --version
+
+Option B: TeX Live
+  1. Download install-tl-windows.exe from https://tug.org/texlive/acquire-netinstall.html
+  2. Run the installer (full install is ~5 GB, basic scheme is ~300 MB)
+  3. Restart your terminal
+  4. Verify: pdflatex --version
+```
+
+### macOS
+
+```
+Option A: MacTeX (recommended)
+  1. Download from https://tug.org/mactex/
+  2. Run the installer (~5 GB full, or BasicTeX ~100 MB)
+  3. Restart your terminal
+  4. Verify: pdflatex --version
+
+Option B: Homebrew
+  brew install --cask mactex    # Full install
+  brew install --cask basictex  # Minimal install
+```
+
+### Linux
+
+```
+Ubuntu/Debian:
+  sudo apt-get install texlive-latex-base texlive-latex-extra texlive-fonts-recommended
+
+Fedora/RHEL:
+  sudo dnf install texlive-scheme-basic texlive-latex
+
+Arch:
+  sudo pacman -S texlive-basic texlive-latexextra
+```
+
+After installation, restart the terminal and run `/sbir:setup` again to verify detection.
 
 ## Next Steps Commands
 

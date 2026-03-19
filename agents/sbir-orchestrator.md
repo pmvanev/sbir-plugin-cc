@@ -140,7 +140,7 @@ User runs `/sbir:proposal new` with a solicitation file path.
 3. DISPATCH: Create `.sbir/` directory, initialize state with topic metadata
 4. DISPATCH: Invoke sbir-corpus-librarian to ingest solicitation
 5. DISPATCH: Score fit across subject matter, past performance, certifications
-6. FORMAT SELECTION: Prompt for output format (LaTeX or DOCX, default DOCX). If solicitation hints at PDF submission, recommend LaTeX. Record `output_format` in state.
+6. FORMAT SELECTION: Prompt for output format (LaTeX or DOCX, default DOCX). If solicitation hints at PDF submission, recommend LaTeX. Before offering LaTeX, check compiler availability (`pdflatex --version`). If no LaTeX compiler is detected, warn the user: "LaTeX compiler not detected. Select DOCX or install LaTeX first (run /sbir:setup for install help)." Record `output_format` in state.
 7. CHECKPOINT: Present Go/No-Go with fit scoring results and chosen format
 
 ### Example 2: Session Resume After Days Away
