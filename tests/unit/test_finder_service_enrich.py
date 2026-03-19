@@ -284,7 +284,9 @@ class TestBackwardCompatibility:
         assert len(result.topics) == 5
         assert result.error is None
 
-    def test_search_and_filter_still_works_without_enrichment_ports(self) -> None:
+    def test_search_and_filter_returns_correct_candidate_and_eliminated_counts(self) -> None:
+        """search_and_filter without enrichment ports filters 15 topics:
+        5 DE topics match capabilities, 10 bio topics eliminated."""
         de_topics = _make_de_topics(5)
         bio_topics = _make_bio_topics(10)
         fetch_adapter = InMemoryTopicFetchAdapter(topics=de_topics + bio_topics)
@@ -295,5 +297,7 @@ class TestBackwardCompatibility:
 
         result = service.search_and_filter()
 
-        assert result.candidates_count == 5
-        assert result.eliminated_count == 10
+        assert result.candidates_count == 5, "5 DE topics should match 'directed energy' capability"
+        assert result.eliminated_count == 10, "10 bio topics should be eliminated"
+        assert result.total_fetched == 15, "All 15 topics should have been fetched"
+        assert len(result.topics) == 5, "Returned topics should be the 5 candidates"

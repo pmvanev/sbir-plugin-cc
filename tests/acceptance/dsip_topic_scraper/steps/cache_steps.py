@@ -165,33 +165,35 @@ def phil_searches_with_filter(agency: str, scraper_context: dict[str, Any]):
 @then(parsers.parse("the cache file contains all {count:d} enriched topics"))
 def cache_contains_topics(count: int, scraper_context: dict[str, Any]):
     """Verify cache contains the expected number of topics."""
-    cache_data = scraper_context.get("cache_write_result", {})
-    topics = cache_data.get("topics", [])
+    cache_data = scraper_context.get("cache_write_result")
+    assert cache_data is not None, "No cache write result found"
+    topics = cache_data.topics
     assert len(topics) == count, f"Expected {count} topics in cache, got {len(topics)}"
 
 
 @then("the cache file includes a scrape date timestamp")
 def cache_has_scrape_date(scraper_context: dict[str, Any]):
     """Verify cache includes scrape_date."""
-    cache_data = scraper_context.get("cache_write_result", {})
-    assert "scrape_date" in cache_data, "Cache missing scrape_date"
-    assert cache_data["scrape_date"] is not None
+    cache_data = scraper_context.get("cache_write_result")
+    assert cache_data is not None, "No cache write result found"
+    assert cache_data.scrape_date, "Cache missing scrape_date"
 
 
 @then("the cache file includes the data source identifier")
 def cache_has_source(scraper_context: dict[str, Any]):
     """Verify cache includes source identifier."""
-    cache_data = scraper_context.get("cache_write_result", {})
-    assert "source" in cache_data, "Cache missing source"
-    assert cache_data["source"] == "dsip_api"
+    cache_data = scraper_context.get("cache_write_result")
+    assert cache_data is not None, "No cache write result found"
+    assert cache_data.source == "dsip_api", f"Expected 'dsip_api', got '{cache_data.source}'"
 
 
 @then("the cache file includes enrichment completeness metrics")
 def cache_has_completeness(scraper_context: dict[str, Any]):
     """Verify cache includes enrichment completeness."""
-    cache_data = scraper_context.get("cache_write_result", {})
-    assert "enrichment_completeness" in cache_data, "Cache missing completeness"
-    completeness = cache_data["enrichment_completeness"]
+    cache_data = scraper_context.get("cache_write_result")
+    assert cache_data is not None, "No cache write result found"
+    completeness = cache_data.enrichment_completeness
+    assert completeness, "Cache missing enrichment_completeness"
     assert "descriptions" in completeness
     assert "instructions" in completeness
     assert "qa" in completeness
@@ -270,7 +272,7 @@ def cache_file_valid(scraper_context: dict[str, Any]):
     assert adapter is not None
     data = adapter.read()
     assert data is not None, "Cache data should be valid"
-    assert "topics" in data, "Cache should contain topics"
+    assert data.topics is not None, "Cache should contain topics"
 
 
 @then("the tool proceeds with a fresh fetch from the topic source")

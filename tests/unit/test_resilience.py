@@ -108,11 +108,16 @@ class TestDiagnosticSave:
 # ---------------------------------------------------------------------------
 
 
-class TestWhatWhyDoMessages:
-    """Error messages follow what/why/do pattern."""
+class TestStructuralChangeMessageContent:
+    """Structural change messages contain actionable guidance for the user."""
 
-    def test_structural_change_message_has_all_three_sections(self) -> None:
-        """Structural change messages include what, why, and do sections."""
+    def test_structural_change_messages_contain_actionable_content(self) -> None:
+        """When FinderService detects a structural_change error from the fetch port,
+        the returned messages contain:
+        - What: identifies the specific structural change detected
+        - Why: explains the likely cause (API schema update)
+        - Do: provides a concrete fallback action (use --file with BAA PDF)
+        """
         adapter = InMemoryTopicFetchAdapter(
             topics=[],
             available=True,
@@ -122,15 +127,30 @@ class TestWhatWhyDoMessages:
 
         result = service.search()
 
+        # Verify error is propagated
+        assert result.error is not None
+        assert "structural_change" in result.error
+
         messages = result.messages
-        all_text = " ".join(messages).lower()
-        # Must contain distinct what/why/do guidance
-        has_what = any("what:" in m.lower() for m in messages)
-        has_why = any("why:" in m.lower() for m in messages)
-        has_do = any("do:" in m.lower() or "--file" in m for m in messages)
-        assert has_what, f"Missing 'What:' in messages: {messages}"
-        assert has_why, f"Missing 'Why:' in messages: {messages}"
-        assert has_do, f"Missing 'Do:' or '--file' in messages: {messages}"
+        assert len(messages) >= 3, f"Expected at least 3 messages (what/why/do), got {len(messages)}"
+
+        # What message includes the specific change detail from the error
+        what_msgs = [m for m in messages if m.lower().startswith("what:")]
+        assert len(what_msgs) == 1, f"Expected exactly 1 'What:' message, got: {messages}"
+        assert "expected" in what_msgs[0].lower() or "structure" in what_msgs[0].lower(), \
+            f"What message should describe the structural issue: {what_msgs[0]}"
+
+        # Why message references the API
+        why_msgs = [m for m in messages if m.lower().startswith("why:")]
+        assert len(why_msgs) == 1, f"Expected exactly 1 'Why:' message, got: {messages}"
+        assert "api" in why_msgs[0].lower() or "schema" in why_msgs[0].lower(), \
+            f"Why message should reference API change: {why_msgs[0]}"
+
+        # Do message provides actionable fallback
+        do_msgs = [m for m in messages if m.lower().startswith("do:")]
+        assert len(do_msgs) == 1, f"Expected exactly 1 'Do:' message, got: {messages}"
+        assert "--file" in do_msgs[0], \
+            f"Do message should suggest --file fallback: {do_msgs[0]}"
 
 
 # ---------------------------------------------------------------------------

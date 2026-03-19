@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from pes.ports.topic_cache_port import CacheResult
 from pes.ports.topic_enrichment_port import EnrichmentResult, TopicEnrichmentPort
 from pes.ports.topic_fetch_port import FetchResult, TopicFetchPort
 
@@ -214,11 +215,21 @@ class InMemoryTopicCacheAdapter:
         self._data = data
         self._corrupt = corrupt
 
-    def read(self) -> dict[str, Any] | None:
-        """Read cached topic data."""
+    def read(self) -> CacheResult | None:
+        """Read cached topic data as CacheResult (matching TopicCachePort contract)."""
         if self._corrupt:
-            raise ValueError("Cache file is corrupt")
-        return self._data
+            return None
+        if self._data is None:
+            return None
+        return CacheResult(
+            topics=self._data.get("topics", []),
+            scrape_date=self._data.get("scrape_date", ""),
+            source=self._data.get("source", ""),
+            ttl_hours=self._data.get("ttl_hours", 24),
+            total_topics=self._data.get("total_topics", 0),
+            enrichment_completeness=self._data.get("enrichment_completeness", {}),
+            filters_applied=self._data.get("filters_applied", {}),
+        )
 
     def write(self, topics: list[dict[str, Any]], metadata: dict[str, Any]) -> None:
         """Write enriched topics to cache."""

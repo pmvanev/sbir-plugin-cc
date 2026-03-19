@@ -284,14 +284,14 @@ class FinderService:
         if self._cache_port is not None and self._cache_port.is_fresh(ttl_hours):
             cached = self._cache_port.read()
             if cached is not None:
-                cached_topics = cached.get("topics", [])
+                cached_topics = cached.topics
                 return SearchResult(
                     topics=cached_topics,
                     total=len(cached_topics),
-                    source=cached.get("source", ""),
+                    source=cached.source,
                     company_name=company_name,
                     messages=["Using cached enriched data"],
-                    total_fetched=cached.get("total_topics", len(cached_topics)),
+                    total_fetched=cached.total_topics or len(cached_topics),
                     candidates_count=len(cached_topics),
                 )
 
