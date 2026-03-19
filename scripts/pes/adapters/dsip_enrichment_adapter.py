@@ -32,6 +32,10 @@ DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_RATE_LIMIT_SECONDS = 1.0
 
 
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_RETRY_BASE_SECONDS = 5.0
+
+
 class DsipEnrichmentAdapter(TopicEnrichmentPort):
     """DSIP adapter for per-topic PDF enrichment.
 
@@ -43,6 +47,8 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
         timeout: HTTP request timeout in seconds.
         rate_limit_seconds: Delay between per-topic requests.
         http_client: Optional pre-configured httpx.Client (for testing).
+        max_retries: Maximum retry attempts per download on transient failure.
+        retry_base_seconds: Base delay for exponential backoff between retries.
     """
 
     def __init__(
@@ -51,11 +57,15 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         rate_limit_seconds: float = DEFAULT_RATE_LIMIT_SECONDS,
         http_client: httpx.Client | None = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        retry_base_seconds: float = DEFAULT_RETRY_BASE_SECONDS,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._rate_limit_seconds = rate_limit_seconds
         self._client = http_client or httpx.Client(timeout=timeout)
+        self._max_retries = max_retries
+        self._retry_base_seconds = retry_base_seconds
 
     def enrich(
         self,
@@ -138,15 +148,42 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
         )
 
     def _download_pdf(self, topic_id: str) -> bytes:
-        """Download topic PDF from DSIP API.
+        """Download topic PDF from DSIP API with retry and exponential backoff.
+
+        Retries on transient failures (HTTP 5xx, timeouts) up to max_retries.
 
         Raises:
-            RuntimeError: If the HTTP request fails.
+            RuntimeError: After all retry attempts exhausted.
         """
         url = f"{self._base_url}/{topic_id}/download/PDF"
-        response = self._client.get(url)
-        response.raise_for_status()
-        return response.content
+        last_error: Exception | None = None
+
+        for attempt in range(self._max_retries):
+            try:
+                response = self._client.get(url)
+                response.raise_for_status()
+                return response.content
+            except (httpx.TimeoutException, httpx.HTTPStatusError) as exc:
+                last_error = exc
+                if attempt < self._max_retries - 1:
+                    backoff = self._retry_base_seconds * (2 ** attempt)
+                    logger.warning(
+                        "Transient failure for topic %s (attempt %d/%d), "
+                        "retrying in %.1fs: %s",
+                        topic_id, attempt + 1, self._max_retries, backoff, exc,
+                    )
+                    time.sleep(backoff)
+            except httpx.HTTPError as exc:
+                last_error = exc
+                break
+
+        msg = (
+            f"document download failed after {self._max_retries} attempts "
+            f"for topic {topic_id}"
+        )
+        if last_error:
+            msg = f"{msg}: {last_error}"
+        raise RuntimeError(msg)
 
     def _extract_from_pdf(self, pdf_bytes: bytes) -> dict[str, Any]:
         """Extract structured data from PDF bytes using pypdf.

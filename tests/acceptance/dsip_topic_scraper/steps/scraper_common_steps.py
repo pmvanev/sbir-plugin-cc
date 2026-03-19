@@ -123,6 +123,15 @@ def phil_updated_profile_capability(
     scraper_context["profile"] = profile
 
 
+# --- Enrichment setup ---
+
+
+@given("each candidate topic has a downloadable description document")
+def each_candidate_has_description(scraper_context: dict[str, Any]):
+    """All candidate topics have downloadable description documents."""
+    scraper_context.setdefault("enrichment_data", {})
+
+
 # --- Shared Then steps ---
 
 

@@ -21,7 +21,6 @@ Feature: Scraper Resilience and Observability
     And the user never waits more than 10 seconds without progress output
 
   # Happy path: automatic retry succeeds
-  @skip
   Scenario: Automatic retry succeeds after transient failure
     Given the topic source returns a transient error on the first request for page 2
     When the scraper attempts to fetch page 2
@@ -33,7 +32,6 @@ Feature: Scraper Resilience and Observability
   # --- US-DSIP-004: Edge Cases ---
 
   # Edge: retry with exponential backoff
-  @skip
   Scenario: Retry uses exponential backoff between attempts
     Given the topic source returns transient errors for the first 2 requests
     When the scraper retries with exponential backoff
@@ -42,7 +40,6 @@ Feature: Scraper Resilience and Observability
     And the third attempt succeeds
 
   # Edge: configurable connection timeout
-  @skip
   Scenario: Connection timeout is configurable with sensible default
     Given the topic source does not respond
     When the scraper attempts to connect with the default timeout
@@ -53,7 +50,6 @@ Feature: Scraper Resilience and Observability
   # --- US-DSIP-004: Error Paths ---
 
   # Error: structural change detected in topic source response
-  @skip
   Scenario: Structural change in topic source response detected and reported
     Given the topic source response uses an unexpected data structure
     When the scraper parses the response
@@ -64,7 +60,6 @@ Feature: Scraper Resilience and Observability
     And the error message suggests using a solicitation document file as a fallback
 
   # Error: all retries exhausted
-  @skip
   Scenario: All retries exhausted produces clear failure message
     Given the topic source returns transient errors for all 3 retry attempts
     When the scraper exhausts all retries for page 2

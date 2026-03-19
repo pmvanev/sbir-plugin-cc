@@ -6,12 +6,18 @@ and scoring through driven ports. Tests invoke through this service.
 
 from __future__ import annotations
 
+import json
+import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from pes.domain.keyword_prefilter import KeywordPreFilter
+from pes.domain.topic_enrichment import combine_topics_with_enrichment, completeness_report
 from pes.ports.finder_results_port import FinderResultsPort
 from pes.ports.topic_fetch_port import FetchResult, TopicFetchPort
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -44,10 +50,12 @@ class FinderService:
         topic_fetch: TopicFetchPort,
         profile: dict[str, Any] | None = None,
         results_port: FinderResultsPort | None = None,
+        diagnostic_dir: Path | None = None,
     ) -> None:
         self._topic_fetch = topic_fetch
         self._profile = profile
         self._results_port = results_port
+        self._diagnostic_dir = diagnostic_dir
         self._prefilter = KeywordPreFilter()
 
     # Profile sections that trigger per-section warnings when missing.
@@ -108,13 +116,19 @@ class FinderService:
         )
 
         if fetch_result.error and not fetch_result.topics:
-            # Complete failure
-            messages.append("topic source unavailable")
-            messages.append("You can provide a solicitation document as a file instead")
-            messages.append(
-                "Download solicitation documents from "
-                "https://www.dodsbirsttr.mil/topics-app/"
-            )
+            # Check for structural change (API schema change)
+            if self._is_structural_change(fetch_result.error):
+                self._handle_structural_change(fetch_result.error, messages)
+            else:
+                # Generic failure
+                messages.append("topic source unavailable")
+                messages.append(
+                    "You can provide a solicitation document as a file instead"
+                )
+                messages.append(
+                    "Download solicitation documents from "
+                    "https://www.dodsbirsttr.mil/topics-app/"
+                )
             return SearchResult(
                 source=fetch_result.source,
                 error=fetch_result.error,
@@ -260,3 +274,37 @@ class FinderService:
                     f"Missing profile section: {label} -- "
                     f"scoring capped at EVALUATE for {label} dimension"
                 )
+
+    @staticmethod
+    def _is_structural_change(error: str) -> bool:
+        """Check if error indicates a structural API change."""
+        return error.startswith("structural_change:")
+
+    def _handle_structural_change(
+        self, error: str, messages: list[str]
+    ) -> None:
+        """Produce what/why/do messages and save diagnostics for structural change."""
+        detail = error.removeprefix("structural_change:").strip()
+        messages.append(
+            f"What: DSIP API response structure changed -- {detail}"
+        )
+        messages.append(
+            "Why: The DSIP API may have been updated with a new schema"
+        )
+        messages.append(
+            "Do: Report the issue and use --file with a downloaded BAA PDF as fallback"
+        )
+        self._save_structural_diagnostic(error)
+
+    def _save_structural_diagnostic(self, error: str) -> None:
+        """Save raw error data to .sbir/dsip_debug_response.json."""
+        if self._diagnostic_dir is None:
+            return
+        debug_path = self._diagnostic_dir / "dsip_debug_response.json"
+        try:
+            debug_path.write_text(
+                json.dumps({"raw_error": error}, indent=2)
+            )
+            logger.info("Diagnostic data saved to %s", debug_path)
+        except OSError as exc:
+            logger.warning("Failed to save diagnostic data: %s", exc)
