@@ -54,6 +54,10 @@ def process_hook_event(
         agent_name = hook_input.get("agent_type", "")
         return _handle_subagent_start(engine, state_dir, agent_name)
 
+    if event == "SubagentStop":
+        agent_name = hook_input.get("agent_type", "")
+        return _handle_subagent_stop(engine, state_dir, agent_name)
+
     return {"exit_code": 0}  # unknown event — allow
 
 
@@ -111,6 +115,20 @@ def _handle_subagent_start(
     return {"exit_code": 0}
 
 
+def _handle_subagent_stop(
+    engine: EnforcementEngine, state_dir: str, agent_name: str
+) -> dict[str, Any]:
+    """Handle SubagentStop event -- record agent deactivation in audit trail."""
+    state_reader = JsonStateAdapter(state_dir)
+    try:
+        state = state_reader.load()
+    except StateNotFoundError:
+        return {"exit_code": 0}
+
+    engine.record_agent_stop(state, agent_name)
+    return {"exit_code": 0}
+
+
 # Tools that only read data -- skip post-action validation entirely
 READ_ONLY_TOOLS = {"Read", "Glob", "Grep"}
 
@@ -162,7 +180,7 @@ def main() -> None:
     import sys
 
     if len(sys.argv) < 2:
-        msg = "Usage: hook_adapter <session-start|subagent-start|pre-tool-use|post-tool-use>"
+        msg = "Usage: hook_adapter <session-start|subagent-start|subagent-stop|pre-tool-use|post-tool-use>"
         print(json.dumps({"error": msg}))
         sys.exit(2)
 
@@ -170,6 +188,7 @@ def main() -> None:
     event_map = {
         "session-start": "SessionStart",
         "subagent-start": "SubagentStart",
+        "subagent-stop": "SubagentStop",
         "pre-tool-use": "PreToolUse",
         "post-tool-use": "PostToolUse",
     }

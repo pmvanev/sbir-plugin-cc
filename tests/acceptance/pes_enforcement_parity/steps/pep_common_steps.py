@@ -404,7 +404,7 @@ def agent_completes_work(
     state = enforcement_context["state"]
     enforcement_context["agent_event"] = "stop"
     enforcement_context["stopped_agent"] = "writer"
-    result = enforcement_engine.evaluate(state, tool_name="agent_stop_writer")
+    result = enforcement_engine.record_agent_stop(state, "writer")
     enforcement_context["result"] = result
     return enforcement_context
 
@@ -661,17 +661,26 @@ def rejected_dispatch_audited(in_memory_audit_log):
 def agent_deactivation_audited(in_memory_audit_log):
     """Verify an audit entry was recorded for agent deactivation."""
     entries = in_memory_audit_log.entries
-    assert len(entries) >= 1, (
-        f"Expected audit entry for agent deactivation. Got: {entries}"
+    stop_entries = [e for e in entries if e.get("event") == "agent_stop"]
+    assert len(stop_entries) >= 1, (
+        f"Expected agent_stop audit entry. Got: {entries}"
     )
+    assert stop_entries[0]["decision"] == "allow"
 
 
 @then("the audit entry includes the agent name and wave number")
 def audit_has_agent_and_wave(in_memory_audit_log):
     """Verify the audit entry includes agent and wave information."""
     entries = in_memory_audit_log.entries
-    assert len(entries) >= 1
-    # Implementation will add agent_name and wave to audit entries
+    stop_entries = [e for e in entries if e.get("event") == "agent_stop"]
+    assert len(stop_entries) >= 1, (
+        f"Expected agent_stop audit entry. Got: {entries}"
+    )
+    entry = stop_entries[0]
+    assert "agent_name" in entry, f"Missing agent_name in audit entry: {entry}"
+    assert "wave" in entry, f"Missing wave in audit entry: {entry}"
+    assert entry["agent_name"] == "writer"
+    assert entry["wave"] == 4
 
 
 @then(

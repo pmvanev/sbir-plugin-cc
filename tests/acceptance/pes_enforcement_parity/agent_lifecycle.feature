@@ -22,7 +22,6 @@ Feature: Agent Lifecycle Tracking
     Then the agent dispatch is allowed
     And the agent activation is recorded in the audit trail
 
-  @skip
   Scenario: Agent stop event is recorded when agent completes work
     Given Phil's proposal "AF243-001" is in Wave 4 drafting
     And the writer agent is currently active

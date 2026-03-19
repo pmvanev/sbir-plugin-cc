@@ -235,6 +235,31 @@ class EnforcementEngine:
         })
         return result
 
+    def record_agent_stop(
+        self,
+        state: dict[str, Any],
+        agent_name: str,
+    ) -> EnforcementResult:
+        """Record agent deactivation in audit trail.
+
+        SubagentStop is audit-only -- never blocks.
+        Returns ALLOW with audit entry containing agent name and wave.
+        """
+        proposal_id = state.get("proposal_id", "unknown")
+        current_wave = state.get("current_wave", -1)
+
+        result = EnforcementResult(decision=Decision.ALLOW)
+        self._safe_audit_log({
+            "timestamp": datetime.now(UTC).isoformat(),
+            "event": "agent_stop",
+            "decision": "allow",
+            "agent_name": agent_name,
+            "wave": current_wave,
+            "proposal_id": proposal_id,
+            "messages": [],
+        })
+        return result
+
     def _safe_audit_log(self, entry: dict[str, Any]) -> None:
         """Log audit entry, suppressing write failures with a warning."""
         try:

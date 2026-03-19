@@ -366,6 +366,35 @@ class TestEnforcementEngineAgentDispatch:
         assert result.decision == Decision.ALLOW
 
 
+class TestEnforcementEngineAgentStop:
+    """Agent stop (deactivation) recording through driving port.
+
+    Test Budget: 2 behaviors x 2 = 4 max unit tests
+    """
+
+    def test_record_agent_stop_logs_audit_with_agent_name_and_wave(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        state = {"proposal_id": "test-uuid-agent", "current_wave": 4}
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        result = engine.record_agent_stop(state, "writer")
+        assert result.decision == Decision.ALLOW
+        assert len(audit_logger.entries) == 1
+        entry = audit_logger.entries[0]
+        assert entry["event"] == "agent_stop"
+        assert entry["decision"] == "allow"
+        assert entry["agent_name"] == "writer"
+        assert entry["wave"] == 4
+        assert entry["proposal_id"] == "test-uuid-agent"
+        assert "timestamp" in entry
+
+    def test_record_agent_stop_resilient_to_audit_failure(self) -> None:
+        state = {"proposal_id": "test-uuid-agent", "current_wave": 4}
+        engine = EnforcementEngine(FakeRuleLoader(), FailingAuditLogger())
+        result = engine.record_agent_stop(state, "writer")
+        assert result.decision == Decision.ALLOW
+
+
 class TestEnforcementEngineMultiReasonBlock:
     """Audit entry for multi-rule blocks includes all block reasons."""
 
