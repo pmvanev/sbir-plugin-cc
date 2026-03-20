@@ -1,0 +1,219 @@
+{
+  "roadmap": {
+    "project_id": "visual-asset-quality",
+    "created_at": "2026-03-20",
+    "total_steps": 10,
+    "phases": [
+      {
+        "id": "01",
+        "name": "Python Domain Extension",
+        "description": "Extend PES domain model for TikZ routing and quality tracking fields",
+        "default_agent": "nw-software-crafter",
+        "default_deps_strategy": "sequential",
+        "steps": [
+          {
+            "id": "01-01",
+            "name": "TikZ routing in VisualAssetService",
+            "criteria": [
+              "VisualAssetService routes 'tikz' generation_method to a TikZ handler",
+              "TikZ handler returns FigureGenerationResult with format 'tikz'",
+              "Existing methods (corpus-reuse, external, mermaid) unchanged",
+              "FigureGenerationResult carries prompt_hash and iteration_count fields"
+            ],
+            "files_to_modify": [
+              "scripts/pes/domain/visual_asset_service.py",
+              "scripts/pes/domain/visual_asset.py",
+              "tests/unit/test_visual_asset_service.py"
+            ],
+            "implementation_notes": "delivery: code/tdd. Add _generate_tikz() method parallel to _generate_mermaid(). Add optional prompt_hash: str = '' and iteration_count: int = 0 to FigureGenerationResult."
+          },
+          {
+            "id": "01-02",
+            "name": "FileVisualAssetAdapter TikZ persistence",
+            "criteria": [
+              "Adapter writes TikZ source (.tex) and preview (.pdf) to figures directory",
+              "Adapter reads TikZ figures with format 'tikz' from inventory",
+              "Existing write_figure and read paths unchanged"
+            ],
+            "files_to_modify": [
+              "scripts/pes/adapters/file_visual_asset_adapter.py",
+              "tests/unit/test_file_visual_asset_adapter.py"
+            ],
+            "implementation_notes": "delivery: code/tdd. Extend write_figure to handle binary content (PDF) alongside text (TEX, SVG)."
+          }
+        ]
+      },
+      {
+        "id": "02",
+        "name": "Visual Style Intelligence Skill",
+        "description": "Create new skill with domain-style database and style profile schema",
+        "default_agent": "nw-agent-builder",
+        "default_deps_strategy": "sequential",
+        "steps": [
+          {
+            "id": "02-01",
+            "name": "Create visual-style-intelligence skill",
+            "criteria": [
+              "Skill contains agency-domain style database (Navy, Air Force, Army, DARPA, generic)",
+              "Each domain entry has palette (hex), tone, detail level, avoid list",
+              "Style profile YAML schema defined with validation rules",
+              "Recommendation guidance for agent: read solicitation, identify domain, recommend"
+            ],
+            "files_to_modify": [
+              "skills/formatter/visual-style-intelligence.md"
+            ],
+            "implementation_notes": "delivery: forge/skill. New file. Follow nWave skill format: YAML frontmatter + domain knowledge sections."
+          }
+        ]
+      },
+      {
+        "id": "03",
+        "name": "Prompt Engineering Enhancement",
+        "description": "Extend visual-asset-generator skill with structured prompt templates and critique patterns",
+        "default_agent": "nw-agent-builder",
+        "default_deps_strategy": "sequential",
+        "steps": [
+          {
+            "id": "03-01",
+            "name": "Engineered prompt templates in skill",
+            "criteria": [
+              "Skill defines structured prompt template with COMPOSITION, STYLE, LABELS, AVOID, RESOLUTION sections",
+              "Per-figure-type prompt patterns provided (system-diagram, concept, block-diagram, etc.)",
+              "Style profile injection point documented (palette, tone from YAML)",
+              "Figure plan metadata injection documented (section content, compliance items)"
+            ],
+            "files_to_modify": [
+              "skills/formatter/visual-asset-generator.md"
+            ],
+            "implementation_notes": "delivery: skill/edit. Replace existing 'Prompt engineering for SBIR figures' section with structured templates."
+          },
+          {
+            "id": "03-02",
+            "name": "Critique categories and refinement patterns in skill",
+            "criteria": [
+              "Five critique categories defined with descriptions and 1-5 rating scale",
+              "Per-category prompt adjustment patterns documented (additions/removals)",
+              "Refinement preservation rules specified (high-rated sections unchanged)",
+              "Maximum 3 iterations with escape path guidance"
+            ],
+            "files_to_modify": [
+              "skills/formatter/visual-asset-generator.md"
+            ],
+            "implementation_notes": "delivery: skill/edit. Add 'Structured Critique' and 'Refinement Patterns' sections after prompt templates."
+          },
+          {
+            "id": "03-03",
+            "name": "TikZ generation guidance in skill",
+            "criteria": [
+              "TikZ section covers when to offer, compatible figure types, compilation steps",
+              "Fallback guidance on compilation failure documented",
+              "Method selection guide updated with TikZ entry"
+            ],
+            "files_to_modify": [
+              "skills/formatter/visual-asset-generator.md"
+            ],
+            "implementation_notes": "delivery: skill/edit. Add 'TikZ Generation' section. Update method selection table."
+          }
+        ]
+      },
+      {
+        "id": "04",
+        "name": "Formatter Agent Workflow Enhancement",
+        "description": "Update sbir-formatter agent with style analysis, prompt preview, critique loop, TikZ routing, and quality summary",
+        "default_agent": "nw-agent-builder",
+        "default_deps_strategy": "sequential",
+        "steps": [
+          {
+            "id": "04-01",
+            "name": "Style analysis and prompt preview in formatter agent",
+            "criteria": [
+              "Phase 1 includes style analysis: load style skill, read solicitation, recommend profile, persist YAML",
+              "Phase 2 includes prompt preview: construct prompt, display, offer edit/generate/skip",
+              "Agent loads visual-style-intelligence skill in Phase 1 skill loading table"
+            ],
+            "files_to_modify": [
+              "agents/sbir-formatter.md"
+            ],
+            "implementation_notes": "delivery: agent/edit. Add style analysis step to Phase 1. Add prompt preview to Phase 2 before generation."
+          },
+          {
+            "id": "04-02",
+            "name": "Critique loop and TikZ routing in formatter agent",
+            "criteria": [
+              "Phase 2 review checkpoint replaced with structured 5-category critique",
+              "Refinement loop: flagged categories trigger prompt adjustments, max 3 rounds, escape paths",
+              "TikZ routing: offered for LaTeX + compiler + diagram types, compile-verify-present workflow",
+              "Quality ratings and prompt hash recorded in figure log"
+            ],
+            "files_to_modify": [
+              "agents/sbir-formatter.md"
+            ],
+            "implementation_notes": "delivery: agent/edit. Replace Phase 2 review section. Add TikZ workflow alongside existing methods."
+          },
+          {
+            "id": "04-03",
+            "name": "Quality summary at Wave 5 conclusion",
+            "criteria": [
+              "Post-Phase 2 quality summary: aggregate ratings, style consistency check, outlier detection",
+              "Summary persisted to wave-5-visuals/quality-summary.md",
+              "Style inconsistencies and quality outliers flagged with actionable options"
+            ],
+            "files_to_modify": [
+              "agents/sbir-formatter.md"
+            ],
+            "implementation_notes": "delivery: agent/edit. Add quality summary step between Phase 2 and Phase 3."
+          }
+        ]
+      },
+      {
+        "id": "05",
+        "name": "Command Documentation Updates",
+        "description": "Update command files to document new style analysis, prompt preview, and critique features",
+        "default_agent": "nw-agent-builder",
+        "default_deps_strategy": "sequential",
+        "steps": [
+          {
+            "id": "05-01",
+            "name": "Update wave visuals and draft figure commands",
+            "criteria": [
+              "/proposal wave visuals documents style analysis step in flow and examples",
+              "/proposal draft figure documents prompt preview and critique loop in flow and examples",
+              "Both commands reference new skills in context files"
+            ],
+            "files_to_modify": [
+              "commands/proposal-wave-visuals.md",
+              "commands/proposal-draft-figure.md"
+            ],
+            "implementation_notes": "delivery: command/edit. Update Flow, Examples, and Context Files sections in both commands."
+          }
+        ]
+      }
+    ]
+  },
+  "implementation_scope": {
+    "production_files": [
+      "scripts/pes/domain/visual_asset_service.py",
+      "scripts/pes/domain/visual_asset.py",
+      "scripts/pes/adapters/file_visual_asset_adapter.py",
+      "skills/formatter/visual-style-intelligence.md",
+      "skills/formatter/visual-asset-generator.md",
+      "agents/sbir-formatter.md",
+      "commands/proposal-wave-visuals.md",
+      "commands/proposal-draft-figure.md"
+    ],
+    "test_files": [
+      "tests/unit/test_visual_asset_service.py",
+      "tests/unit/test_file_visual_asset_adapter.py"
+    ],
+    "documentation_files": [
+      "docs/adrs/adr-033-prompt-engineering-in-skill.md",
+      "docs/adrs/adr-034-tikz-as-generation-method.md",
+      "docs/adrs/adr-035-style-profile-yaml-artifact.md"
+    ]
+  },
+  "validation": {
+    "status": "pending",
+    "decomposition_ratio": 1.25,
+    "decomposition_check": "10 steps / 8 production files = 1.25 (under 2.5 limit)"
+  }
+}
