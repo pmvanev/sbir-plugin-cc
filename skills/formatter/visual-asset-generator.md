@@ -400,6 +400,122 @@ land-centric imagery in maritime context.
 RESOLUTION: 2K, 16:9.
 ```
 
+## Critique Categories and Refinement Patterns
+
+### Five Critique Categories
+
+Every generated figure is reviewed using five structured categories. Each category is rated 1-5, where 1 = poor and 5 = excellent. Categories rated below 3 are flagged for refinement.
+
+| # | Category | Description | What to Evaluate |
+|---|----------|-------------|------------------|
+| 1 | **Composition** | Spatial layout, visual hierarchy, element arrangement | Are elements logically arranged? Is the visual flow clear? Is the perspective appropriate for the figure type? |
+| 2 | **Labels** | Text clarity, label placement, readability | Are all components labeled? Are labels readable (size, contrast)? Do labels overlap or obscure content? |
+| 3 | **Accuracy** | Technical correctness, completeness of required elements | Are all required subsystems/components present? Are connections/flows correct? Does the figure match the section content? |
+| 4 | **Style Match** | Consistency with approved style profile | Does the palette match the style profile? Is the tone appropriate for the agency? Does it feel professional and domain-appropriate? |
+| 5 | **Scale / Proportion** | Element sizing, relative proportions, whitespace balance | Are elements proportionally sized? Is whitespace balanced? Are important elements visually prominent? |
+
+### Rating Scale
+
+| Rating | Meaning | Action |
+|--------|---------|--------|
+| 5 | Excellent -- no changes needed | Preserve in refinement |
+| 4 | Good -- minor issues acceptable | Preserve in refinement |
+| 3 | Adequate -- at threshold, acceptable | No refinement (boundary) |
+| 2 | Below standard -- specific issues identified | Flag for refinement |
+| 1 | Poor -- significant rework needed | Flag for refinement |
+
+### Per-Category Prompt Adjustment Patterns
+
+When a category is flagged (rated below 3), the system prepares prompt additions and removals specific to that category. The user reviews adjustments before regeneration.
+
+#### Composition (flagged)
+
+**Additions:**
+- "Clear visual hierarchy with primary element centered or at focal point"
+- "Logical left-to-right / top-to-bottom flow with no ambiguous spatial relationships"
+- "Balanced whitespace, no crowded regions"
+- Specific layout directive based on user notes (e.g., "isometric view" or "layered horizontal layout")
+
+**Removals:**
+- Remove any conflicting layout directive from the original prompt
+- Remove perspective instructions that produced the poor composition
+
+#### Labels (flagged)
+
+**Additions:**
+- "Large clear labels, minimum 12pt equivalent, high-contrast label backgrounds"
+- "No overlapping labels -- offset with leader lines if necessary"
+- "Every component, interface, and data flow labeled"
+- Specific label instructions from user notes (e.g., "power bus as bold line with voltage annotation")
+
+**Removals:**
+- Remove any small-font or compact-label instructions
+- Remove "minimal labeling" or "clean/uncluttered" directives that caused under-labeling
+
+#### Accuracy (flagged)
+
+**Additions:**
+- "Include all of the following components: {missing components from user notes}"
+- "Correct the following: {specific inaccuracies from user notes}"
+- Re-inject section content terms that were omitted in the original generation
+
+**Removals:**
+- Remove elements the user identified as incorrect or extraneous
+- Remove generic placeholders that were rendered instead of specific technical content
+
+#### Style Match (flagged)
+
+**Additions:**
+- "Use exactly these colors: {palette.primary}, {palette.secondary}, {palette.accent}"
+- "Match tone: {style_profile.tone}"
+- Specific style directives from user notes (e.g., "more authoritative, less casual")
+
+**Removals:**
+- Remove any color specifications that deviate from the approved palette
+- Remove tone descriptors that conflict with the style profile
+
+#### Scale / Proportion (flagged)
+
+**Additions:**
+- "Primary system/component visually largest, supporting elements proportionally smaller"
+- "Balanced element sizing -- no single element dominating disproportionately"
+- Specific sizing directives from user notes (e.g., "power bus connection more prominent")
+
+**Removals:**
+- Remove fixed-size instructions that caused proportion issues
+- Remove "equal sizing" directives if hierarchy is needed
+
+### Refinement Preservation Rules
+
+During prompt refinement, sections associated with well-rated categories (rated 3 or higher) are preserved unchanged. This prevents regression in areas the user already approved.
+
+| User Rating | Prompt Action |
+|-------------|---------------|
+| 4-5 (Good/Excellent) | **Lock** -- do not modify this section's prompt text |
+| 3 (Adequate) | **Preserve** -- do not modify unless user explicitly requests |
+| 1-2 (Below standard) | **Refine** -- apply per-category adjustments |
+
+The refinement prompt is constructed by:
+1. Copying the previous prompt verbatim
+2. Applying additions for flagged categories (appended to relevant section)
+3. Applying removals for flagged categories (specific string removal)
+4. Leaving locked sections untouched
+5. Showing the diff to the user before regeneration
+
+### Maximum Iterations and Escape Paths
+
+The refinement loop runs a maximum of **3 iterations** per figure. After the 3rd iteration:
+
+| Escape Path | When to Offer | What Happens |
+|-------------|---------------|--------------|
+| **Approve current** | Always | Accept the current result despite remaining issues |
+| **Switch to TikZ** | Labels persistently failing (Nano Banana text rendering limitation) | Generate TikZ code for precise label control; enters TikZ compilation flow |
+| **Switch to SVG** | Composition/scale persistently failing | Generate SVG for pixel-precise layout control |
+| **Defer to external** | All categories persistently failing | Write external brief with the engineered prompt for manual generation |
+| **Write external brief** | User wants to use a different tool entirely | Save the refined prompt text for use outside the plugin |
+
+The iteration count and per-category ratings for each iteration are recorded in the figure log for the Wave 5 quality summary.
+
 ## Agency Format Requirements
 
 | Requirement | Typical Constraint | Check Method |
