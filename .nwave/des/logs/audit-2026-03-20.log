@@ -1,0 +1,9 @@
+{"event":"HOOK_INVOKED","handler":"pre_tool_use","hook_id":"1d3885ea-b8ad-436a-8125-1da3b5cbd327","input_summary":{"subagent_type":"nw:nw-product-owner"},"timestamp":"2026-03-20T00:04:20.254386+00:00"}
+{"context":"non_des_task","event":"HOOK_PRE_TOOL_USE_ALLOWED","hook_id":"1d3885ea-b8ad-436a-8125-1da3b5cbd327","timestamp":"2026-03-20T00:04:20.256872+00:00"}
+{"decision":"allow","duration_ms":23.1342,"event":"HOOK_COMPLETED","exit_code":0,"handler":"pre_tool_use","hook_id":"1d3885ea-b8ad-436a-8125-1da3b5cbd327","timestamp":"2026-03-20T00:04:20.258706+00:00"}
+{"event":"HOOK_INVOKED","handler":"subagent_stop","hook_id":"f9cb4895-1895-4204-866c-340ecb28d8ec","input_summary":{"agent_id":"a38c7db3d14b7b55f","agent_type":"nw:nw-product-owner","has_transcript":true},"timestamp":"2026-03-20T00:13:46.733609+00:00"}
+{"error":"'charmap' codec can't decode byte 0x90 in position 2058: character maps to <undefined>","error_type":"UnicodeDecodeError","event":"HOOK_ERROR","handler":"subagent_stop","stderr_capture":"","timestamp":"2026-03-20T00:13:46.735011+00:00"}
+{"decision":"error","duration_ms":21.0598,"event":"HOOK_COMPLETED","exit_code":1,"handler":"subagent_stop","hook_id":"f9cb4895-1895-4204-866c-340ecb28d8ec","timestamp":"2026-03-20T00:13:46.735658+00:00"}
+{"event":"HOOK_INVOKED","handler":"post_tool_use","hook_id":"8aa36744-b066-4386-94c3-05844afaefce","input_summary":{"tool_name":"Agent"},"timestamp":"2026-03-20T00:13:47.900412+00:00"}
+{"event":"HOOK_POST_TOOL_USE_PASSTHROUGH","hook_id":"8aa36744-b066-4386-94c3-05844afaefce","is_des_task":false,"reason":"non_des_task","timestamp":"2026-03-20T00:13:47.917151+00:00"}
+{"decision":"allow","duration_ms":18.3507,"event":"HOOK_COMPLETED","exit_code":0,"handler":"post_tool_use","hook_id":"8aa36744-b066-4386-94c3-05844afaefce","timestamp":"2026-03-20T00:13:47.918081+00:00"}

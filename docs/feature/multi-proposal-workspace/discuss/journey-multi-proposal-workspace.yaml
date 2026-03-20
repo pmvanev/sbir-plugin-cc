@@ -1,0 +1,351 @@
+journey:
+  name: "Multi-Proposal Workspace"
+  goal: "Work on multiple SBIR/STTR proposals from a single workspace with shared resources and isolated state"
+  persona: "Phil Santos -- small business engineer, 2-3 proposals/year, CLI-native, Windows/Git Bash"
+
+  emotional_arc:
+    start: "Cautious -- will this break my existing work?"
+    middle: "Focused -- I can see all proposals and work on each one"
+    end: "Confident -- organized workspace that grows with me"
+
+  backward_compatibility:
+    legacy_layout: ".sbir/proposal-state.json at root"
+    detection: "Check for .sbir/proposals/ (multi) vs .sbir/proposal-state.json (legacy)"
+    strategy: "Legacy directories continue working. No forced migration."
+
+steps:
+  - id: 1
+    name: "Start Second Proposal"
+    command: "/sbir:proposal new <solicitation>"
+    trigger: "Phil has an active proposal and downloads a new solicitation"
+
+    tui_mockup: |
+      +-- /sbir:proposal new -- Multi-Proposal Workspace ----------------------+
+      |                                                                         |
+      |  Existing proposals detected in this workspace:                         |
+      |    1. ${existing_topic_id} "${existing_title}"  [${existing_wave}]      |
+      |                                                                         |
+      |  Creating new proposal from ${solicitation_file}...                     |
+      |                                                                         |
+      |  Topic:     ${new_topic_id}                                             |
+      |  Title:     ${new_title}                                                |
+      |  Agency:    ${agency}                                                   |
+      |  Deadline:  ${deadline} (${days_remaining} days)                        |
+      |                                                                         |
+      |  Proposal namespace: ${namespace}                                       |
+      |  State:     .sbir/proposals/${namespace}/proposal-state.json            |
+      |  Artifacts: artifacts/${namespace}/                                     |
+      |                                                                         |
+      |  Shared resources available:                                            |
+      |    [ok] Corpus (${corpus_count} documents)                              |
+      |    [ok] Company profile (${company_name})                               |
+      |    [ok] Partners: ${partner_list}                                       |
+      |                                                                         |
+      |  Active proposal switched to: ${namespace}                              |
+      |                                                                         |
+      +-------------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "existing_proposals"
+        source: ".sbir/proposals/*/proposal-state.json"
+        displayed_as: "${existing_topic_id}, ${existing_title}, ${existing_wave}"
+        consumers:
+          - "Step 1 header (existing proposals list)"
+          - "Step 2 dashboard (all proposals table)"
+
+      - name: "active_proposal"
+        source: ".sbir/active-proposal"
+        displayed_as: "${namespace}"
+        consumers:
+          - "Step 1 confirmation"
+          - "Step 2 dashboard (currently active indicator)"
+          - "Step 3 switch confirmation"
+          - "Step 4 wave header"
+          - "PES enforcement context"
+          - "All command routing"
+
+      - name: "corpus_count"
+        source: ".sbir/corpus/ (file count)"
+        displayed_as: "${corpus_count}"
+        consumers:
+          - "Step 1 shared resources"
+          - "Step 2 dashboard (if shown)"
+
+      - name: "company_name"
+        source: "~/.sbir/company-profile.json"
+        displayed_as: "${company_name}"
+        consumers:
+          - "Step 1 shared resources"
+          - "Step 2 dashboard header"
+
+      - name: "partner_list"
+        source: "~/.sbir/partners/*.json"
+        displayed_as: "${partner_list}"
+        consumers:
+          - "Step 1 shared resources"
+
+    emotional_state:
+      entry: "Cautious -- afraid of breaking existing proposal"
+      exit: "Reassured -- both proposals have separate namespaces"
+
+    integration_checkpoint: |
+      After proposal creation:
+      - Existing proposal state file unchanged
+      - New proposal state file exists at .sbir/proposals/${namespace}/
+      - Active proposal pointer updated
+      - Shared corpus accessible from new context
+
+    gherkin: |
+      Scenario: Start second proposal in existing workspace
+        Given Phil Santos has an active proposal AF263-042 in Wave 3
+        And Phil has a solicitation file for topic N244-012
+        When Phil runs "/sbir:proposal new ./solicitations/N244-012.pdf"
+        Then a new proposal namespace "n244-012" is created
+        And the state file exists at ".sbir/proposals/n244-012/proposal-state.json"
+        And the AF263-042 state file is unchanged
+        And shared artifact "active_proposal" is set to "n244-012"
+
+  - id: 2
+    name: "Orient Across All Proposals"
+    command: "/sbir:continue"
+    trigger: "Phil returns to workspace after days away"
+
+    tui_mockup: |
+      +-- SBIR Proposal Workspace -- ${company_name} -------------------------+
+      |                                                                         |
+      |  Active Proposals:                                                      |
+      |  +---------+--------------------------+--------+------------+---------+ |
+      |  | Topic   | Title                    | Wave   | Deadline   | Status  | |
+      |  +---------+--------------------------+--------+------------+---------+ |
+      |  | ${id_1} | ${title_1}               |${wave1}| ${dead_1}  |${stat1} | |
+      |  | ${id_2} | ${title_2}               |${wave2}| ${dead_2}  |${stat2} | |
+      |  +---------+--------------------------+--------+------------+---------+ |
+      |                                                                         |
+      |  Completed Proposals:                                                   |
+      |    ${completed_list_or_none}                                            |
+      |                                                                         |
+      |  Currently active: ${active_proposal}                                   |
+      |                                                                         |
+      |  Suggested actions:                                                     |
+      |    ${deadline_based_suggestion}                                         |
+      |                                                                         |
+      +-------------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "proposal_list"
+        source: ".sbir/proposals/*/proposal-state.json"
+        displayed_as: "${id_N}, ${title_N}, ${wave_N}, ${deadline_N}, ${status_N}"
+        consumers:
+          - "Step 2 dashboard table"
+
+    emotional_state:
+      entry: "Disoriented -- where was I? what needs attention?"
+      exit: "Oriented -- I see all proposals, deadlines, and a suggested next action"
+
+    integration_checkpoint: |
+      Dashboard must:
+      - Show all proposals from .sbir/proposals/*/
+      - Sort suggestions by deadline proximity
+      - Read-only operation (no state modification)
+      - Handle mix of active and completed proposals
+
+    gherkin: |
+      Scenario: Dashboard shows multiple proposals sorted by deadline
+        Given Phil has proposal AF263-042 in Wave 3 with deadline 2026-04-15
+        And Phil has proposal N244-012 in Wave 0 with deadline 2026-05-30
+        When Phil runs "/sbir:continue"
+        Then the dashboard shows both proposals
+        And the suggested action references AF263-042 (closer deadline)
+        And the currently active proposal indicator is shown
+
+  - id: 3
+    name: "Switch Active Proposal Context"
+    command: "/sbir:proposal switch <topic-id>"
+    trigger: "Phil decides to work on a different proposal"
+
+    tui_mockup: |
+      +-- Context Switch -------------------------------------------------------+
+      |                                                                         |
+      |  Switched from: ${old_proposal} (${old_title})                          |
+      |  Switched to:   ${new_proposal} (${new_title})                          |
+      |                                                                         |
+      |  ${new_proposal} Status:                                                |
+      |    Wave ${wave}: ${wave_name}                                           |
+      |    Deadline: ${deadline} (${days_remaining} days)                        |
+      |                                                                         |
+      |    ${task_checklist}                                                     |
+      |                                                                         |
+      |  Next action:                                                           |
+      |    ${suggested_command}                                                  |
+      |                                                                         |
+      +-------------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "active_proposal"
+        source: ".sbir/active-proposal"
+        displayed_as: "${new_proposal}"
+        consumers:
+          - "All subsequent commands"
+          - "PES enforcement context"
+
+    emotional_state:
+      entry: "Decisive -- I know which proposal needs attention"
+      exit: "Confident -- context is clear, I see exactly where this proposal stands"
+
+    integration_checkpoint: |
+      After switch:
+      - .sbir/active-proposal updated to new topic ID
+      - Subsequent state reads go to .sbir/proposals/${new_proposal}/
+      - PES enforcement scoped to new proposal
+      - Artifact writes go to artifacts/${new_proposal}/
+
+    gherkin: |
+      Scenario: Switch active proposal context
+        Given Phil has active proposal N244-012
+        And proposal AF263-042 exists with deadline in 27 days
+        When Phil runs "/sbir:proposal switch af263-042"
+        Then the active proposal changes to AF263-042
+        And the switch confirmation shows AF263-042 status summary
+        And subsequent commands operate on AF263-042
+
+  - id: 4
+    name: "Work in Active Context"
+    command: "Any wave command (e.g., /sbir:proposal wave outline)"
+    trigger: "Phil issues a standard workflow command"
+
+    tui_mockup: |
+      +-- Wave 3: Discrimination & Outline -- ${active_proposal} ---------------+
+      |                                                                         |
+      |  Active proposal: ${active_proposal} (${title})                         |
+      |  Deadline: ${deadline} (${days_remaining} days)                         |
+      |                                                                         |
+      |  [Standard wave workflow -- unchanged from current behavior]             |
+      |  [Proposal ID shown in header for orientation]                          |
+      |                                                                         |
+      +-------------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "active_proposal"
+        source: ".sbir/active-proposal"
+        displayed_as: "${active_proposal}"
+        consumers:
+          - "Wave command header"
+          - "State read path resolution"
+          - "Artifact write path resolution"
+
+    emotional_state:
+      entry: "Focused -- I know which proposal this is"
+      exit: "Productive -- workflow feels the same as single-proposal mode"
+
+    integration_checkpoint: |
+      During active work:
+      - State reads from .sbir/proposals/${active_proposal}/
+      - Artifact writes to artifacts/${active_proposal}/wave-N-name/
+      - PES enforcement uses active proposal state
+      - Active proposal header shown on all output
+
+    gherkin: |
+      Scenario: Wave command operates on active proposal
+        Given Phil has switched to proposal AF263-042
+        When Phil runs "/sbir:proposal wave outline"
+        Then the outline workflow reads from .sbir/proposals/af263-042/
+        And artifacts are written to artifacts/af263-042/wave-3-outline/
+        And the header shows "AF263-042" as active proposal
+
+  - id: 5
+    name: "Complete and Archive a Proposal"
+    command: "/sbir:proposal submit prep (completes Wave 8)"
+    trigger: "Phil submits a proposal and it transitions to completed state"
+
+    tui_mockup: |
+      +-- SBIR Proposal Workspace -- ${company_name} -------------------------+
+      |                                                                         |
+      |  Active Proposals:                                                      |
+      |    ${remaining_active_proposals}                                        |
+      |                                                                         |
+      |  Completed Proposals:                                                   |
+      |    ${completed_proposal} -- Submitted ${submission_date}                |
+      |                                                                         |
+      |  Currently active: ${auto_switched_proposal}                            |
+      |  (Active proposal auto-switched after submission)                       |
+      |                                                                         |
+      +-------------------------------------------------------------------------+
+
+    emotional_state:
+      entry: "Satisfied -- another one submitted"
+      exit: "Focused -- workspace auto-adjusted, remaining work is clear"
+
+    integration_checkpoint: |
+      After submission:
+      - Completed proposal appears in Completed section
+      - Active proposal auto-switches to remaining active (if only one)
+      - If multiple remain active, prompt for selection
+      - Completed proposal artifacts untouched (accessible for debrief)
+
+    gherkin: |
+      Scenario: Completed proposal moves to archive section
+        Given Phil has submitted proposal AF263-042 (Wave 8 complete)
+        And Phil has one remaining active proposal N244-012
+        When Phil views the workspace dashboard
+        Then AF263-042 appears under "Completed Proposals"
+        And N244-012 appears under "Active Proposals"
+        And the active proposal is automatically set to N244-012
+
+  - id: 6
+    name: "Return for Debrief"
+    command: "/sbir:proposal switch <completed-topic-id>"
+    trigger: "Phil receives evaluator feedback months later"
+
+    tui_mockup: |
+      +-- Context Switch -------------------------------------------------------+
+      |                                                                         |
+      |  Switched to: ${topic_id} (${title})                                    |
+      |  Status: Submitted (awaiting debrief)                                   |
+      |                                                                         |
+      |  This proposal was submitted on ${submission_date}.                     |
+      |  Wave 9 (Post-Submission) is available for debrief ingestion.           |
+      |                                                                         |
+      +-------------------------------------------------------------------------+
+
+    emotional_state:
+      entry: "Curious -- how did we do?"
+      exit: "Informed -- debrief captured, lessons available for future proposals"
+
+    integration_checkpoint: |
+      Debrief access:
+      - Completed proposals accept switch for Wave 9 operations
+      - Debrief artifacts at artifacts/${topic_id}/wave-9-debrief/
+      - Lessons learned accessible from shared corpus
+
+    gherkin: |
+      Scenario: Switch to completed proposal for debrief
+        Given Phil has a completed proposal AF263-042
+        And evaluator feedback has been received
+        When Phil runs "/sbir:proposal switch af263-042"
+        Then the context switches to AF263-042
+        And the status shows "Submitted (awaiting debrief)"
+        And Wave 9 commands are available
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "active_proposal"
+      must_match_across: [1, 2, 3, 4, 5, 6]
+      failure_message: "Active proposal pointer in .sbir/active-proposal must match the proposal context used by all commands"
+
+    - artifact: "proposal_state_path"
+      must_match_across: [1, 3, 4]
+      failure_message: "State read/write path must resolve to .sbir/proposals/${active_proposal}/ in all contexts"
+
+    - artifact: "artifact_write_path"
+      must_match_across: [1, 4, 5]
+      failure_message: "Artifact writes must go to artifacts/${active_proposal}/wave-N-name/ consistently"
+
+    - artifact: "company_name"
+      must_match_across: [1, 2]
+      failure_message: "Company name from ~/.sbir/company-profile.json must display consistently"
+
+  backward_compatibility:
+    - check: "Legacy single-proposal directories"
+      condition: ".sbir/proposal-state.json exists at root (no .sbir/proposals/)"
+      behavior: "All commands operate exactly as today -- no multi-proposal features shown"
+      failure_message: "Legacy layout must not break or show multi-proposal UI"
