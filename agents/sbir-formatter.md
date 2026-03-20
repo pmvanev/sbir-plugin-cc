@@ -77,14 +77,21 @@ For each figure specification, in outline order:
 
 **For all other generation methods**:
 1. **Prompt preview** (Nano Banana figures): Construct an engineered prompt using the five-section template from the visual-asset-generator skill (COMPOSITION, STYLE, LABELS, AVOID, RESOLUTION). Inject metadata from the figure specification (type, description, cross-referenced section content, compliance items) and style profile values (palette, tone, avoid list). Display the full prompt text to the user and offer four options: **generate** (proceed with this prompt), **edit prompt** (user modifies text, additions preserved alongside engineered sections), **switch method** (select a different generation method), **skip figure** (defer to later). Do not begin generation until the user confirms. Record the prompt hash in the figure log for audit traceability. If `GEMINI_API_KEY` is not set, display the engineered prompt for external use and offer: switch to SVG, write external brief.
-2. Generate draft using selected method (SVG, Mermaid, Graphviz, chart, Nano Banana, or external brief)
-3. Apply style profile palette and styling (from `{artifact_base}/wave-5-visuals/style-profile.yaml` if available, otherwise default palette from skill)
-4. Verify caption text and figure numbering
-5. Write figure to `{artifact_base}/wave-5-visuals/{figure-name}.{ext}`
-6. Update figure log at `{artifact_base}/wave-5-visuals/figure-log.md`
-7. Present to user: approve | revise (with notes) | regenerate (different method) | defer to external
-8. On revision: update figure, update log, re-present
-9. On external deferral: write brief to `{artifact_base}/wave-5-visuals/external-briefs/{figure-name}-brief.md`
+2. **TikZ routing** (diagram-type figures in LaTeX proposals): If proposal format is LaTeX AND a LaTeX compiler is detected AND the figure type is diagram-compatible (system-diagram, block-diagram, process-flow, comparison, timeline), offer TikZ as a generation method alongside other options. If TikZ is selected: generate standalone `.tex` file with TikZ code, compile with the detected LaTeX compiler (`pdflatex -interaction=nonstopmode -halt-on-error`), check exit code. On success: save `.tex` source and `.pdf` preview to `{artifact_base}/wave-5-visuals/`. On compilation failure: display error message with line number, show problematic source line in context, offer three options (edit TikZ source and recompile, switch to SVG automatic fallback, defer to external). Do not write broken figure files. Log compilation outcome in figure log. If no LaTeX compiler is detected, list TikZ as "unavailable (no LaTeX compiler detected). See /proposal setup for installation help." If proposal format is DOCX, do not offer TikZ.
+3. Generate draft using selected method (SVG, Mermaid, Graphviz, chart, TikZ, Nano Banana, or external brief)
+4. Apply style profile palette and styling (from `{artifact_base}/wave-5-visuals/style-profile.yaml` if available, otherwise default palette from skill)
+5. Verify caption text and figure numbering
+6. Write figure to `{artifact_base}/wave-5-visuals/{figure-name}.{ext}`
+7. Update figure log at `{artifact_base}/wave-5-visuals/figure-log.md` -- include quality ratings and prompt hash
+8. **Structured critique** (replaces unstructured review): Present the figure with five critique categories, each rated 1-5:
+   - **Composition** (spatial layout, visual hierarchy, element arrangement)
+   - **Labels** (text clarity, label placement, readability)
+   - **Accuracy** (technical correctness, completeness of required elements)
+   - **Style match** (consistency with approved style profile)
+   - **Scale / Proportion** (element sizing, relative proportions, whitespace balance)
+   Include a free-text notes field. If all categories rate 3 or above, prominently offer **approve as-is**. The user can also choose: **regenerate** (different method) | **defer to external**.
+9. **Refinement loop** (categories rated below 3): For each flagged category, prepare per-category prompt adjustments using the addition/removal patterns from the visual-asset-generator skill. Preserve prompt sections for well-rated categories (4-5: locked, 3: preserved unless user requests change). Show the prompt diff (additions and removals) to the user before regeneration. The user can edit adjustments. Regenerate with the refined prompt. Maximum **3 refinement iterations** per figure. After the 3rd iteration, offer escape paths: approve current result, switch to TikZ (for persistent label issues), switch to SVG (for persistent composition/scale issues), defer to external, write external brief with the refined prompt. Record per-iteration category ratings in the figure log.
+10. On external deferral: write brief to `{artifact_base}/wave-5-visuals/external-briefs/{figure-name}-brief.md`
 
 After all figures processed:
 - Verify all planned figures are approved or have external briefs
