@@ -57,8 +57,33 @@ The parser extracts these fields from the solicitation text:
 
 - **Fresh workspace**: Creates multi-proposal layout from the first proposal. No legacy root-level state file is created.
 - **Existing multi-proposal workspace**: Creates a new namespace alongside existing proposals. Existing proposal state files are unchanged.
-- **Legacy workspace**: Detects root-level `proposal-state.json` and prompts for migration before creating the second proposal.
+- **Legacy workspace**: Detects root-level `proposal-state.json` and prompts for migration before creating the second proposal. See Legacy Migration below.
 - **Active proposal**: Automatically set to the newly created proposal. Use `/proposal switch` to return to a previous proposal.
+
+### Legacy Migration
+
+When `/proposal new` detects a legacy workspace (`.sbir/proposal-state.json` at root, no `.sbir/proposals/`), it prompts:
+
+```
+Single-proposal layout detected. Enable multi-proposal support?
+  (m) migrate existing proposal into namespace
+  (s) start a new workspace instead
+```
+
+**Migrate (m)**: Moves the existing proposal into a per-proposal namespace derived from its topic ID, then creates the new proposal alongside it.
+
+Migration steps:
+1. Read `topic.id` from `.sbir/proposal-state.json` to derive namespace (lowercased)
+2. Create `.sbir/proposals/{topic-id}/` and `artifacts/{topic-id}/`
+3. Copy state files to namespace: `proposal-state.json`, `compliance-matrix.json` (if exists), `tpoc-answers.json` (if exists), `audit/` (if exists)
+4. Move `artifacts/wave-*` directories into `artifacts/{topic-id}/`
+5. Rename originals with `.migrated` suffix (safety net)
+6. Set `.sbir/active-proposal` to the existing proposal's topic ID
+7. Proceed with creating the new proposal namespace
+
+**Separate workspace (s)**: Suggests creating a new directory. No files are modified.
+
+**Safety**: Original files are preserved as `.migrated` (not deleted). To restore legacy layout: remove `.migrated` suffixes and delete `.sbir/proposals/`. The copy-then-rename pattern ensures no data loss if migration is interrupted.
 
 ## Examples
 
@@ -75,6 +100,13 @@ Creates `.sbir/proposals/af263-042/`, sets active proposal to `af263-042`, proce
 ```
 
 Creates `.sbir/proposals/n244-012/` without modifying the existing proposal. Active proposal switches to `n244-012`.
+
+### Second proposal in a legacy workspace (triggers migration)
+```
+/proposal new ./solicitations/N244-012.pdf
+```
+
+Legacy layout detected (`.sbir/proposal-state.json` at root). Prompts for migration. If migrated, existing AF263-042 moves to `.sbir/proposals/af263-042/` and `artifacts/af263-042/`. Originals preserved as `.migrated`. Then creates `n244-012` namespace alongside it.
 
 ### Resubmission with namespace override
 ```

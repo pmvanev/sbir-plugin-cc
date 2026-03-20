@@ -153,13 +153,48 @@ Before creating directories, check if `.sbir/proposals/{namespace}/` already exi
 - If it exists, **reject** the command with error: "A proposal with topic ID '{topic-id}' already exists. Use `--name {topic-id}-v2` to create a differently-named proposal."
 - No files are created or modified on collision.
 
-### Legacy Workspace Detection
+### Legacy Workspace Detection and Migration
 
-If a legacy workspace is detected (`.sbir/proposal-state.json` at root, no `.sbir/proposals/`):
+When `proposal new` is invoked in a legacy workspace (`.sbir/proposal-state.json` at root, no `.sbir/proposals/`), the orchestrator detects the legacy layout and prompts before proceeding.
 
-- Prompt the user: "Single-proposal layout detected. Enable multi-proposal support? (m)igrate existing proposal into namespace / (s)tart a new workspace instead."
-- On migrate: move existing state and artifacts into a namespace derived from the existing proposal's topic ID, then proceed with the new proposal.
-- Migration preserves originals as `.migrated` suffix (safety net).
+**Detection**: Check for `.sbir/proposal-state.json` AND absence of `.sbir/proposals/` directory. Both conditions must be true.
+
+**Prompt**:
+```
+Single-proposal layout detected. Enable multi-proposal support?
+  (m) migrate existing proposal into namespace
+  (s) start a new workspace instead
+```
+
+**If user chooses (m) migrate**:
+
+1. **Read existing state**: Parse `.sbir/proposal-state.json`, extract `topic.id` to derive the namespace. Lowercase for filesystem safety (e.g., `AF263-042` -> `af263-042`).
+2. **Create namespace directories**:
+   - `.sbir/proposals/{topic-id}/`
+   - `.sbir/proposals/{topic-id}/audit/`
+   - `artifacts/{topic-id}/`
+3. **Copy state files** (copy-then-rename pattern to prevent data loss on interruption):
+   - Copy `.sbir/proposal-state.json` -> `.sbir/proposals/{topic-id}/proposal-state.json`
+   - Copy `.sbir/compliance-matrix.json` -> `.sbir/proposals/{topic-id}/compliance-matrix.json` (if exists)
+   - Copy `.sbir/tpoc-answers.json` -> `.sbir/proposals/{topic-id}/tpoc-answers.json` (if exists)
+   - Copy `.sbir/audit/` contents -> `.sbir/proposals/{topic-id}/audit/` (if exists)
+4. **Move artifacts**: Move `artifacts/wave-*` directories -> `artifacts/{topic-id}/wave-*`
+5. **Rename originals with `.migrated` suffix** (safety net, not deleted):
+   - `.sbir/proposal-state.json` -> `.sbir/proposal-state.json.migrated`
+   - `.sbir/compliance-matrix.json` -> `.sbir/compliance-matrix.json.migrated` (if existed)
+   - `.sbir/tpoc-answers.json` -> `.sbir/tpoc-answers.json.migrated` (if existed)
+   - `.sbir/audit/` -> `.sbir/audit.migrated/` (if existed)
+6. **Set active proposal**: Write `{topic-id}` to `.sbir/active-proposal`
+7. **Proceed**: Continue with normal `proposal new` flow to create the second proposal namespace
+
+**If user chooses (s) separate workspace**:
+
+Suggest the user create a new directory for the second proposal: "Create a new directory and run `/sbir:proposal new` there. Your existing workspace will remain unchanged."
+
+**Safety guarantees**:
+- Original files are preserved with `.migrated` suffix -- user can restore legacy layout by removing `.migrated` suffixes and deleting `.sbir/proposals/`
+- Copy-then-rename pattern: files are copied to namespace first, then originals renamed. If interrupted mid-migration, originals remain intact.
+- Migration is agent-driven (Bash tool file operations), not Python code
 
 ### Existing Proposal Isolation
 
@@ -206,6 +241,23 @@ User runs `/sbir:proposal new ./solicitations/N244-012.pdf` with AF263-042 alrea
 8. DISPATCH: Invoke sbir-corpus-librarian to ingest solicitation, list shared resources (corpus, company profile, partners)
 9. DISPATCH: Score fit, FORMAT SELECTION, CHECKPOINT as in Example 1
 10. AF263-042 state is untouched -- `.sbir/proposals/af263-042/proposal-state.json` unchanged
+
+### Example 1c: New Proposal in Legacy Workspace (Migration Path)
+User runs `/sbir:proposal new ./solicitations/N244-012.pdf` in a workspace with legacy layout (`.sbir/proposal-state.json` at root, `artifacts/wave-3-outline/` at root, no `.sbir/proposals/`).
+
+1. ORIENT: Legacy layout detected -- `.sbir/proposal-state.json` exists, no `.sbir/proposals/`
+2. ROUTE: `proposal new` in legacy workspace -> trigger migration prompt
+3. PROMPT: "Single-proposal layout detected. Enable multi-proposal support? (m)igrate / (s)eparate workspace"
+4. User chooses (m):
+   - Read topic.id `AF263-042` from existing state -> namespace `af263-042`
+   - Create `.sbir/proposals/af263-042/`, `.sbir/proposals/af263-042/audit/`, `artifacts/af263-042/`
+   - Copy `.sbir/proposal-state.json` -> `.sbir/proposals/af263-042/proposal-state.json`
+   - Copy `.sbir/compliance-matrix.json` -> `.sbir/proposals/af263-042/compliance-matrix.json` (if exists)
+   - Move `artifacts/wave-3-outline/` -> `artifacts/af263-042/wave-3-outline/`
+   - Rename `.sbir/proposal-state.json` -> `.sbir/proposal-state.json.migrated`
+   - Write `.sbir/active-proposal` = `af263-042`
+5. DISPATCH: Proceed with normal `proposal new` flow for N244-012 (namespace `n244-012`)
+6. AF263-042 state now lives at `.sbir/proposals/af263-042/proposal-state.json`, originals preserved as `.migrated`
 
 ### Example 2: Session Resume After Days Away
 User runs `/sbir:proposal status` after 5 days.
