@@ -164,6 +164,69 @@ Best for: figures that already exist in a past winning proposal at adequate reso
 
 **Limitations**: Cannot modify embedded text within raster images. If the image contains proposal-specific text rendered as pixels, the user must edit the image externally or choose "replace" to generate a new figure.
 
+### TikZ/PGF (LaTeX Native)
+Best for: diagram-type figures in LaTeX proposals where typographic consistency matters. Produces vector-sharp diagrams that compile natively with the document, matching its fonts and scaling.
+
+**When to offer TikZ:**
+- Proposal format is LaTeX (not DOCX)
+- A LaTeX compiler is detected (pdflatex, xelatex, or lualatex)
+- Figure type is a diagram: system-diagram, block-diagram, process-flow, comparison, or timeline
+
+**When NOT to offer TikZ:**
+- Proposal format is DOCX (TikZ requires LaTeX compilation)
+- No LaTeX compiler detected (mark as "unavailable" with install help reference)
+- Figure type is concept image (TikZ cannot render realistic/semi-realistic illustrations)
+- Figure type is chart with complex data (matplotlib or SVG is more efficient)
+
+**Compatible figure types:**
+
+| Figure Type | TikZ Suitability | Notes |
+|-------------|------------------|-------|
+| System diagram | HIGH | Nodes, edges, labels -- TikZ excels |
+| Block diagram | HIGH | Rectangular nodes with arrow connections |
+| Process flow | HIGH | Flowchart nodes, decision diamonds, swim lanes |
+| Comparison table | MEDIUM | Grid layout with TikZ matrix or tabular |
+| Timeline / Gantt | MEDIUM | Horizontal bars and milestone markers |
+| Chart (bar/line/pie) | LOW | Use pgfplots if available; matplotlib preferred |
+| Concept image | NOT SUITABLE | TikZ cannot produce realistic illustrations |
+
+**Compilation steps:**
+
+1. Generate TikZ code as a standalone `.tex` file with `\documentclass{standalone}` and required packages (`tikz`, `pgfplots`, etc.)
+2. Compile with the detected LaTeX compiler:
+   ```bash
+   pdflatex -interaction=nonstopmode -halt-on-error figure-{N}.tex
+   ```
+3. Check exit code: 0 = success, non-zero = compilation failure
+4. On success: PDF preview at `wave-5-visuals/figure-{N}.pdf`, source at `wave-5-visuals/figure-{N}.tex`
+5. Present PDF preview to user in the standard critique flow (same 5 categories)
+
+**Compilation failure fallback:**
+
+If TikZ compilation fails:
+1. Display the compiler error message with the line number
+2. Show the problematic TikZ source line in context
+3. Offer three options:
+   - **Edit TikZ source** -- user or agent fixes the syntax error, recompile
+   - **Switch to SVG** -- generate an SVG version of the same diagram (automatic fallback)
+   - **Defer to external** -- write external brief with the diagram specification
+4. Do NOT write a broken figure file to artifacts
+5. Log the compilation failure and chosen fallback in the figure log
+
+**Detection:**
+```bash
+which pdflatex 2>/dev/null || which xelatex 2>/dev/null || which lualatex 2>/dev/null
+```
+If none found: TikZ listed as "unavailable (no LaTeX compiler detected). See /proposal setup for installation help."
+
+**TikZ code guidelines:**
+- Use `standalone` document class for isolated compilation
+- Include `\usepackage{tikz}` and relevant TikZ libraries (`arrows.meta`, `positioning`, `shapes.geometric`, `fit`, `calc`)
+- Use the style profile palette for node colors: `\definecolor{primary}{HTML}{RRGGBB}`
+- Keep code under 150 lines for maintainability
+- Use relative positioning (`right=of`, `below=of`) not absolute coordinates
+- Add comments for each major section of the diagram
+
 ### External Tool (Manual Fallback)
 Best for: figures no available tool can generate.
 Approach: Write detailed specification brief. Track as "pending-external" in figure log. The domain model's `ExternalBrief` captures `content_description`, `dimensions`, and `resolution`.
@@ -173,15 +236,17 @@ Approach: Write detailed specification brief. Track as "pending-external" in fig
 | Figure Need | First Choice | Fallback |
 |------------|-------------|----------|
 | Figure exists in corpus at HIGH quality | Corpus Reuse | Generate with standard method |
-| System architecture, block diagrams | Mermaid or SVG | SVG inline |
-| Flowcharts, sequence diagrams | Mermaid | SVG inline |
+| System architecture, block diagrams (LaTeX) | TikZ | Mermaid or SVG |
+| System architecture, block diagrams (DOCX) | Mermaid or SVG | SVG inline |
+| Flowcharts, sequence diagrams (LaTeX) | TikZ or Mermaid | SVG inline |
+| Flowcharts, sequence diagrams (DOCX) | Mermaid | SVG inline |
 | Dependency graphs, network topology | Graphviz | SVG inline |
 | Data charts (bar, line, pie) | Python matplotlib | SVG inline |
 | Concept figures, technical illustrations | Nano Banana | External brief |
 | Deployment scenarios, operational environments | Nano Banana | External brief |
 | Hardware/system visualizations | Nano Banana | External brief |
 | Complex infographics | Nano Banana | External brief |
-| Comparison tables (visual) | SVG | Mermaid |
+| Comparison tables (visual) | SVG | TikZ (LaTeX) or Mermaid |
 
 ## Figure Specification Format
 
@@ -191,7 +256,7 @@ Each figure gets a specification before generation:
 ## Figure {N}: {Title}
 
 - **Type**: {system-diagram | block-diagram | timeline | chart | concept | process-flow | comparison}
-- **Method**: {svg | mermaid | graphviz | chart | nano-banana | external}
+- **Method**: {svg | mermaid | graphviz | chart | nano-banana | tikz | external}
 - **Purpose**: {What this figure communicates to the evaluator}
 - **Content**: {Specific elements to include}
 - **Cross-references**: {Section(s) that cite this figure}
