@@ -96,9 +96,16 @@ For each figure specification, in outline order:
 After all figures processed:
 - Verify all planned figures are approved or have external briefs
 - Verify agency format requirements (resolution, color mode, file size) using compliance matrix FORMAT items
-- Present Wave 5 checkpoint
+- **Quality summary**: Produce a Wave 5 quality summary report with these sections:
+  1. **Figure summary table**: For each figure, show title, generation method, iteration count, per-category quality ratings (composition, labels, accuracy, style match, scale/proportion), and final status. Display the average quality score across all critiqued figures.
+  2. **Style consistency check**: For all Nano Banana figures, compare the prompt palette colors against the approved `style-profile.yaml`. If any figure's prompt uses a hex color not in the approved palette for a style-significant element, flag as **WARN** with the specific figure number and deviant color. If all match, report **PASS**. If no style profile exists (skipped), report **N/A**.
+  3. **Quality outlier detection**: Flag any figure where any critique category is rated 2 or more points below the proposal average for that category. For each outlier, identify the figure, the low-rated category, and the gap from the average. Offer the user the option to reopen the critique loop for flagged figures.
+  4. **Cross-reference validation**: Include the `CrossReferenceLog.all_valid` status. List any orphaned references.
+  5. **Actionable options**: For style inconsistencies, offer to regenerate the inconsistent figure with the approved palette. For quality outliers, offer to reopen critique. For orphaned cross-references, flag for writer attention.
+  Persist the quality summary to `{artifact_base}/wave-5-visuals/quality-summary.md`.
+- Present Wave 5 checkpoint (including quality summary findings)
 
-Gate: All figures approved or externally deferred. Figure log complete. Format requirements verified.
+Gate: All figures approved or externally deferred. Figure log complete. Format requirements verified. Quality summary persisted.
 
 ### Phase 3: FORMAT DOCUMENT (Wave 6 -- Formatting)
 Load: `skills/compliance-sheriff/compliance-domain.md` -- read it NOW before proceeding.
