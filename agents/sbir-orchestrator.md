@@ -46,12 +46,16 @@ You MUST load your skill files before beginning work. Skills encode wave routing
 ### Phase 1: ORIENT
 Load: `proposal-state-patterns` -- read it NOW before proceeding.
 
-1. Read `.sbir/proposal-state.json` to determine current wave, go/no-go, deadlines
-2. If no state file exists and command is not `proposal new`, surface error using the what/why/what-to-do pattern
+1. Detect workspace layout:
+   - If `.sbir/proposals/` exists -> multi-proposal layout. Read `.sbir/active-proposal` to get the active topic ID, then load state from `.sbir/proposals/{active}/proposal-state.json`.
+   - If `.sbir/proposal-state.json` exists at root and no `.sbir/proposals/` -> legacy layout. Load state from `.sbir/proposal-state.json`.
+   - If neither exists and command is `proposal new` -> fresh workspace (expected).
+   - If neither exists and command is NOT `proposal new` -> surface error using the what/why/what-to-do pattern.
+2. If `.sbir/proposals/` exists but `.sbir/active-proposal` is missing, surface error: "No active proposal selected. Available: {list}. Run `/sbir:proposal switch <topic-id>`."
 3. Compute days to deadline, surface warnings if within threshold
 4. Identify the user's intent from the command invoked
 
-Gate: State loaded and understood. Command intent identified.
+Gate: State loaded and understood. Layout detected. Command intent identified.
 
 ### Phase 2: ROUTE
 Load: `wave-agent-mapping` -- read it NOW before proceeding.
@@ -105,7 +109,7 @@ Gate: Human decision recorded. State updated.
 - `proposal config format <format>` -- Update output format (latex or docx). At Wave 3+, display rework warning and require user confirmation before state update. Dispatch to FormatConfigService.
 
 ### Wave 0: Intelligence and Fit
-- `proposal new` -- Initialize state, dispatch corpus-librarian for solicitation ingestion, score fit, prompt for output format selection, present Go/No-Go checkpoint.
+- `proposal new [--name <namespace>]` -- Create per-proposal namespace, initialize state, dispatch corpus-librarian for solicitation ingestion, score fit, prompt for output format selection, present Go/No-Go checkpoint. See **Multi-Proposal Namespace Creation** below.
 - `proposal corpus add <path>` -- Dispatch sbir-corpus-librarian to ingest directory.
 - `proposal corpus list` -- Dispatch sbir-corpus-librarian to list contents.
 
@@ -122,6 +126,49 @@ Gate: Human decision recorded. State updated.
 - `proposal submit prep` -- Dispatch sbir-submission-agent for packaging (Wave 8).
 - `proposal debrief ingest <path>` -- Dispatch sbir-debrief-analyst for feedback analysis (Wave 9).
 
+## Multi-Proposal Namespace Creation
+
+When `proposal new` is invoked, the orchestrator creates a per-proposal namespace. Every workspace -- including fresh ones -- uses the multi-proposal layout from the first proposal. Legacy single-proposal workspaces are handled separately (see Backward Compatibility below).
+
+### Namespace Derivation
+
+1. Extract topic ID from the solicitation during parsing (existing behavior).
+2. Lowercase the topic ID for filesystem safety (e.g., `AF263-042` -> `af263-042`).
+3. If `--name <namespace>` flag is provided, use that value as the namespace instead. The original topic ID is still recorded in proposal state.
+
+### Directory Creation Sequence
+
+On `proposal new`, create the following directories and files using Bash/Write tools:
+
+1. `.sbir/proposals/{namespace}/` -- per-proposal state directory
+2. `.sbir/proposals/{namespace}/audit/` -- per-proposal audit log directory
+3. `artifacts/{namespace}/` -- per-proposal artifact directory
+4. `.sbir/active-proposal` -- write the namespace value (plain text, single line, no trailing newline)
+5. `.sbir/proposals/{namespace}/proposal-state.json` -- initialized via PES state adapter with `state_dir` set to `.sbir/proposals/{namespace}/`
+
+### Namespace Collision Detection
+
+Before creating directories, check if `.sbir/proposals/{namespace}/` already exists:
+
+- If it exists, **reject** the command with error: "A proposal with topic ID '{topic-id}' already exists. Use `--name {topic-id}-v2` to create a differently-named proposal."
+- No files are created or modified on collision.
+
+### Legacy Workspace Detection
+
+If a legacy workspace is detected (`.sbir/proposal-state.json` at root, no `.sbir/proposals/`):
+
+- Prompt the user: "Single-proposal layout detected. Enable multi-proposal support? (m)igrate existing proposal into namespace / (s)tart a new workspace instead."
+- On migrate: move existing state and artifacts into a namespace derived from the existing proposal's topic ID, then proceed with the new proposal.
+- Migration preserves originals as `.migrated` suffix (safety net).
+
+### Existing Proposal Isolation
+
+Creating a new proposal MUST NOT modify any existing proposal's state files. The existing proposal's `proposal-state.json` remains byte-identical before and after. Only `.sbir/active-proposal` changes (to point to the new proposal).
+
+### Shared Resources
+
+The shared corpus (`.sbir/corpus/`), company profile (`~/.sbir/company-profile.json`), and partner profiles (`~/.sbir/partners/`) are accessible to all proposals. During new proposal creation, list available shared resources in the output.
+
 ## Critical Rules
 
 1. Read state before every action. Stale state leads to wrong routing and lost work.
@@ -132,16 +179,33 @@ Gate: Human decision recorded. State updated.
 
 ## Examples
 
-### Example 1: New Proposal Start
-User runs `/sbir:proposal new` with a solicitation file path.
+### Example 1: New Proposal Start (Fresh Workspace)
+User runs `/sbir:proposal new ./solicitations/AF263-042.pdf` in a fresh workspace.
 
-1. ORIENT: No state file exists -- this is expected for `new`
-2. ROUTE: `proposal new` -> sbir-corpus-librarian for solicitation ingestion
-3. DISPATCH: Create `.sbir/` directory, initialize state with topic metadata
-4. DISPATCH: Invoke sbir-corpus-librarian to ingest solicitation
-5. DISPATCH: Score fit across subject matter, past performance, certifications
-6. FORMAT SELECTION: Prompt for output format (LaTeX or DOCX, default DOCX). If solicitation hints at PDF submission, recommend LaTeX. Before offering LaTeX, check compiler availability (`pdflatex --version`). If no LaTeX compiler is detected, warn the user: "LaTeX compiler not detected. Select DOCX or install LaTeX first (run /sbir:setup for install help)." Record `output_format` in state.
-7. CHECKPOINT: Present Go/No-Go with fit scoring results and chosen format
+1. ORIENT: No `.sbir/` directory exists -- fresh workspace, expected for `new`
+2. ROUTE: `proposal new` -> namespace creation, then sbir-corpus-librarian for solicitation ingestion
+3. DISPATCH: Parse solicitation, extract topic ID `AF263-042`, derive namespace `af263-042`
+4. DISPATCH: Create `.sbir/proposals/af263-042/`, `.sbir/proposals/af263-042/audit/`, `artifacts/af263-042/`
+5. DISPATCH: Write `.sbir/active-proposal` with content `af263-042`
+6. DISPATCH: Initialize state at `.sbir/proposals/af263-042/proposal-state.json` with topic metadata
+7. DISPATCH: Invoke sbir-corpus-librarian to ingest solicitation
+8. DISPATCH: Score fit across subject matter, past performance, certifications
+9. FORMAT SELECTION: Prompt for output format (LaTeX or DOCX, default DOCX). If solicitation hints at PDF submission, recommend LaTeX. Before offering LaTeX, check compiler availability (`pdflatex --version`). If no LaTeX compiler is detected, warn the user: "LaTeX compiler not detected. Select DOCX or install LaTeX first (run /sbir:setup for install help)." Record `output_format` in state.
+10. CHECKPOINT: Present Go/No-Go with fit scoring results and chosen format
+
+### Example 1b: Second Proposal in Existing Workspace
+User runs `/sbir:proposal new ./solicitations/N244-012.pdf` with AF263-042 already active in Wave 3.
+
+1. ORIENT: Multi-proposal layout detected. Active proposal: `af263-042` (Wave 3, 27 days to deadline)
+2. ROUTE: `proposal new` -> namespace creation for new proposal
+3. DISPATCH: Parse solicitation, extract topic ID `N244-012`, derive namespace `n244-012`
+4. DISPATCH: Check `.sbir/proposals/n244-012/` does not exist (no collision)
+5. DISPATCH: Create `.sbir/proposals/n244-012/`, `.sbir/proposals/n244-012/audit/`, `artifacts/n244-012/`
+6. DISPATCH: Write `.sbir/active-proposal` with content `n244-012` (switches active to new proposal)
+7. DISPATCH: Initialize state at `.sbir/proposals/n244-012/proposal-state.json`
+8. DISPATCH: Invoke sbir-corpus-librarian to ingest solicitation, list shared resources (corpus, company profile, partners)
+9. DISPATCH: Score fit, FORMAT SELECTION, CHECKPOINT as in Example 1
+10. AF263-042 state is untouched -- `.sbir/proposals/af263-042/proposal-state.json` unchanged
 
 ### Example 2: Session Resume After Days Away
 User runs `/sbir:proposal status` after 5 days.
