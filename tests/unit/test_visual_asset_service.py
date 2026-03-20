@@ -546,10 +546,10 @@ class TestFigureGenerationResultNewFields:
 
         result = service.generate_figure(placeholder=placeholder)
 
-        assert hasattr(result, "prompt_hash")
-        assert hasattr(result, "iteration_count")
-        assert isinstance(result.prompt_hash, str)
-        assert isinstance(result.iteration_count, int)
+        assert result.prompt_hash == ""
+        assert result.iteration_count == 0
+        assert result.generation_method == "tikz"
+        assert result.original_method == ""
 
     def test_existing_methods_default_prompt_hash_and_iteration_count(self):
         service, _, _, _ = _make_service()
