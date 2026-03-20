@@ -11,6 +11,7 @@ Evaluate in this exact order. Stop at the first match.
 
 | Priority | Check | Classification | Route |
 |----------|-------|---------------|-------|
+| 0 | `.sbir/proposals/` directory exists | multi_proposal | Load multi-proposal-dashboard skill, render dashboard |
 | 1 | No profile at `~/.sbir/company-profile.json` AND no `.sbir/proposal-state.json` | no_setup | Welcome + suggest /sbir:setup |
 | 2 | Profile exists but no corpus (0 files in `.sbir/corpus/`) AND no proposal state | partial_setup | Setup checklist + options |
 | 3 | Profile exists, setup functionally complete, no `.sbir/proposal-state.json` | no_proposal | Profile summary + suggest find/new |

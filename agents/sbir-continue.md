@@ -6,6 +6,7 @@ tools: Read, Bash, Glob
 maxTurns: 15
 skills:
   - continue-detection
+  - multi-proposal-dashboard
 ---
 
 # sbir-continue
@@ -37,11 +38,21 @@ You MUST load your skill file before beginning work. The continue-detection skil
 | Phase | Load | Trigger |
 |-------|------|---------|
 | 1 GATHER | `continue-detection` | Always -- detection priority, display patterns, command mapping |
+| 1b MULTI-PROPOSAL | `multi-proposal-dashboard` | `.sbir/proposals/` detected -- enumeration, display templates, corruption handling |
 
 ## Workflow
 
 ### Phase 1: GATHER
 Load: `continue-detection` -- read it NOW before proceeding.
+
+**Step 0 -- Multi-proposal detection (before all other checks):**
+
+Check if `.sbir/proposals/` directory exists (use Glob for `.sbir/proposals/*/proposal-state.json`).
+
+- If `.sbir/proposals/` exists: load `multi-proposal-dashboard` skill and switch to Phase 1b (Multi-Proposal Dashboard). Skip the single-proposal state gathering below.
+- If `.sbir/proposals/` does NOT exist: proceed with standard single-proposal detection flow below.
+
+**Step 1 -- Single-proposal state gathering (only if no multi-proposal layout):**
 
 Read all state sources in parallel:
 1. `~/.sbir/company-profile.json` -- global company profile (may not exist)
@@ -52,6 +63,22 @@ Read all state sources in parallel:
 Handle read errors gracefully: missing files are valid states (not errors). Invalid JSON in proposal-state.json triggers the corrupted state error path.
 
 Gate: All state sources read (or confirmed absent). No files created.
+
+### Phase 1b: MULTI-PROPOSAL DASHBOARD
+
+Only entered when `.sbir/proposals/` exists (detected in Phase 1, Step 0).
+
+1. **Enumerate proposals**: Glob `.sbir/proposals/*/proposal-state.json`. Read each file. On parse failure (invalid JSON), record as corrupted -- do not abort.
+2. **Read active proposal pointer**: Read `.sbir/active-proposal` to identify which proposal is currently active.
+3. **Classify each proposal**: Apply the completion rules from multi-proposal-dashboard skill (Wave 8 completed, archived, or no-go = completed; all others = active).
+4. **Single-proposal shortcut**: If exactly one proposal found, render the familiar single-proposal display from continue-detection skill (not the table). Skip to Phase 3 DISPLAY using standard single-proposal patterns.
+5. **Sort**: Active proposals by deadline ascending (closest first). Completed proposals by submission date descending.
+6. **Render dashboard**: Use the display templates from multi-proposal-dashboard skill. Show active proposals table, then completed proposals table. Corrupted proposals appear as error rows.
+7. **Suggest action**: If the closest-deadline proposal is not currently active, suggest switching. If it is active, suggest the next wave action. Use deadline display rules from continue-detection skill.
+
+After rendering, skip to Phase 3 DISPLAY (output is already rendered). Do not enter Phase 2 CLASSIFY.
+
+Gate: Dashboard displayed. No files modified.
 
 ### Phase 2: CLASSIFY
 
@@ -170,7 +197,52 @@ DO:    Run /sbir:proposal status for diagnostics.
        PES session checker may recover from the .bak backup.
 ```
 
-### Example 5: Archived No-Go Proposal
+### Example 5: Multi-Proposal Dashboard
+
+Two active proposals, one completed. Active proposal is N244-012 but AF263-042 has the closer deadline.
+
+Output:
+```
+SBIR Proposal Workspace
+========================
+
+Active Proposals:
+| Topic ID    | Title                          | Wave | Deadline   | Days | Status      |
+|-------------|--------------------------------|------|------------|------|-------------|
+|   af263-042 | Compact Directed Energy        | 3    | 2026-04-15 | 27   | Outlining   |
+| > n244-012  | AUV Navigation                 | 0    | 2026-05-30 | 72   | Fit Scoring |
+
+Completed Proposals:
+| Topic ID    | Title                | Submitted  | Outcome   |
+|-------------|----------------------|------------|-----------|
+|   da-25-001 | Sensor Fusion        | 2026-01-10 | Submitted |
+
+AF263-042 has the closest deadline (27 days). Consider: /sbir:proposal switch af263-042
+```
+
+### Example 6: Multi-Proposal with Corrupted State
+
+Two proposals, one with corrupted state file.
+
+Output:
+```
+SBIR Proposal Workspace
+========================
+
+Active Proposals:
+| Topic ID       | Title                          | Wave | Deadline   | Days | Status    |
+|----------------|--------------------------------|------|------------|------|-----------|
+| > n244-012     | AUV Navigation                 | 1    | 2026-05-30 | 72   | Strategy  |
+| [!!] af263-042 | State corrupted                | --   | --         | --   | Error     |
+
+[!!] af263-042: State file corrupted (invalid JSON).
+     Run /sbir:proposal switch af263-042 then /sbir:proposal status for recovery.
+     PES session checker may recover from the .bak backup.
+
+Next: /sbir:proposal wave strategy
+```
+
+### Example 7: Archived No-Go Proposal (Single-Proposal)
 
 Proposal DA-26-003 has `go_no_go: "no-go"`, `archived: true`.
 
