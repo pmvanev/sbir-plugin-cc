@@ -199,6 +199,207 @@ Each figure gets a specification before generation:
 - **Caption**: {Draft caption text}
 ```
 
+## Engineered Prompt Templates
+
+### Prompt Structure
+
+Every Nano Banana prompt is constructed from five mandatory sections. The formatter agent assembles these from the figure specification, style profile, and figure plan metadata.
+
+```
+COMPOSITION: {composition directive based on figure type}
+STYLE: {tone and palette from style profile}
+LABELS: {component list extracted from figure description and section content}
+AVOID: {figure-type avoids + style profile avoids}
+RESOLUTION: {size and aspect ratio}
+```
+
+### Section Definitions
+
+**COMPOSITION** -- Describes the visual layout, perspective, and spatial organization. Derived from the figure type. Includes arrangement of elements, visual hierarchy, and perspective (isometric, top-down, left-to-right flow, etc.).
+
+**STYLE** -- Visual tone and color scheme. Injected from the approved style profile (see Style Profile Injection below). Includes palette colors, illustration tone, background color, and line style.
+
+**LABELS** -- Explicit list of every component, subsystem, or data element that must appear as a labeled element in the figure. Extracted from the figure description, the section content it cross-references, and compliance items it supports.
+
+**AVOID** -- Explicit negative directives. Combines figure-type-specific avoids with style profile avoids. Prevents common AI generation failures (photorealistic people, unlabeled components, decorative clutter, text-heavy layouts).
+
+**RESOLUTION** -- Output dimensions and quality. Specifies pixel density ("2K"), aspect ratio (from figure spec or default), and any agency-specific resolution requirements.
+
+### Per-Figure-Type Prompt Patterns
+
+#### System Diagram
+
+```
+COMPOSITION: Technical illustration showing system architecture. Exploded isometric
+view or layered block layout. Clear subsystem boundaries with labeled interfaces.
+Hierarchical arrangement: top-level system at top, subsystems below, external
+interfaces at edges.
+STYLE: {style_profile.tone} illustration. {palette.primary} and {palette.secondary}
+color scheme. White background. Clean outlines. Labels in {palette.primary} with
+high contrast.
+LABELS: {all subsystem names}, {interface names}, {data flow labels}, {external
+system connections}.
+AVOID: Photorealistic rendering, unlabeled components, decorative elements,
+3D perspective distortion, {style_profile.avoid}.
+RESOLUTION: 2K, {aspect_ratio from figure spec, default 16:9}.
+```
+
+#### Concept Image
+
+```
+COMPOSITION: Professional technical illustration depicting {concept description}.
+Scene composition showing operational context with clearly distinguishable elements.
+Focal point on the primary innovation or system under discussion.
+STYLE: {style_profile.tone} illustration. {palette.primary} and {palette.secondary}
+color scheme. {palette.accent} for callout arrows and emphasis markers.
+Clean, professional, suitable for a government proposal.
+LABELS: {key concept elements}, {operational environment features}, {annotated
+callouts for critical components}.
+AVOID: Photorealistic people, logos, trademarked imagery, science fiction aesthetic,
+cartoon/sketch style, {style_profile.avoid}.
+RESOLUTION: 2K, {aspect_ratio from figure spec, default 16:9}.
+```
+
+#### Block Diagram
+
+```
+COMPOSITION: Functional block diagram showing data/signal flow between components.
+Left-to-right or top-to-bottom flow direction. Input sources on left/top, output
+sinks on right/bottom. Clear signal path lines with arrowheads.
+STYLE: {style_profile.tone} illustration. {palette.primary} blocks with
+{palette.secondary} borders. White background. {palette.accent} for signal flow
+arrows. Consistent block sizing.
+LABELS: {input sources}, {processing blocks}, {output sinks}, {signal types with
+units where applicable}.
+AVOID: Overlapping blocks, unlabeled signal paths, excessive detail inside blocks,
+rounded organic shapes for technical systems, {style_profile.avoid}.
+RESOLUTION: 2K, {aspect_ratio from figure spec, default 16:9}.
+```
+
+#### Timeline / Gantt
+
+```
+COMPOSITION: Horizontal timeline showing project phases and milestones. Time axis
+at top or bottom with labeled intervals. Phase bars with clear start/end boundaries.
+Milestone markers at key deliverables.
+STYLE: {style_profile.tone} layout. {palette.primary} for phase bars.
+{palette.accent} for milestone markers. {palette.secondary} for grid lines.
+White background. Clean typography.
+LABELS: {phase names}, {milestone labels with dates}, {deliverable names},
+{time period labels}.
+AVOID: Overlapping bars, unlabeled milestones, excessive decoration, 3D bar effects,
+{style_profile.avoid}.
+RESOLUTION: 2K, {aspect_ratio from figure spec, default 16:9}.
+```
+
+#### Chart (Bar/Line/Pie)
+
+```
+COMPOSITION: Data visualization with clearly labeled axes. Title at top. Legend
+positioned to avoid obscuring data. Data points/bars/slices with direct labels
+where possible. Source citation below chart.
+STYLE: {style_profile.tone} chart. {palette.primary} for primary data series.
+{palette.accent} for secondary series. {palette.secondary} for axes and gridlines.
+White background. No gradient fills.
+LABELS: {axis labels with units}, {data series names}, {data point annotations
+where significant}, {source citation}.
+AVOID: 3D chart effects, gradient fills, unlabeled axes, missing units,
+decorative chartjunk, {style_profile.avoid}.
+RESOLUTION: 2K, {aspect_ratio from figure spec, default 4:3}.
+```
+
+#### Process Flow
+
+```
+COMPOSITION: Flowchart with clear start/end nodes. Decision diamonds with
+yes/no labels. Process rectangles with action descriptions. Swim lanes if
+multiple actors involved. Top-to-bottom or left-to-right flow.
+STYLE: {style_profile.tone} diagram. {palette.primary} for process nodes.
+{palette.accent} for decision diamonds. {palette.highlight} for start/end nodes.
+{palette.secondary} for flow arrows. White background.
+LABELS: {process step names}, {decision conditions}, {branch labels (yes/no/
+condition)}, {actor names for swim lanes}.
+AVOID: Ambiguous flow directions, unlabeled decisions, excessive node count
+(max 15-20 nodes), crossing flow lines, {style_profile.avoid}.
+RESOLUTION: 2K, {aspect_ratio from figure spec, default 3:4 portrait}.
+```
+
+#### Comparison Table (Visual)
+
+```
+COMPOSITION: Structured grid with row headers on left, column headers on top.
+Visual indicators (checkmarks, color coding, rating bars) for comparison values.
+Clear cell boundaries. Summary row at bottom if applicable.
+STYLE: {style_profile.tone} table. {palette.primary} for header row/column.
+{palette.secondary} for cell borders. {palette.highlight} for positive indicators.
+{palette.accent} for caution/warning indicators. White background.
+LABELS: {row category names}, {column option names}, {cell values or indicators},
+{summary labels}.
+AVOID: Dense text in cells (use icons/indicators), inconsistent cell sizing,
+missing legend for visual indicators, {style_profile.avoid}.
+RESOLUTION: 2K, {aspect_ratio from figure spec, default 4:3}.
+```
+
+### Style Profile Injection
+
+The style profile (from `visual-style-intelligence` skill, persisted at `{artifact_base}/wave-5-visuals/style-profile.yaml`) is injected into prompts at these points:
+
+| Prompt Section | Injected Values | Source Field |
+|---------------|-----------------|--------------|
+| STYLE | `{tone} illustration` | `style_profile.tone` |
+| STYLE | `{primary} and {secondary} color scheme` | `style_profile.palette.primary`, `.secondary` |
+| STYLE | `{accent} for callout arrows` | `style_profile.palette.accent` (if defined) |
+| STYLE | `{highlight} for secondary groupings` | `style_profile.palette.highlight` (if defined) |
+| AVOID | Appended to figure-type avoids | `style_profile.avoid` (joined by ", ") |
+
+If no style profile exists (user skipped style analysis), fall back to the default palette defined in the "Color Palette for Consistent Styling" section of this skill.
+
+### Figure Plan Metadata Injection
+
+The figure plan (`./artifacts/wave-3-outline/figure-plan.md`) and section content provide metadata injected into the prompt:
+
+| Metadata | Injection Point | How Used |
+|----------|----------------|----------|
+| `figure_type` | Selects the per-figure-type template | Determines COMPOSITION pattern |
+| `description` | COMPOSITION, LABELS | Seeded into composition narrative; key terms extracted for labels |
+| `section_id` | LABELS, COMPOSITION | Section content read to extract domain terms, subsystem names, technical details |
+| `compliance_items` | LABELS | Compliance matrix items (e.g., R-7) looked up; relevant requirements added as labeled elements |
+| `cross_references` | COMPOSITION | Referenced sections provide context for what the figure must communicate |
+| `caption` | COMPOSITION | Draft caption informs the focal point and narrative intent |
+
+#### Metadata Injection Example
+
+Given figure plan entry:
+```markdown
+## Figure 3: System Architecture
+- **Type**: system-diagram
+- **Purpose**: Show compact DE weapon system architecture for naval integration
+- **Cross-references**: Section 3.1
+- **Compliance items**: R-3, R-7
+- **Caption**: Figure 3. Compact DE weapon system architecture showing subsystem integration
+```
+
+And section 3.1 content mentions: "Power Conditioning Unit, Beam Director Assembly, Target Acquisition Sensor, Thermal Management System, C2 Interface, Ship Power Bus 450V DC."
+
+The assembled prompt becomes:
+```
+COMPOSITION: Technical illustration showing system architecture. Exploded isometric
+view showing compact DE weapon system architecture for naval integration. Clear
+subsystem boundaries with labeled interfaces. Hierarchical arrangement: top-level
+system at top, subsystems below, external interfaces at edges.
+STYLE: technical-authoritative illustration. #003366 and #6B7B8D color scheme.
+White background. Clean outlines. Labels in #003366 with high contrast.
+Use #FF6B35 for callout arrows and emphasis markers.
+Use #2B7A8C for secondary groupings or status indicators.
+LABELS: Power Conditioning Unit, Beam Director Assembly, Target Acquisition Sensor,
+Thermal Management System, C2 Interface, Ship Power Bus 450V DC, subsystem
+interfaces, data flow paths.
+AVOID: Photorealistic rendering, unlabeled components, decorative elements,
+3D perspective distortion, cartoon/sketch style, excessive gradients,
+land-centric imagery in maritime context.
+RESOLUTION: 2K, 16:9.
+```
+
 ## Agency Format Requirements
 
 | Requirement | Typical Constraint | Check Method |
