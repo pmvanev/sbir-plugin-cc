@@ -37,6 +37,34 @@
       "s": "EXECUTED",
       "d": "PASS",
       "t": "2026-03-20T19:36:12Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "PREPARE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-20T19:40:16Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED_ACCEPTANCE",
+      "s": "SKIPPED",
+      "d": "NOT_APPLICABLE: hook adapter CLI tests serve as acceptance-level tests; no separate BDD scenario for hook-resolver integration",
+      "t": "2026-03-20T19:40:37Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "RED_UNIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-20T19:42:55Z"
+    },
+    {
+      "sid": "01-02",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-20T19:48:45Z"
     }
   ]
 }

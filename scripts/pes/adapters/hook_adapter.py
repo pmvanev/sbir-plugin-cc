@@ -195,11 +195,26 @@ def main() -> None:
 
     hook_input["event"] = event
 
-    # Resolve paths: state in CWD/.sbir, config relative to plugin root
+    # Resolve workspace layout and derive state_dir
+    from pathlib import Path
+
+    from pes.adapters.workspace_resolver import WorkspaceResolutionError, resolve_workspace
+
     plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", os.getcwd())
-    state_dir = os.path.join(os.getcwd(), ".sbir")
     config_path = os.path.join(plugin_root, "templates", "pes-config.json")
 
+    workspace_root = Path(os.getcwd())
+    try:
+        ctx = resolve_workspace(workspace_root)
+    except WorkspaceResolutionError:
+        # Cannot resolve workspace -- allow hook to proceed
+        sys.exit(0)
+
+    if ctx.layout == "fresh":
+        # No proposal state -- nothing to enforce
+        sys.exit(0)
+
+    state_dir = str(ctx.state_dir)
     result = process_hook_event(hook_input, state_dir, config_path)
 
     exit_code = result.pop("exit_code", 0)
