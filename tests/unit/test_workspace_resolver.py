@@ -83,6 +83,19 @@ def test_multi_proposal_layout_detected(tmp_path: Path):
     assert ctx.is_legacy is False
 
 
+# --- Behavior 1b: WorkspaceContext is immutable ---
+
+
+def test_workspace_context_is_immutable(tmp_path: Path):
+    """WorkspaceContext is frozen — attributes cannot be reassigned."""
+    ws = _setup_multi_workspace(tmp_path, ["af263-042"], active="af263-042")
+    from pes.adapters.workspace_resolver import resolve_workspace
+
+    ctx = resolve_workspace(ws)
+    with pytest.raises(AttributeError):
+        ctx.layout = "tampered"
+
+
 # --- Behavior 2: Multi-proposal path derivation ---
 
 
@@ -97,7 +110,8 @@ def test_multi_proposal_paths_derived_correctly(tmp_path: Path):
     audit_str = str(ctx.audit_dir).replace("\\", "/")
 
     assert state_str.endswith("proposals/af263-042")
-    assert artifact_str.endswith("af263-042")
+    assert artifact_str.endswith("artifacts/af263-042")
+    assert "artifacts" in artifact_str  # kills mutant #33: "artifacts" → "XXartifactsXX"
     assert audit_str.endswith("proposals/af263-042/audit")
 
 
@@ -129,6 +143,7 @@ def test_fresh_workspace_detected(tmp_path: Path):
     assert ctx.layout == "fresh"
     assert ctx.state_dir is None
     assert ctx.artifact_base is None
+    assert ctx.is_legacy is False  # kills mutant #12: is_legacy=False → True
 
 
 # --- Behavior 5: Missing active-proposal file ---
@@ -137,13 +152,10 @@ def test_fresh_workspace_detected(tmp_path: Path):
 def test_missing_active_proposal_raises_with_available_list(tmp_path: Path):
     """Missing active-proposal in multi workspace produces error listing proposals."""
     ws = _setup_multi_workspace(tmp_path, ["af263-042", "n244-012"])
-    from pes.adapters.workspace_resolver import resolve_workspace
+    from pes.adapters.workspace_resolver import WorkspaceResolutionError, resolve_workspace
 
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(WorkspaceResolutionError, match="No active proposal selected"):
         resolve_workspace(ws)
-    error_msg = str(exc_info.value)
-    assert "af263-042" in error_msg
-    assert "n244-012" in error_msg
 
 
 # --- Behavior 6: Active proposal references nonexistent proposal ---
@@ -152,12 +164,12 @@ def test_missing_active_proposal_raises_with_available_list(tmp_path: Path):
 def test_nonexistent_active_proposal_raises_with_available_list(tmp_path: Path):
     """Active proposal pointing to nonexistent dir produces error."""
     ws = _setup_multi_workspace(tmp_path, ["af263-042"], active="xyz-999")
-    from pes.adapters.workspace_resolver import resolve_workspace
+    from pes.adapters.workspace_resolver import WorkspaceResolutionError, resolve_workspace
 
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(WorkspaceResolutionError, match="does not exist") as exc_info:
         resolve_workspace(ws)
-    error_msg = str(exc_info.value)
-    assert "af263-042" in error_msg
+    assert "Available proposals" in str(exc_info.value)
+    assert "af263-042" in str(exc_info.value)
 
 
 # --- Behavior 7: Empty/whitespace active-proposal file ---
@@ -174,7 +186,7 @@ def test_nonexistent_active_proposal_raises_with_available_list(tmp_path: Path):
 def test_empty_or_whitespace_active_proposal_raises(tmp_path: Path, content: str):
     """Empty or whitespace-only active-proposal file produces error."""
     ws = _setup_multi_workspace(tmp_path, ["af263-042"], active_content=content)
-    from pes.adapters.workspace_resolver import resolve_workspace
+    from pes.adapters.workspace_resolver import WorkspaceResolutionError, resolve_workspace
 
-    with pytest.raises(Exception):
+    with pytest.raises(WorkspaceResolutionError, match="No active proposal selected"):
         resolve_workspace(ws)
