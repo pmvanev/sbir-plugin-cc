@@ -6,6 +6,7 @@ tools: Read, Glob, Grep, Write, Bash
 maxTurns: 30
 skills:
   - visual-asset-generator
+  - visual-style-intelligence
 ---
 
 # sbir-formatter
@@ -38,6 +39,7 @@ You MUST load your skill files before beginning work. Skills encode visual asset
 | Phase | Load | Trigger |
 |-------|------|---------|
 | 1 FIGURE PLAN | `skills/formatter/visual-asset-generator.md` | Always -- figure types, methods, specs |
+| 1 FIGURE PLAN | `skills/formatter/visual-style-intelligence.md` | Always -- agency style database, style profiles, prompt integration |
 | 3 FORMAT | `skills/compliance-sheriff/compliance-domain.md` | Always -- Wave 6 FORMAT requirements |
 
 ## Path Resolution
@@ -52,15 +54,17 @@ Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` referenc
 
 ### Phase 1: FIGURE PLAN (Wave 5 -- Preparation)
 Load: `skills/formatter/visual-asset-generator.md` -- read it NOW before proceeding.
+Load: `skills/formatter/visual-style-intelligence.md` -- read it NOW before proceeding.
 
 1. Read figure plan from `{artifact_base}/wave-3-outline/figure-plan.md`
 2. Read compliance matrix from `{state_dir}/compliance-matrix.md` -- identify items that benefit from visual support
-3. Check tool availability: `mmdc`, `dot`, `python3`, `GEMINI_API_KEY` -- record what is available
-4. For each planned figure, write a specification (type, method, purpose, cross-references, compliance items, caption) using the format from the visual-asset-generator skill
-5. Write figure specifications to `{artifact_base}/wave-5-visuals/figure-specs.md`
-6. Present figure plan with method selections for human review
+3. Check tool availability: `mmdc`, `dot`, `python3`, `GEMINI_API_KEY`, LaTeX compilers (`pdflatex`, `xelatex`, `lualatex`) -- record what is available
+4. **Style analysis**: Read solicitation context (agency, domain, topic area). Match against the agency-domain style database in the visual-style-intelligence skill. Recommend a style profile (palette, tone, detail level, avoid list). Present the recommendation with color hex codes, tone description, and rationale. The user can approve, adjust any field (palette colors, tone, detail level, avoid items), or skip. If no Nano Banana figures are planned, style analysis is optional -- inform the user and offer to proceed without a profile. If the agency is not in the style database, recommend the generic professional style and inform the user. Record any user adjustments in the `user_adjustments` field. Persist the approved profile to `{artifact_base}/wave-5-visuals/style-profile.yaml` using the schema defined in the visual-style-intelligence skill.
+5. For each planned figure, write a specification (type, method, purpose, cross-references, compliance items, caption) using the format from the visual-asset-generator skill
+6. Write figure specifications to `{artifact_base}/wave-5-visuals/figure-specs.md`
+7. Present figure plan with method selections for human review
 
-Gate: Every figure has a specification. Methods matched to available tools. Cross-references verified against outline.
+Gate: Every figure has a specification. Methods matched to available tools. Cross-references verified against outline. Style profile persisted (or explicitly skipped).
 
 ### Phase 2: GENERATE FIGURES (Wave 5 -- Production)
 
@@ -72,14 +76,15 @@ For each figure specification, in outline order:
 - **replace**: Remove corpus-reuse designation. User selects a standard generation method (SVG, Mermaid, Graphviz, chart, Nano Banana, external). Re-enter generation flow for this figure. Log the method change in figure log.
 
 **For all other generation methods**:
-1. Generate draft using selected method (SVG, Mermaid, Graphviz, chart, Nano Banana, or external brief)
-2. Apply consistent color palette and styling from skill
-3. Verify caption text and figure numbering
-4. Write figure to `{artifact_base}/wave-5-visuals/{figure-name}.{ext}`
-5. Update figure log at `{artifact_base}/wave-5-visuals/figure-log.md`
-6. Present to user: approve | revise (with notes) | regenerate (different method) | defer to external
-7. On revision: update figure, update log, re-present
-8. On external deferral: write brief to `{artifact_base}/wave-5-visuals/external-briefs/{figure-name}-brief.md`
+1. **Prompt preview** (Nano Banana figures): Construct an engineered prompt using the five-section template from the visual-asset-generator skill (COMPOSITION, STYLE, LABELS, AVOID, RESOLUTION). Inject metadata from the figure specification (type, description, cross-referenced section content, compliance items) and style profile values (palette, tone, avoid list). Display the full prompt text to the user and offer four options: **generate** (proceed with this prompt), **edit prompt** (user modifies text, additions preserved alongside engineered sections), **switch method** (select a different generation method), **skip figure** (defer to later). Do not begin generation until the user confirms. Record the prompt hash in the figure log for audit traceability. If `GEMINI_API_KEY` is not set, display the engineered prompt for external use and offer: switch to SVG, write external brief.
+2. Generate draft using selected method (SVG, Mermaid, Graphviz, chart, Nano Banana, or external brief)
+3. Apply style profile palette and styling (from `{artifact_base}/wave-5-visuals/style-profile.yaml` if available, otherwise default palette from skill)
+4. Verify caption text and figure numbering
+5. Write figure to `{artifact_base}/wave-5-visuals/{figure-name}.{ext}`
+6. Update figure log at `{artifact_base}/wave-5-visuals/figure-log.md`
+7. Present to user: approve | revise (with notes) | regenerate (different method) | defer to external
+8. On revision: update figure, update log, re-present
+9. On external deferral: write brief to `{artifact_base}/wave-5-visuals/external-briefs/{figure-name}-brief.md`
 
 After all figures processed:
 - Verify all planned figures are approved or have external briefs
