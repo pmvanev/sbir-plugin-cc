@@ -101,12 +101,24 @@ class FileVisualAssetAdapter(VisualAssetPort):
 
     # --- FigurePersistence protocol methods ---
 
-    def write_figure(self, figure: GeneratedFigure, content: str) -> None:
-        """Write generated figure file to figures directory."""
+    def write_figure(
+        self,
+        figure: GeneratedFigure,
+        content: str,
+        pdf_preview: bytes | None = None,
+    ) -> None:
+        """Write generated figure file to figures directory.
+
+        For TikZ figures, writes the .tex source as text. If pdf_preview
+        is provided, also writes a .pdf preview alongside the source.
+        """
         figures_dir = self._dir / "figures"
         self._ensure_dir(figures_dir)
         path = figures_dir / figure.file_path
         path.write_text(content, encoding="utf-8")
+        if pdf_preview is not None and figure.format == "tikz":
+            pdf_path = path.with_suffix(".pdf")
+            pdf_path.write_bytes(pdf_preview)
 
     def write_external_brief(self, brief: ExternalBrief) -> None:
         """Write external brief as JSON to figures directory."""

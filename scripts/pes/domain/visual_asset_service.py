@@ -28,7 +28,12 @@ class FigureGenerator(Protocol):
 class FigurePersistence(Protocol):
     """Driven port: persists figure artifacts and cross-reference logs."""
 
-    def write_figure(self, figure: GeneratedFigure, content: str) -> None: ...
+    def write_figure(
+        self,
+        figure: GeneratedFigure,
+        content: str,
+        pdf_preview: bytes | None = None,
+    ) -> None: ...
 
     def write_external_brief(self, brief: ExternalBrief) -> None: ...
 
