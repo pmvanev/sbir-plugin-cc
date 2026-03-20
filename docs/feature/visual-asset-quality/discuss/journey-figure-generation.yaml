@@ -1,0 +1,368 @@
+journey:
+  name: "High-Quality Figure Generation"
+  goal: "Produce professional, domain-appropriate visual assets for SBIR proposals through engineered prompts, structured critique, and optional TikZ generation"
+  persona: "Phil Van Every -- solo SBIR proposal writer, experienced engineer, 2-3 proposals/year to DoD/NASA"
+
+  emotional_arc:
+    start: "Cautious/Hopeful -- new workflow, will it actually produce better figures?"
+    middle: "Focused/Engaged -- critique loop shows visible improvement, Phil feels in control"
+    end: "Proud/Satisfied -- figures look professional, consistent, domain-appropriate"
+
+  style_profile:
+    description: "Per-proposal visual style derived from solicitation analysis"
+    fields:
+      - domain: "e.g., maritime, aerospace, ground, cyber, medical"
+      - palette: "4-6 colors appropriate to domain"
+      - tone: "e.g., technical-authoritative, clean-modern, research-academic"
+      - detail_level: "low | medium | high"
+      - avoid: "styles and elements to exclude"
+      - tikz_available: "boolean -- true if LaTeX proposal with pdflatex/xelatex/lualatex detected"
+
+steps:
+  - id: 1
+    name: "Style Analysis"
+    command: "/proposal wave visuals (enhanced)"
+    description: "Read solicitation, identify agency/domain, recommend visual style profile for the proposal"
+
+    tui_mockup: |
+      +-- Wave 5: Visual Assets -- Style Analysis -------------------------+
+      |  Solicitation: ${solicitation_id} (${agency}, ${domain})            |
+      |  Proposal Format: ${format}                                         |
+      |  Figures Planned: ${figure_count}                                   |
+      |                                                                     |
+      |  Recommended Visual Style:                                          |
+      |  | Domain:  ${style_domain}                                         |
+      |  | Palette: ${palette_colors}                                       |
+      |  | Tone:    ${style_tone}                                           |
+      |  | Detail:  ${detail_level}                                         |
+      |  | Avoid:   ${style_avoid}                                          |
+      |  | TikZ:    ${tikz_available}                                       |
+      |                                                                     |
+      |  [approve style] [adjust palette] [adjust tone] [skip style]       |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "style_profile"
+        source: "{artifact_base}/wave-5-visuals/style-profile.yaml"
+        displayed_as: "${style_domain}, ${palette_colors}, ${style_tone}"
+        consumers:
+          - "Step 2 (prompt engineering)"
+          - "Step 4 (style match critique)"
+          - "Step 7 (consistency check)"
+
+      - name: "solicitation_context"
+        source: "{state_dir}/solicitation-parsed.md"
+        displayed_as: "${solicitation_id}, ${agency}, ${domain}"
+        consumers:
+          - "Step 1 (style analysis input)"
+          - "Step 2 (domain-specific prompt content)"
+
+      - name: "figure_plan"
+        source: "{artifact_base}/wave-3-outline/figure-plan.md"
+        displayed_as: "${figure_count} figures"
+        consumers:
+          - "Step 1 (figure enumeration)"
+          - "Step 2 (per-figure specification)"
+          - "Step 7 (completeness check)"
+
+    emotional_state:
+      entry: "Cautious -- new workflow, uncertain of value"
+      exit: "Curious -- recommendations feel reasonable, system understands my domain"
+
+    integration_checkpoint: |
+      Style profile written to style-profile.yaml.
+      Solicitation parsed and domain identified.
+      Figure plan loaded with all planned figures enumerated.
+      LaTeX detection result available for TikZ decision.
+
+    gherkin: |
+      Scenario: Style recommended from solicitation analysis
+        Given Phil has a solicitation for Navy directed energy systems
+        And the figure plan contains 6 planned figures
+        When Phil runs "/proposal wave visuals"
+        Then the system recommends a maritime/naval visual style
+        And the palette includes navy blue and steel gray
+        And TikZ is listed as available (LaTeX detected)
+
+  - id: 2
+    name: "Prompt Preview"
+    command: "/proposal draft figure {name} (enhanced)"
+    description: "Show engineered prompt incorporating style profile and figure specification before generation"
+
+    tui_mockup: |
+      +-- Figure ${figure_number}: ${figure_title} -- Prompt Preview ------+
+      |  Type:     ${figure_type}                                           |
+      |  Method:   ${generation_method} | ${alternative_methods}            |
+      |  Section:  ${section_id}                                            |
+      |                                                                     |
+      |  Engineered Prompt:                                                 |
+      |  | ${prompt_text}                                                   |
+      |                                                                     |
+      |  [generate] [edit prompt] [switch to TikZ] [skip figure]           |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "engineered_prompt"
+        source: "generated in-memory from style_profile + figure_spec"
+        displayed_as: "${prompt_text}"
+        consumers:
+          - "Step 3 (generation input)"
+          - "Step 5 (refinement baseline)"
+
+    emotional_state:
+      entry: "Curious -- what will the prompt look like?"
+      exit: "Focused -- I can see exactly what will be generated, I feel prepared"
+
+    integration_checkpoint: |
+      Prompt incorporates style profile colors, tone, and domain.
+      Figure type and content from figure plan are reflected in prompt.
+      Method selection matches tool availability.
+
+    gherkin: |
+      Scenario: Engineered prompt shown before generation
+        Given Phil is generating Figure 3 (System Architecture)
+        And the approved style is maritime/naval
+        When Phil runs "/proposal draft figure system-architecture"
+        Then the system shows a detailed prompt with composition, style, labels, and avoid instructions
+        And the prompt uses the approved palette colors
+        And Phil can edit the prompt before generation
+
+  - id: 3
+    name: "Generate Figure"
+    command: "(automatic after prompt confirmation)"
+    description: "Generate the figure using the confirmed method and prompt"
+
+    tui_mockup: |
+      +-- Generating Figure ${figure_number}: ${figure_title} -------------+
+      |  Method: ${generation_method}                                       |
+      |  [################............] ${progress}% -- ${status_msg}       |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "generated_figure"
+        source: "{artifact_base}/wave-5-visuals/${figure_filename}"
+        displayed_as: "figure file"
+        consumers:
+          - "Step 4 (critique input)"
+          - "Step 6 (approved figure)"
+          - "Step 7 (consistency check)"
+
+    emotional_state:
+      entry: "Focused -- prompt confirmed, let's see what comes out"
+      exit: "Anticipating -- generation complete, time to evaluate"
+
+    integration_checkpoint: |
+      Figure file written to wave-5-visuals directory.
+      Figure log updated with generation metadata.
+      For TikZ: compilation succeeded with 0 errors.
+
+    gherkin: |
+      Scenario: Nano Banana figure generated with engineered prompt
+        Given Phil confirmed the prompt for Figure 3
+        And GEMINI_API_KEY is set
+        When the system generates the figure via Nano Banana
+        Then a PNG file is written to wave-5-visuals/
+        And the figure log records the generation method and prompt hash
+
+      Scenario: TikZ figure compiled and verified
+        Given Phil chose TikZ for Figure 2 (Block Diagram)
+        And pdflatex is available
+        When the system generates TikZ code and compiles it
+        Then compilation completes with 0 errors
+        And a PDF preview is rendered
+        And the .tex source is saved alongside the preview
+
+  - id: 4
+    name: "Structured Critique"
+    command: "(interactive review)"
+    description: "Phil evaluates the figure using structured critique categories"
+
+    tui_mockup: |
+      +-- Figure ${figure_number}: ${figure_title} -- Review --------------+
+      |  Critique Categories:                                               |
+      |  | Rate | Category         | Question                              |
+      |  | ___  | Composition      | Layout clear? Hierarchy readable?     |
+      |  | ___  | Labels           | All components labeled? Readable?     |
+      |  | ___  | Accuracy         | Technical content correct?            |
+      |  | ___  | Style Match      | Consistent with proposal domain?      |
+      |  | ___  | Scale/Proportion | Elements sized appropriately?         |
+      |  Rate each 1-5. Categories <3 will be targeted for refinement.      |
+      |                                                                     |
+      |  Overall impression: ____________________________________________  |
+      |  Specific issues:    ____________________________________________  |
+      |                                                                     |
+      |  [submit critique] [approve as-is] [replace method] [defer]        |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "critique_ratings"
+        source: "user input during review"
+        displayed_as: "per-category 1-5 ratings + notes"
+        consumers:
+          - "Step 5 (refinement targeting)"
+          - "Step 7 (quality summary)"
+
+    emotional_state:
+      entry: "Anticipating -- what does the figure look like?"
+      exit: "Engaged -- structured categories help me articulate what needs improvement"
+
+    integration_checkpoint: |
+      All 5 critique categories rated.
+      Categories rated <3 flagged for refinement.
+      User notes captured for prompt adjustment.
+
+    gherkin: |
+      Scenario: Structured critique with category ratings
+        Given Phil is reviewing the generated Figure 3
+        When Phil rates composition 4, labels 2, accuracy 4, style 5, scale 3
+        And Phil notes "Labels too small, some overlap"
+        Then categories Labels and Scale are flagged for refinement
+        And the system prepares prompt adjustments targeting those categories
+
+  - id: 5
+    name: "Refine"
+    command: "(automatic refinement loop)"
+    description: "System adjusts prompt based on critique, regenerates, re-presents"
+    max_iterations: 3
+    escape_paths:
+      - "approve current figure despite remaining issues"
+      - "replace with different generation method"
+      - "defer to external tool brief"
+
+    tui_mockup: |
+      +-- Figure ${figure_number} -- Refinement (Round ${round}/${max}) ---+
+      |  Your Critique:                                                     |
+      |    ${category_ratings_summary}                                      |
+      |    Notes: "${user_notes}"                                           |
+      |                                                                     |
+      |  Prompt Adjustments:                                                |
+      |  + Added: "${additions}"                                            |
+      |  - Removed: "${removals}"                                           |
+      |                                                                     |
+      |  [regenerate] [edit adjustments] [approve current]                  |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "refined_prompt"
+        source: "derived from original prompt + critique adjustments"
+        displayed_as: "${additions} / ${removals}"
+        consumers:
+          - "Step 3 (regeneration)"
+
+    emotional_state:
+      entry: "Engaged -- I see my feedback being incorporated"
+      exit: "In Control -- the system is converging on what I want"
+
+    integration_checkpoint: |
+      Prompt adjustments target only flagged categories.
+      Adjustments preserve elements that scored well.
+      Iteration count tracked (max 3 before escape path).
+
+    gherkin: |
+      Scenario: Prompt refined from critique feedback
+        Given Phil rated Labels 2/5 with note "too small, overlap"
+        When the system prepares refinement round 1
+        Then the prompt adds "large clear labels, no overlap, min 12pt"
+        And the prompt removes "10pt labels"
+        And the system regenerates the figure with adjusted prompt
+
+      Scenario: Max iterations reached with escape paths
+        Given Phil has completed 3 refinement rounds
+        And the figure still has issues
+        When the system presents the 3rd iteration result
+        Then Phil is offered: approve current, replace method, or defer to external
+        And no further refinement rounds are offered
+
+  - id: 6
+    name: "Approve"
+    command: "(interactive approval)"
+    description: "Phil approves the figure after critique/refinement converges"
+
+    tui_mockup: |
+      +-- Figure ${figure_number}: ${figure_title} -- APPROVED ------------+
+      |  Quality: ${avg_quality}/5  Iterations: ${iteration_count}          |
+      |  Method: ${generation_method}                                       |
+      |  File: ${file_path}                                                 |
+      |  Status: APPROVED                                                   |
+      |                                                                     |
+      |  Next: Figure ${next_figure_number} (${next_figure_title})          |
+      |  [proceed to next] [reopen critique]                                |
+      +---------------------------------------------------------------------+
+
+    emotional_state:
+      entry: "In Control -- figure converged to quality bar"
+      exit: "Satisfied -- one more figure done well"
+
+    integration_checkpoint: |
+      Figure log status updated to "approved".
+      Quality ratings persisted for summary.
+      Cross-reference entry validated.
+
+    gherkin: |
+      Scenario: Figure approved after refinement
+        Given Phil has completed critique and refinement for Figure 3
+        And all categories rate 3 or higher
+        When Phil approves the figure
+        Then the figure log status changes to "approved"
+        And Phil is presented with the next figure in the plan
+
+  - id: 7
+    name: "Conclude"
+    command: "(automatic after all figures processed)"
+    description: "Verify style consistency, cross-references, and produce quality summary"
+
+    tui_mockup: |
+      +-- Wave 5: Visual Assets -- Quality Summary -----------------------+
+      |  Proposal: ${solicitation_id} (${proposal_title})                  |
+      |  Style: ${style_domain} (approved)                                 |
+      |  Figures: ${figure_count} total                                    |
+      |                                                                    |
+      |  | # | Title          | Method | Iter | Quality | Status |        |
+      |  | ${figure_table_rows}                                  |        |
+      |                                                                    |
+      |  Style Consistency: ${consistency_status}                           |
+      |  Cross-References: ${xref_status}                                  |
+      |  Average Quality: ${avg_quality}/5                                 |
+      |                                                                    |
+      |  Wave 5 complete. Ready for Wave 6 formatting.                     |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "quality_summary"
+        source: "{artifact_base}/wave-5-visuals/quality-summary.md"
+        displayed_as: "quality table and consistency status"
+        consumers:
+          - "Wave 6 formatting (assembly report)"
+
+    emotional_state:
+      entry: "Satisfied -- all individual figures approved"
+      exit: "Proud -- cohesive set of professional figures ready for the proposal"
+
+    integration_checkpoint: |
+      All figures approved or have external briefs.
+      Style consistency verified (all Nano Banana figures use approved palette).
+      Cross-reference log shows all_valid = true.
+      Quality summary written to wave-5-visuals/.
+
+    gherkin: |
+      Scenario: Wave 5 quality summary with style consistency
+        Given all 6 figures have been approved
+        And 3 figures were generated via Nano Banana with the approved style
+        When the system produces the Wave 5 summary
+        Then style consistency is PASS
+        And cross-references show all_valid
+        And the average quality score is displayed
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "style_profile"
+      must_match_across: [1, 2, 4, 7]
+      failure_message: "Style profile changed between analysis and conclusion -- figures may be visually inconsistent"
+
+    - artifact: "figure_plan"
+      must_match_across: [1, 7]
+      failure_message: "Figure count at conclusion differs from plan -- figures may be missing or orphaned"
+
+    - artifact: "solicitation_context"
+      must_match_across: [1, 2]
+      failure_message: "Solicitation context used in style analysis differs from prompt engineering -- domain mismatch"
