@@ -5,16 +5,78 @@ description: State persistence patterns, atomic writes, status rendering, and se
 
 # Proposal State Patterns
 
-## State File Location
+## Multi-Proposal Directory Layout
 
-- Per-project state: `.sbir/proposal-state.json`
+The plugin supports multiple concurrent proposals under a single project. The orchestrator resolves paths and provides them to wave agents via dispatch context.
+
+### Directory Structure
+
+```
+.sbir/
+  active-proposal              # plain text file: topic ID of active proposal (e.g., "af263-042")
+  pes-config.json              # shared PES configuration
+  proposals/
+    af263-042/
+      proposal-state.json      # per-proposal state
+      compliance-matrix.json   # per-proposal compliance matrix
+      tpoc-answers.json        # per-proposal TPOC data
+      corpus/                  # per-proposal corpus index
+      audit/                   # per-proposal audit log
+    n244-012/
+      proposal-state.json
+      ...
+
+artifacts/
+  af263-042/
+    wave-0-intelligence/
+    wave-1-strategy/
+    wave-2-research/
+    ...
+  n244-012/
+    wave-0-intelligence/
+    ...
+```
+
+### Reading Active Proposal
+
+1. Read `.sbir/active-proposal` to get the active topic ID
+2. State path: `.sbir/proposals/{active}/proposal-state.json`
+3. Artifact path: `artifacts/{active}/wave-N-name/`
+
+### Legacy Fallback
+
+When `.sbir/active-proposal` does not exist, fall back to legacy single-proposal paths:
+- State: `.sbir/proposal-state.json`
+- Artifacts: `artifacts/wave-N-name/`
+
+This ensures backward compatibility with existing single-proposal projects.
+
+### Dispatch Context
+
+The orchestrator resolves paths before dispatching to wave agents:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Wave agents use `{state_dir}` and `{artifact_base}` instead of hardcoded paths.
+
+### Global Paths (unchanged)
+
+These remain at fixed locations regardless of active proposal:
+- Company profile: `~/.sbir/company-profile.json`
+- Partner profiles: `~/.sbir/partners/{slug}.json`
+- Quality artifacts: `~/.sbir/quality-preferences.json`, `~/.sbir/winning-patterns.json`, `~/.sbir/writing-quality-profile.json`
+- PES config: `.sbir/pes-config.json`
+
+## State File Location (Legacy)
+
+- Per-project state: `.sbir/proposal-state.json` (legacy) or `.sbir/proposals/{topic-id}/proposal-state.json` (multi-proposal)
 - Global company profile: `~/.sbir/company-profile.json`
 - PES config: `.sbir/pes-config.json`
-- Audit log: `.sbir/audit/`
+- Audit log: `.sbir/audit/` (legacy) or `.sbir/proposals/{topic-id}/audit/` (multi-proposal)
 
 ## Reading State
 
-Read `.sbir/proposal-state.json` to determine:
+Read `{state_dir}/proposal-state.json` to determine:
 1. `current_wave` -- which wave is active
 2. `go_no_go` -- whether proposal passed Wave 0 gate
 3. `waves.{N}.status` -- per-wave completion status
@@ -56,8 +118,8 @@ Deadline Warnings:
 ## Atomic State Writes
 
 The orchestrator delegates state writes to PES Python code. Pattern:
-1. Write new state to `.sbir/proposal-state.json.tmp`
-2. Copy existing to `.sbir/proposal-state.json.bak`
+1. Write new state to `{state_dir}/proposal-state.json.tmp`
+2. Copy existing to `{state_dir}/proposal-state.json.bak`
 3. Rename `.tmp` to target (atomic on most filesystems)
 
 Do not write state JSON directly from the agent. Use the PES state adapter via Bash tool.

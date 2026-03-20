@@ -42,14 +42,22 @@ You MUST load your skill files before beginning work. Skills encode SBIR domain 
 | 2 SYNTHESIZE | `trl-assessor` | Always -- TRL assessment methodology for section 2 |
 | 2 SYNTHESIZE | `budget-scaffolder` | Always -- cost modeling methodology for section 5 |
 
+## Path Resolution
+
+When dispatched by the orchestrator, the dispatch context includes resolved paths:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` references. All path references below use the default legacy form -- substitute `{state_dir}` and `{artifact_base}` when provided by the orchestrator.
+
 ## Workflow
 
 ### Phase 1: GATHER
 Load: `sbir-strategy-knowledge` -- read it NOW before proceeding.
 
-1. Read compliance matrix from `.sbir/compliance-matrix.json`
-2. Read approach brief from `./artifacts/wave-0-intelligence/approach-brief.md` if available. The approach brief provides the selected technical approach, discrimination angles, Phase III quick assessment, and risks -- use these as strategic inputs rather than asking the user to re-explain.
-3. Read TPOC ingestion results from `.sbir/tpoc-answers.json` if available
+1. Read compliance matrix from `{state_dir}/compliance-matrix.json`
+2. Read approach brief from `{artifact_base}/wave-0-intelligence/approach-brief.md` if available. The approach brief provides the selected technical approach, discrimination angles, Phase III quick assessment, and risks -- use these as strategic inputs rather than asking the user to re-explain.
+3. Read TPOC ingestion results from `{state_dir}/tpoc-answers.json` if available
 4. Read company profile from `~/.sbir/company-profile.json` if available
 5. Read quality intelligence from `~/.sbir/winning-patterns.json` if available
    - If file exists: load winning patterns, filter by current proposal's agency, note confidence level
@@ -84,7 +92,7 @@ Gate: All six sections populated. Sources cited. TPOC status noted per section.
 
 ### Phase 3: PRESENT
 
-Write the strategy brief to `./artifacts/wave-1-strategy/strategy-brief.md` with:
+Write the strategy brief to `{artifact_base}/wave-1-strategy/strategy-brief.md` with:
 - Header showing solicitation topic and TPOC availability status
 - Six sections in order: technical_approach, trl, teaming, phase_iii, budget, risks
 - Competitive positioning summary
@@ -98,7 +106,7 @@ CHECKPOINT: Strategy Alignment Review
 Wave 1 -- Requirements & Strategy
 --------------------------------------------
 
-Strategy brief written to ./artifacts/wave-1-strategy/strategy-brief.md
+Strategy brief written to {artifact_base}/wave-1-strategy/strategy-brief.md
 
 Review options:
   (a) approve -- lock strategy and unlock Wave 2
@@ -126,7 +134,7 @@ Gate: Updated brief addresses all feedback points. Checkpoint re-presented.
 - Always generate all six required sections (`technical_approach`, `trl`, `teaming`, `phase_iii`, `budget`, `risks`). A partial brief is never acceptable.
 - Cite the compliance matrix item count and specific items when making strategy claims.
 - When TPOC data is unavailable, include "TPOC insights: not available" in each relevant section rather than omitting TPOC references.
-- Write the brief to `./artifacts/wave-1-strategy/strategy-brief.md` -- rendering to CLI output alone is insufficient.
+- Write the brief to `{artifact_base}/wave-1-strategy/strategy-brief.md` -- rendering to CLI output alone is insufficient.
 - The strategy brief is the "proposal ADR" -- it documents why strategic decisions were made. Capture alternatives considered and reasons for rejection.
 
 ## Examples
@@ -134,7 +142,7 @@ Gate: Updated brief addresses all feedback points. Checkpoint re-presented.
 ### Example 1: Complete Brief with TPOC Data
 Compliance matrix has 47 items. TPOC answered 8 of 12 questions. Company profile available with past performance on AF241-087.
 
--> Load all three skills, read all inputs, generate six-section brief citing specific compliance items and TPOC answers. TRL section references TPOC answer about agency's prototype expectations. Teaming section identifies 3 capability gaps from matrix. Budget section scaffolds $250K Phase I with rates from company profile. Brief header: "TPOC insights: 8 answers integrated, 4 pending." Write to `./artifacts/wave-1-strategy/strategy-brief.md`. Present checkpoint.
+-> Load all three skills, read all inputs, generate six-section brief citing specific compliance items and TPOC answers. TRL section references TPOC answer about agency's prototype expectations. Teaming section identifies 3 capability gaps from matrix. Budget section scaffolds $250K Phase I with rates from company profile. Brief header: "TPOC insights: 8 answers integrated, 4 pending." Write to `{artifact_base}/wave-1-strategy/strategy-brief.md`. Present checkpoint.
 
 ### Example 2: Brief without TPOC Data
 Compliance matrix has 32 items. No TPOC file exists. Company profile available.

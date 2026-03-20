@@ -54,6 +54,14 @@ You MUST load your skill files before beginning any work. Skills encode solicita
 Skills path for topic-scout-specific: `skills/topic-scout/`
 Skills path for shared skills: `skills/corpus-librarian/`
 
+## Path Resolution
+
+When dispatched by the orchestrator, the dispatch context includes resolved paths:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` references. All path references below use the default legacy form -- substitute `{state_dir}` and `{artifact_base}` when provided by the orchestrator.
+
 ## Workflow
 
 ### Phase 1: INGEST
@@ -89,7 +97,7 @@ For DSIP API sources, `FinderService.search_and_enrich()` enriches pre-filtered 
    ```
    Enrichment completeness: Descriptions N/M | Instructions N/M | Q&A N/M
    ```
-4. Enriched data is automatically cached to `.sbir/dsip_topics.json` with TTL metadata
+4. Enriched data is automatically cached to `{state_dir}/dsip_topics.json` with TTL metadata
 
 Gate: Topic data captured from at least one source. For DSIP API sources: enriched candidates with completeness metrics reported.
 
@@ -116,7 +124,7 @@ Load: `win-loss-analyzer` from `skills/corpus-librarian/` -- read it NOW if corp
 Score each topic against the company capability profile. When enriched descriptions are available (from DSIP enrichment in Phase 1), use them for deeper semantic scoring alongside titles.
 
 1. Read `~/.sbir/company-profile.json` for company capabilities, certifications, key personnel, past performance
-2. Read `.sbir/proposal-state.json` for corpus data and prior proposal outcomes
+2. Read `{state_dir}/proposal-state.json` for corpus data and prior proposal outcomes
 3. Search corpus for past work matching the topic's agency and technical domain
 4. Score five dimensions (each 0.0 to 1.0):
    - **Subject matter expertise**: keyword overlap between topic description (enriched if available) and company capabilities + corpus technical content. Enriched descriptions provide TRL expectations, teaming requirements, and phase-specific technical detail that titles alone cannot convey.
@@ -195,7 +203,7 @@ Gate: Ranked shortlist presented. Human checkpoint reached: Select topic(s) to p
 
 ### Phase 5: RECORD DECISION
 After human selects topic(s) and makes Go/No-Go decision:
-1. For "go": update `.sbir/proposal-state.json` with selected topic metadata, set `go_no_go: "go"`, advance to Wave 1
+1. For "go": update `{state_dir}/proposal-state.json` with selected topic metadata, set `go_no_go: "go"`, advance to Wave 1
 2. For "no-go": set `go_no_go: "no-go"`, archive with rationale
 3. For "defer": set `go_no_go: "pending"`, preserve scored data for future review
 4. Record fit scoring results in state: `fit_scoring.subject_matter`, `fit_scoring.past_performance`, `fit_scoring.certifications`, `fit_scoring.recommendation`

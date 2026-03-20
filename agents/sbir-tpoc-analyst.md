@@ -38,6 +38,14 @@ You MUST load your skill files before beginning any work. Skills encode the ques
 |-------|------|---------|
 | GENERATE or INGEST | `tpoc-domain` | Always -- question taxonomy, 8-category tags, sequencing blocks, delta methodology |
 
+## Path Resolution
+
+When dispatched by the orchestrator, the dispatch context includes resolved paths:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` references. All path references below use the default legacy form -- substitute `{state_dir}` and `{artifact_base}` when provided by the orchestrator.
+
 ## Workflow: Generate Questions
 
 Triggered by: `/proposal tpoc questions`
@@ -45,8 +53,8 @@ Triggered by: `/proposal tpoc questions`
 ### Phase 1: GATHER
 Load: `tpoc-domain` -- read it NOW before proceeding.
 
-1. Read `.sbir/proposal-state.json` to identify current topic and wave status
-2. Read the compliance matrix from `.sbir/compliance-matrix.json`
+1. Read `{state_dir}/proposal-state.json` to identify current topic and wave status
+2. Read the compliance matrix from `{state_dir}/compliance-matrix.json`
 3. Read the solicitation text (path from proposal state)
 4. Read company profile from `~/.sbir/company-profile.json` if available
 5. Read any available research summaries and past proposal excerpts from corpus
@@ -79,7 +87,7 @@ Gate: Questions sequenced for conversational flow. Count within 7-15 range.
 
 ### Phase 4: OUTPUT
 
-1. Write questions to `artifacts/wave-1-strategy/tpoc-questions.md` using the editable question format from the skill (includes checkboxes, category tags, rationale, answer capture template)
+1. Write questions to `{artifact_base}/wave-1-strategy/tpoc-questions.md` using the editable question format from the skill (includes checkboxes, category tags, rationale, answer capture template)
 2. Report question count by category and conversational block
 3. Update proposal state: set TPOC status to `questions_generated`
 
@@ -92,10 +100,10 @@ Triggered by: `/proposal tpoc ingest`
 ### Phase 1: LOAD
 Load: `tpoc-domain` -- read it NOW before proceeding.
 
-1. Read `.sbir/proposal-state.json` to confirm questions were generated
-2. Read the original question file from `artifacts/wave-1-strategy/tpoc-questions.md`
+1. Read `{state_dir}/proposal-state.json` to confirm questions were generated
+2. Read the original question file from `{artifact_base}/wave-1-strategy/tpoc-questions.md`
 3. Read the call notes (user provides path, or notes are appended to question file)
-4. Read the compliance matrix from `.sbir/compliance-matrix.json`
+4. Read the compliance matrix from `{state_dir}/compliance-matrix.json`
 5. If questions were not generated, return error: "Generate questions first with `/proposal tpoc questions`."
 
 Gate: Original questions, call notes, and compliance matrix loaded.
@@ -124,9 +132,9 @@ Gate: Delta analysis complete. Compliance updates identified.
 
 ### Phase 4: OUTPUT
 
-1. Write structured Q&A log to `artifacts/wave-1-strategy/tpoc-qa-log.md`
-2. Write delta analysis to `artifacts/wave-1-strategy/tpoc-delta.md` with per-item classification
-3. Apply compliance updates to `.sbir/compliance-matrix.json`
+1. Write structured Q&A log to `{artifact_base}/wave-1-strategy/tpoc-qa-log.md`
+2. Write delta analysis to `{artifact_base}/wave-1-strategy/tpoc-delta.md` with per-item classification
+3. Apply compliance updates to `{state_dir}/compliance-matrix.json`
 4. Update proposal state: set TPOC status to `answers_ingested`
 5. Report: answered count, unanswered count, delta count by type, contradictions flagged
 
@@ -157,7 +165,7 @@ Compliance matrix has 3 ambiguous items and solicitation mentions "innovative ap
 2. Generate 1 compliance gap question about "innovative approach" criteria (priority 2, tagged approach-validation)
 3. Add 3 strategic probes: competitive-intelligence, transition-pathway, budget-signal (priority 3)
 4. Sequence: 1 opener (scope from ambiguity), 3 core (remaining ambiguities + approach), 2 strategic (competitive + transition), 1 closer (budget)
-5. Write 7 questions to `artifacts/wave-1-strategy/tpoc-questions.md` with rationale per question
+5. Write 7 questions to `{artifact_base}/wave-1-strategy/tpoc-questions.md` with rationale per question
 
 ### Example 2: Ingestion with Partial Answers and Contradictions
 User provides notes where 8 of 23 questions were answered. Two answers contradict solicitation text.

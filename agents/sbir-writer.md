@@ -44,22 +44,30 @@ You MUST load your skill files before beginning work. Skills encode SBIR proposa
 | 2 OUTLINE | `skills/corpus-librarian/proposal-archive-reader.md` | Always -- retrieval patterns for exemplar section structures |
 | 3 DRAFT | `skills/corpus-librarian/proposal-archive-reader.md` | Already loaded -- use Wave 4 retrieval strategy for section drafting |
 | 3 DRAFT | `skills/reviewer/reviewer-persona-simulator.md` | When available -- self-check drafts against evaluation criteria |
-| 3 DRAFT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `.sbir/proposal-state.json` -- load the named style skill (e.g., `elements-of-style.md` for Strunk & White). If not set, no style skill is loaded and standard prose conventions apply. |
+| 3 DRAFT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `{state_dir}/proposal-state.json` -- load the named style skill (e.g., `elements-of-style.md` for Strunk & White). If not set, no style skill is loaded and standard prose conventions apply. |
 | 3 DRAFT | Quality artifacts from `~/.sbir/` | When available -- quality-preferences.json, winning-patterns.json, writing-quality-profile.json. Supplements elements-of-style with company-specific intelligence. Missing artifacts = proceed with defaults. |
+
+## Path Resolution
+
+When dispatched by the orchestrator, the dispatch context includes resolved paths:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` references. All path references below use the default legacy form -- substitute `{state_dir}` and `{artifact_base}` when provided by the orchestrator.
 
 ## Workflow
 
 ### Phase 1: DISCRIMINATE (Wave 3)
 Load: `skills/writer/discrimination-table.md` -- read it NOW before proceeding.
 
-1. Read strategy brief from `./artifacts/wave-1-strategy/strategy-brief.md`
-2. Read compliance matrix from `.sbir/compliance-matrix.json`
+1. Read strategy brief from `{artifact_base}/wave-1-strategy/strategy-brief.md`
+2. Read compliance matrix from `{state_dir}/compliance-matrix.json`
 3. Read company profile from `~/.sbir/company-profile.json` if available
 4. Read designated partner profile from `~/.sbir/partners/{slug}.json` if proposal state has `partner.slug`
-5. Read TPOC Q&A from `.sbir/tpoc-answers.json` if available
+5. Read TPOC Q&A from `{state_dir}/tpoc-answers.json` if available
 6. Build discrimination table with three dimensions: company vs. competitors | technical approach vs. prior art | team discriminators (personnel, facilities, past performance). When partner is designated, team discriminators include partner personnel, partner facilities, and combined capabilities as differentiators.
 6. Feed TPOC insights into discriminator framing where available
-7. Write discrimination table to `./artifacts/wave-3-outline/discrimination-table.md`
+7. Write discrimination table to `{artifact_base}/wave-3-outline/discrimination-table.md`
 8. Present checkpoint for human review
 
 Gate: Discrimination table covers all three dimensions. Each discriminator cites evidence. Written to file.
@@ -72,8 +80,8 @@ Load: `skills/corpus-librarian/proposal-archive-reader.md` -- read it NOW before
 3. Define figure and table placeholders with descriptive captions
 4. Draft section-level thesis statements -- each thesis ties to a discriminator
 5. Pull exemplar section structures from corpus using Wave 3 retrieval strategy
-6. Write proposal outline to `./artifacts/wave-3-outline/proposal-outline.md`
-7. Write figure plan to `./artifacts/wave-3-outline/figure-plan.md`
+6. Write proposal outline to `{artifact_base}/wave-3-outline/proposal-outline.md`
+7. Write figure plan to `{artifact_base}/wave-3-outline/figure-plan.md`
 8. Present checkpoint for human review
 
 Gate: Every compliance item mapped to a section. Page budgets total to solicitation limit. Thesis statements reference discriminators.
@@ -98,7 +106,7 @@ For each section:
 - Check word count against page budget
 - Run acronym audit -- all terms defined on first use
 - Check cross-references -- cited figures exist, section references are valid
-- Write to `./artifacts/wave-4-drafting/sections/{section-name}.md`
+- Write to `{artifact_base}/wave-4-drafting/sections/{section-name}.md`
 - Present checkpoint for human review
 
 Quality intelligence integration (if quality artifacts available):
@@ -129,7 +137,7 @@ Gate: All sections drafted. Compliance matrix fully addressed. No undefined acro
 ### Example 1: Discrimination Table with TPOC Insights
 Strategy brief identifies 3 technical discriminators. TPOC revealed agency has failed prior approach using X. Company profile shows 2 prior awards in related domain.
 
--> Load discrimination-table skill. Build three-dimension table. Technical approach discriminators explicitly contrast with failed prior approach (TPOC insight). Company discriminators cite 2 prior awards with outcomes. Team discriminators highlight key personnel who worked on prior awards. Write to `./artifacts/wave-3-outline/discrimination-table.md`. Present checkpoint.
+-> Load discrimination-table skill. Build three-dimension table. Technical approach discriminators explicitly contrast with failed prior approach (TPOC insight). Company discriminators cite 2 prior awards with outcomes. Team discriminators highlight key personnel who worked on prior awards. Write to `{artifact_base}/wave-3-outline/discrimination-table.md`. Present checkpoint.
 
 ### Example 2: Section Draft Exceeding Page Budget
 Technical approach allocated 8 pages (~4,000 words). First draft reaches 5,200 words.

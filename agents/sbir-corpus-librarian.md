@@ -47,6 +47,14 @@ You MUST load your skill files before beginning any work. Skills encode corpus d
 
 ## Workflow
 
+## Path Resolution
+
+When dispatched by the orchestrator, the dispatch context includes resolved paths:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` references. All path references below use the default legacy form -- substitute `{state_dir}` and `{artifact_base}` when provided by the orchestrator.
+
 ### Phase 1: ORIENT
 Load: `corpus-domain-knowledge` -- read it NOW before proceeding.
 
@@ -62,7 +70,7 @@ Read the request and determine which operation is needed:
 - **Image use**: Select image for reuse in current proposal (Wave 5)
 - **Image flag/unflag**: Mark or clear compliance concerns on an image (any wave)
 
-Read `.sbir/proposal-state.json` if it exists -- corpus paths, known hashes, and outcome records live there. Identify the current wave to tailor retrieval.
+Read `{state_dir}/proposal-state.json` if it exists -- corpus paths, known hashes, and outcome records live there. Identify the current wave to tailor retrieval.
 
 ### Phase 2: EXECUTE
 Load: `proposal-archive-reader` -- read it NOW before proceeding.
@@ -73,7 +81,7 @@ Load: `win-loss-analyzer` -- read it NOW if operation involves outcomes.
 2. Scan for supported files (.pdf, .docx, .txt, .md) using `FilesystemCorpusAdapter` pattern
 3. Compute SHA-256 hash per file, check against `CorpusRegistry` known hashes
 4. Register new entries. Report: new count, duplicate count, unsupported count by type
-5. Update `.sbir/proposal-state.json` corpus section (directories_ingested, document_count, file_hashes)
+5. Update `{state_dir}/proposal-state.json` corpus section (directories_ingested, document_count, file_hashes)
 
 **For listing** (`corpus list`):
 1. Read the corpus registry from state
@@ -106,7 +114,7 @@ Load: `win-loss-analyzer` -- read it NOW if operation involves outcomes.
 **For image operations** (`corpus images <subcommand>`):
 Load: `corpus-image-reuse` -- read it NOW before proceeding.
 
-All image operations delegate to Python services via Bash. Read `.sbir/corpus/image-registry.json` for the image catalog.
+All image operations delegate to Python services via Bash. Read `{state_dir}/corpus/image-registry.json` for the image catalog.
 
 `corpus images list [--type TYPE] [--source PROPOSAL] [--outcome WIN|LOSS] [--agency AGENCY]`:
 1. Call `ImageSearchService.list_images()` with filters
@@ -114,7 +122,7 @@ All image operations delegate to Python services via Bash. Read `.sbir/corpus/im
 3. If catalog is empty, provide onboarding guidance: "No images in corpus. Run `corpus add <directory>` with PDFs or DOCX files containing figures."
 
 `corpus images search "<query>" [--agency AGENCY]`:
-1. Call `ImageSearchService.search()` with query and current proposal context from `.sbir/proposal-state.json`
+1. Call `ImageSearchService.search()` with query and current proposal context from `{state_dir}/proposal-state.json`
 2. Scoring: caption_match * 0.4 + agency_match * 0.25 + outcome_boost * 0.2 + recency * 0.15
 3. Present ranked results with relevance scores and match rationale
 4. If no results, suggest broadening the query or adjusting filters
@@ -128,7 +136,7 @@ All image operations delegate to Python services via Bash. Read `.sbir/corpus/im
 2. Call `ImageAdaptationService.adapt_for_reuse()` with image ID, target section, figure number
 3. Present original and adapted captions side-by-side for human comparison
 4. List any manual review items (embedded text in image that may contain proposal-specific terms)
-5. On approval: image copied to `./artifacts/wave-5-visuals/`, figure inventory updated with `generation_method: "corpus-reuse"`, attribution recorded in figure log
+5. On approval: image copied to `{artifact_base}/wave-5-visuals/`, figure inventory updated with `generation_method: "corpus-reuse"`, attribution recorded in figure log
 
 `corpus images flag <id> --reason "<text>"` | `corpus images unflag <id>`:
 1. Update compliance_flag field in image registry via `ImageFitnessService`

@@ -45,13 +45,21 @@ You MUST load your skill files before beginning any work. Skills encode approach
 
 Skills path: `skills/solution-shaper/`
 
+## Path Resolution
+
+When dispatched by the orchestrator, the dispatch context includes resolved paths:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` references. All path references below use the default legacy form -- substitute `{state_dir}` and `{artifact_base}` when provided by the orchestrator.
+
 ## Workflow
 
 ### Phase 1: DEEP READ
 
 Read and analyze the full solicitation:
 
-1. Read proposal state from `.sbir/proposal-state.json` -- extract topic ID, title, agency, `solicitation_file` path, and confirm `go_no_go: "go"`
+1. Read proposal state from `{state_dir}/proposal-state.json` -- extract topic ID, title, agency, `solicitation_file` path, and confirm `go_no_go: "go"`
 2. If `go_no_go` is not "go": block with "Wave 0 Go decision required. Run `/sbir:proposal status`."
 3. Read full solicitation text from `solicitation_file` path
 4. If solicitation file not found: block with "Solicitation file not found at {path}. Update proposal state or provide file."
@@ -122,7 +130,7 @@ Synthesize scoring into a recommendation:
 5. Phase III quick assessment: primary pathway (government transition / commercial / dual-use), target programs/markets, estimated market relevance
 6. If all approaches score below 0.40: warn "All approaches scored below 0.40. Reconsider the Go decision." Suggest `/sbir:proposal status`
 7. If score spread < 10 percentage points: note "Multiple viable approaches -- no clear winner by composite score." Present tiebreaker considerations
-8. Write `approach-brief.md` to `./artifacts/wave-0-intelligence/` following the schema from the approach-evaluation skill
+8. Write `approach-brief.md` to `{artifact_base}/wave-0-intelligence/` following the schema from the approach-evaluation skill
 
 Gate: Approach brief written. Recommendation with rationale complete.
 
@@ -138,7 +146,7 @@ Wave 0 -- Intelligence & Fit (Approach Selection)
 
 Recommended approach: {approach name} (composite: {score})
 Runner-up: {approach name} (composite: {score})
-Brief written to ./artifacts/wave-0-intelligence/approach-brief.md
+Brief written to {artifact_base}/wave-0-intelligence/approach-brief.md
 
 Review options:
   (a) approve  -- lock approach and unlock Wave 1
@@ -150,17 +158,17 @@ Review options:
 ```
 
 On user decision:
-- **approve**: Update `.sbir/proposal-state.json` with `approach_selection.status: "approved"`, `approach_selection.approach_name: "{name}"`, `approach_selection.composite_score: {score}`. Confirm Wave 1 unlocked.
+- **approve**: Update `{state_dir}/proposal-state.json` with `approach_selection.status: "approved"`, `approach_selection.approach_name: "{name}"`, `approach_selection.composite_score: {score}`. Confirm Wave 1 unlocked.
 - **revise**: Accept user feedback (new constraints, TPOC insights, manual overrides). Re-score affected dimensions. Regenerate brief. Append to revision history. Re-present checkpoint.
 - **explore**: User specifies which approach. Provide deeper analysis: detailed capability mapping, risk breakdown, development roadmap sketch, competitive landscape for that approach.
 - **restart**: Clear approaches. Return to Phase 2 with new generation.
-- **quit**: Save current state with `approach_selection.status: "pending"`. Brief preserved on disk. User can resume later.
+- **quit**: Save current state to `{state_dir}/proposal-state.json` with `approach_selection.status: "pending"`. Brief preserved on disk. User can resume later.
 
 ## Revision Mode (--revise flag)
 
 When invoked with `--revise`:
 
-1. Read existing approach brief from `./artifacts/wave-0-intelligence/approach-brief.md`
+1. Read existing approach brief from `{artifact_base}/wave-0-intelligence/approach-brief.md`
 2. If no brief exists: display "No prior approach selection found. Run `/sbir:proposal shape` first."
 3. Re-read company profile (may have been updated with new teaming partners, personnel)
 4. Re-read proposal state (may have new TPOC insights)
@@ -176,7 +184,7 @@ When invoked with `--revise`:
 - Read the company profile before scoring. Never fabricate company capabilities.
 - Score all 5 dimensions for every approach. Partial scoring produces misleading rankings.
 - Reference specific company data in score rationale. "Strong past performance" is not specific; "AF241-087 Phase I win in fiber laser domain" is.
-- Write approach-brief.md to `./artifacts/wave-0-intelligence/` -- rendering to CLI output alone is insufficient.
+- Write approach-brief.md to `{artifact_base}/wave-0-intelligence/` -- rendering to CLI output alone is insufficient.
 - Present the checkpoint. Never auto-approve an approach selection.
 - When revising, preserve the original selection in the revision history. Decision trails matter for debriefs.
 

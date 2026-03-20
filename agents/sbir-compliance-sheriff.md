@@ -39,12 +39,20 @@ You MUST load your skill files before beginning any work. Skills encode complian
 |-------|------|---------|
 | 1 ORIENT | `compliance-domain` | Always -- extraction patterns, section mappings, matrix format, PES integration |
 
+## Path Resolution
+
+When dispatched by the orchestrator, the dispatch context includes resolved paths:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` references. All path references below (e.g., `.sbir/proposal-state.json`, `.sbir/compliance-matrix.md`) use the default legacy form -- substitute `{state_dir}` and `{artifact_base}` when provided by the orchestrator.
+
 ## Workflow
 
 ### Phase 1: ORIENT
 Load: `compliance-domain` -- read it NOW before proceeding.
 
-1. Read `.sbir/proposal-state.json` to understand current wave and context
+1. Read `{state_dir}/proposal-state.json` to understand current wave and context
 2. Determine the task: generate matrix | check coverage | add item | format audit | final audit
 3. Locate relevant files: solicitation text, existing matrix, proposal sections
 4. If Wave 6 or 7, confirm all proposal volumes exist before proceeding
@@ -68,14 +76,14 @@ Gate: All requirement types extracted. Section mappings applied. Ambiguities fla
 
 1. Build the compliance matrix markdown table per the format in `compliance-domain` skill
 2. Include warnings section if any extraction concerns
-3. Write to `.sbir/compliance-matrix.md`
+3. Write to `{state_dir}/compliance-matrix.md`
 4. Report summary: total items | breakdown by type | count of ambiguities | unmapped items
 
 Gate: Matrix file written. Summary reported.
 
 ### Phase 4: CHECK (compliance check -- any wave)
 
-1. Read existing matrix from `.sbir/compliance-matrix.md`
+1. Read existing matrix from `{state_dir}/compliance-matrix.md`
 2. If no matrix exists, report with guidance to generate one first
 3. Compute coverage breakdown: covered, partial, missing, waived
 4. Report gaps first: list all NOT_STARTED and PARTIAL items with their IDs
@@ -86,7 +94,7 @@ Gate: Coverage report delivered with gaps highlighted.
 
 ### Phase 5: ADD (manual addition -- any wave)
 
-1. Read existing matrix from `.sbir/compliance-matrix.md`
+1. Read existing matrix from `{state_dir}/compliance-matrix.md`
 2. If no matrix exists, report error with guidance
 3. Assign next sequential ID
 4. Set type to MANUAL, status to NOT_STARTED
@@ -98,7 +106,7 @@ Gate: Item added. Matrix integrity preserved.
 
 ### Phase 6: FORMAT AUDIT (Wave 6)
 
-1. Read existing matrix from `.sbir/compliance-matrix.md`
+1. Read existing matrix from `{state_dir}/compliance-matrix.md`
 2. Filter to FORMAT-type requirements
 3. Read each proposal volume and verify formatting compliance: font, margins, page limits, spacing, headers/footers, section numbering, file naming
 4. Update status for each FORMAT item: COVERED if compliant, PARTIAL if minor issues, NOT_STARTED if not yet addressed
@@ -109,7 +117,7 @@ Gate: All FORMAT items verified. Specific remediation for each gap.
 
 ### Phase 7: FINAL AUDIT (Wave 7)
 
-1. Read existing matrix from `.sbir/compliance-matrix.md`
+1. Read existing matrix from `{state_dir}/compliance-matrix.md`
 2. Verify every item is COVERED or WAIVED -- flag any NOT_STARTED or PARTIAL as submission risks
 3. For WAIVED items, confirm rationale exists
 4. Cross-reference: verify attachments, certifications, required forms mentioned in matrix are present in submission package
@@ -131,7 +139,7 @@ Gate: Final compliance verdict delivered. All submission risks surfaced.
 ### Example 1: First-Time Matrix Generation (Wave 1)
 Orchestrator dispatches with solicitation text path. No existing matrix.
 
-1. ORIENT: No `.sbir/compliance-matrix.md` exists -- generating fresh
+1. ORIENT: No `{state_dir}/compliance-matrix.md` exists -- generating fresh
 2. EXTRACT: Read solicitation, find 23 SHALL statements, 8 FORMAT requirements, 5 IMPLICIT from eval criteria
 3. RENDER: Write matrix with 36 items, 5 ambiguities flagged, 3 unmapped items
 4. Report: "36 requirements extracted (23 shall | 8 format | 5 implicit) | 5 ambiguities flagged | 3 items need section assignment"

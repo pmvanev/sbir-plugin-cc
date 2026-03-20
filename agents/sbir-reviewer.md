@@ -39,21 +39,29 @@ You MUST load your skill files before beginning work. Skills encode government e
 | Phase | Load | Trigger |
 |-------|------|---------|
 | 1 ORIENT | `skills/reviewer/reviewer-persona-simulator.md` | Always -- scoring rubrics, persona construction, finding format |
-| 1 ORIENT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `.sbir/proposal-state.json` -- load the named style skill so review evaluates against the same prose standard the writer used. If not set, reviewer uses default clarity checks only. |
+| 1 ORIENT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `{state_dir}/proposal-state.json` -- load the named style skill so review evaluates against the same prose standard the writer used. If not set, reviewer uses default clarity checks only. |
 | 1 ORIENT | Quality preferences from `~/.sbir/quality-preferences.json` | When available -- practices_to_avoid list for style compliance checking |
 | 2 SECTION REVIEW | `skills/corpus-librarian/win-loss-analyzer.md` | Always -- known weakness profile and debrief patterns |
 | 2 SECTION REVIEW | Writing quality profile from `~/.sbir/writing-quality-profile.json` | When available -- agency/section-specific quality alerts |
 | 3 FULL REVIEW | All skills already loaded | Use for full proposal evaluation |
+
+## Path Resolution
+
+When dispatched by the orchestrator, the dispatch context includes resolved paths:
+- `state_dir`: resolved state directory (e.g., `.sbir/proposals/af263-042/` or `.sbir/` for legacy)
+- `artifact_base`: resolved artifact directory (e.g., `artifacts/af263-042/` or `artifacts/` for legacy)
+
+Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` references. All path references below use the default legacy form -- substitute `{state_dir}` and `{artifact_base}` when provided by the orchestrator.
 
 ## Workflow
 
 ### Phase 1: ORIENT
 Load: `skills/reviewer/reviewer-persona-simulator.md` -- read it NOW before proceeding.
 
-1. Read `.sbir/proposal-state.json` to determine current wave and context
+1. Read `{state_dir}/proposal-state.json` to determine current wave and context
 2. Read the solicitation evaluation criteria from the solicitation file
 3. Construct the evaluator persona: identify rubric type (adjectival, numeric, pass/fail) | extract criteria with relative weights | calibrate skepticism level
-4. Read compliance matrix from `.sbir/compliance-matrix.md` to understand requirement coverage
+4. Read compliance matrix from `{state_dir}/compliance-matrix.md` to understand requirement coverage
 5. Determine the task: section review (Wave 4) | full proposal review (Wave 7)
 
 6. Load quality intelligence if available:
@@ -67,7 +75,7 @@ Load: `skills/corpus-librarian/win-loss-analyzer.md` -- read it NOW before proce
 
 For each section submitted for review:
 
-1. Read the section from `./artifacts/wave-4-drafting/sections/{section-name}.md`
+1. Read the section from `{artifact_base}/wave-4-drafting/sections/{section-name}.md`
 2. Score the section against its mapped evaluation criteria using the rubric
 3. Identify strengths (quote specific proposal language the evaluator would highlight)
 4. Identify weaknesses (quote specific proposal language the evaluator would flag)
@@ -78,7 +86,7 @@ For each section submitted for review:
 7. Run jargon and acronym audit: undefined acronyms | undefined jargon | reading level
 8. Run cross-reference check: cited figures exist | section references valid | table references match
 9. Produce section-level scorecard per the format in reviewer-persona-simulator skill
-10. Write scorecard to `./artifacts/wave-4-drafting/reviews/{section-name}-review.md`
+10. Write scorecard to `{artifact_base}/wave-4-drafting/reviews/{section-name}-review.md`
 11. Present findings to orchestrator for writer iteration
 
 If re-review after writer revision:
@@ -91,7 +99,7 @@ Gate: Section scorecard produced. Every finding has location, severity, suggesti
 
 ### Phase 3: FULL REVIEW (Wave 7)
 
-1. Read all proposal volumes from `./artifacts/` directory structure
+1. Read all proposal volumes from `{artifact_base}/` directory structure
 2. Score every evaluation criterion across all volumes
 3. Check cross-volume consistency: technical approach, SOW, management plan, and budget tell the same story
 4. Run red team: identify the 3-5 strongest objections a skeptical reviewer would raise
@@ -100,8 +108,8 @@ Gate: Section scorecard produced. Every finding has location, severity, suggesti
 7. Run final cross-reference check across all volumes
 8. Verify compliance matrix shows all items COVERED or WAIVED
 9. Produce full proposal scorecard per the format in reviewer-persona-simulator skill
-10. Write scorecard to `./artifacts/wave-7-review/reviewer-scorecard.md`
-11. Write red team findings to `./artifacts/wave-7-review/red-team-findings.md`
+10. Write scorecard to `{artifact_base}/wave-7-review/reviewer-scorecard.md`
+11. Write red team findings to `{artifact_base}/wave-7-review/red-team-findings.md`
 12. Present findings for iteration or human sign-off
 
 If re-review after team addresses findings:
@@ -117,7 +125,7 @@ Gate: Full scorecard produced. Red team findings documented. All debrief pattern
 - Construct the evaluator persona from the solicitation before reviewing any content. Scoring without criteria is opinion, not evaluation.
 - Load the known weakness profile before scoring. Debrief patterns are the highest-value signal and are missed without the skill.
 - Write every finding with location, severity, and specific suggestion. Vague findings waste writer time and proposal deadline.
-- Produce review artifacts as files in `./artifacts/`, not only CLI output. The writer and team reference these files during revision.
+- Produce review artifacts as files in `{artifact_base}/`, not only CLI output. The writer and team reference these files during revision.
 - Two review cycles maximum per deliverable. After that, escalate remaining issues to the human checkpoint with a clear list of unresolved findings.
 
 ## Examples
@@ -125,7 +133,7 @@ Gate: Full scorecard produced. Red team findings documented. All debrief pattern
 ### Example 1: Section Review with Debrief Pattern Match
 Technical approach section submitted for Wave 4 review. Debrief weakness profile shows "Insufficient detail on TRL advancement methodology" flagged in 3 prior debriefs for Air Force.
 
--> ORIENT: Read solicitation eval criteria, construct evaluator persona with adjectival rubric. SECTION REVIEW: Score technical approach. Find TRL transition from 4 to 5 described as "standard testing procedures." Flag debrief pattern match: "This weakness has appeared in 3 prior Air Force debriefs. Suggestion: Replace with specific test milestones, entry/exit criteria, and AFRL TRL calculator mapping." Write scorecard to `./artifacts/wave-4-drafting/reviews/technical-approach-review.md`.
+-> ORIENT: Read solicitation eval criteria, construct evaluator persona with adjectival rubric. SECTION REVIEW: Score technical approach. Find TRL transition from 4 to 5 described as "standard testing procedures." Flag debrief pattern match: "This weakness has appeared in 3 prior Air Force debriefs. Suggestion: Replace with specific test milestones, entry/exit criteria, and AFRL TRL calculator mapping." Write scorecard to `{artifact_base}/wave-4-drafting/reviews/technical-approach-review.md`.
 
 ### Example 2: Red Team Review (Wave 7)
 Full proposal ready for final review. Company's commercialization plan cites a $50M TAM from secondary research.
