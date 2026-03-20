@@ -124,7 +124,7 @@ Gate: Human decision recorded. State updated.
 - `proposal draft <section>` -- Dispatch sbir-writer for section drafting (Wave 4).
 - `proposal iterate <section>` -- Dispatch sbir-writer + sbir-reviewer for iteration loop (Wave 4).
 - `proposal format` -- Dispatch sbir-formatter for document formatting (Wave 6).
-- `proposal submit prep` -- Dispatch sbir-submission-agent for packaging (Wave 8).
+- `proposal submit prep` -- Dispatch sbir-submission-agent for packaging (Wave 8). After submission confirmed, execute **Post-Submission Lifecycle Management** (auto-switch or selection prompt).
 - `proposal debrief ingest <path>` -- Dispatch sbir-debrief-analyst for feedback analysis (Wave 9).
 
 ## Multi-Proposal Namespace Creation
@@ -218,6 +218,59 @@ When `proposal switch <topic-id>` is invoked, the orchestrator handles it inline
 6. **Confirm switch**: Display "Switched from: {old-id}" and "Switched to: {new-id}" with proposal titles if available from state.
 7. **Show target status**: Read `.sbir/proposals/{topic-id}/proposal-state.json` and display: current wave, deadline countdown, next suggested action. For completed proposals (Wave 8+), indicate Wave 9 debrief availability.
 
+## Post-Submission Lifecycle Management
+
+After Wave 8 submission is confirmed for a proposal, the orchestrator performs lifecycle management before returning control to the user. This behavior is part of the DISPATCH/CHECKPOINT flow for `proposal submit prep`.
+
+### Completion Determination
+
+A proposal is **completed** when any of these conditions is true:
+
+- `waves["8"]["status"] == "completed"` (submitted)
+- `archived == true`
+- `go_no_go == "no-go"`
+
+All other proposals are **active**.
+
+### Auto-Switch Logic
+
+After submission confirmation for proposal X:
+
+1. **Enumerate remaining proposals**: Glob `.sbir/proposals/*/proposal-state.json`, parse each, classify as active or completed using completion determination rules above.
+2. **Count remaining active proposals** (excluding the just-submitted proposal X).
+
+**Case 1: Exactly one active proposal remains.**
+Auto-switch the active pointer to that proposal. Display:
+```
+AF263-042 submitted successfully.
+Active proposal auto-switched to N244-012 (AUV Navigation) -- Wave 1, 45 days to deadline.
+Next: /sbir:proposal wave strategy
+```
+
+**Case 2: Multiple active proposals remain (2+).**
+Do not auto-switch. Prompt the user to select:
+```
+AF263-042 submitted successfully. Choose active proposal:
+  (1) N244-012 -- AUV Navigation (Wave 1, 45 days)
+  (2) DA-26-003 -- Sensor Fusion (Wave 0, 60 days)
+```
+Wait for user selection. Write the chosen proposal to `.sbir/active-proposal`.
+
+**Case 3: No active proposals remain.**
+All proposals are completed. Display guidance:
+```
+AF263-042 submitted successfully. All proposals completed.
+
+No active proposals remaining.
+  - Start a new proposal: /sbir:proposal new <solicitation>
+  - Await evaluator feedback, then debrief: /sbir:proposal switch <topic-id>
+```
+The `.sbir/active-proposal` file retains the just-submitted proposal (do not clear it).
+
+### Integration with Existing Flow
+
+This logic executes at the end of Phase 4 (CHECKPOINT) for the `proposal submit prep` command, after the submission checkpoint is approved. It does not affect other commands or waves. The auto-switch confirmation message is the last output before returning control to the user.
+
 ## Critical Rules
 
 1. Read state before every action. Stale state leads to wrong routing and lost work.
@@ -303,6 +356,15 @@ User runs `/sbir:proposal wave strategy` without having completed a TPOC call.
 3. DISPATCH: Invoke sbir-strategist, note TPOC data is unavailable
 4. Strategist generates brief with "[TPOC data pending]" markers
 5. CHECKPOINT: Strategy alignment review -- brief notes gaps from missing TPOC input
+
+### Example 6: Auto-Switch After Submission (One Remaining Active)
+Phil submits AF263-042 via `/sbir:proposal submit prep`. Wave 8 checkpoint approved. Orchestrator enumerates proposals: AF263-042 (now completed), N244-012 (Wave 1, active). Exactly one active remains. Auto-switches to N244-012. Output: "AF263-042 submitted successfully. Active proposal auto-switched to N244-012 (AUV Navigation) -- Wave 1, 45 days to deadline. Next: /sbir:proposal wave strategy."
+
+### Example 7: Selection Prompt After Submission (Multiple Remaining Active)
+Phil submits AF263-042 via `/sbir:proposal submit prep`. Orchestrator enumerates: AF263-042 (completed), N244-012 (Wave 1), DA-26-003 (Wave 0). Two active remain. Prompts: "Choose active proposal: (1) N244-012 (2) DA-26-003." Phil selects 1. Active pointer set to N244-012.
+
+### Example 8: All Proposals Completed
+Phil submits his last active proposal. Orchestrator enumerates: all completed. Displays: "All proposals completed. Start a new proposal with `/sbir:proposal new` or switch to a completed proposal for debrief."
 
 ## Constraints
 
