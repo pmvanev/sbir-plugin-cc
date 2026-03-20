@@ -63,6 +63,8 @@ class FigureGenerationResult:
     )
     generation_method: str = ""
     original_method: str = ""
+    prompt_hash: str = ""
+    iteration_count: int = 0
 
 
 class VisualAssetService:
@@ -99,6 +101,8 @@ class VisualAssetService:
             return self._corpus_reuse(placeholder)
         if method == "external":
             return self._create_external_brief(placeholder)
+        if method == "tikz":
+            return self._generate_tikz(placeholder)
         return self._generate_mermaid(placeholder)
 
     def validate_cross_references(
@@ -223,6 +227,20 @@ class VisualAssetService:
             section_id=placeholder.section_id,
             file_path=file_name,
             format="svg",
+        )
+
+    def _generate_tikz(
+        self,
+        placeholder: FigurePlaceholder,
+    ) -> FigureGenerationResult:
+        """Generate TikZ figure specification (pending compilation)."""
+        file_name = f"figure-{placeholder.figure_number}.tex"
+        return FigureGenerationResult(
+            figure_number=placeholder.figure_number,
+            section_id=placeholder.section_id,
+            file_path=file_name,
+            format="tikz",
+            generation_method="tikz",
         )
 
     def _create_external_brief(

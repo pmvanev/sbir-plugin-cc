@@ -1,6 +1,6 @@
 """Unit tests for VisualAssetService (driving port) -- visual asset generation and review.
 
-Test Budget: 11 behaviors x 2 = 22 unit tests max.
+Test Budget: 13 behaviors x 2 = 26 unit tests max.
 Tests enter through driving port (VisualAssetService).
 Driven ports (FigureGenerator, VisualAssetPort) mocked at port boundary.
 Domain objects (FigurePlaceholder, GeneratedFigure, etc.) are real collaborators.
@@ -17,6 +17,8 @@ Behaviors:
 9. Approve corpus-reuse figure changes status to approved
 10. Replace corpus-reuse figure converts to standard generation with log
 11. Cross-reference validation includes corpus-reused figures
+12. TikZ routing returns FigureGenerationResult with format 'tikz'
+13. FigureGenerationResult carries prompt_hash and iteration_count fields
 """
 
 from __future__ import annotations
@@ -495,3 +497,65 @@ class TestCrossRefIncludesCorpusReuse:
 
         assert not log.all_valid
         assert log.orphaned_references[0].referenced_figure == 3
+
+
+# ---------------------------------------------------------------------------
+# Behavior 12: TikZ routing returns FigureGenerationResult with format 'tikz'
+# ---------------------------------------------------------------------------
+
+
+def _tikz_placeholder(*, figure_number: int = 7, section_id: str = "3.5") -> FigurePlaceholder:
+    return FigurePlaceholder(
+        figure_number=figure_number,
+        section_id=section_id,
+        description="Signal processing pipeline diagram",
+        figure_type="block_diagram",
+        generation_method="tikz",
+    )
+
+
+class TestTikzRouting:
+    def test_tikz_method_returns_tikz_format(self):
+        service, _, _, _ = _make_service()
+        placeholder = _tikz_placeholder()
+
+        result = service.generate_figure(placeholder=placeholder)
+
+        assert result.format == "tikz"
+        assert result.figure_number == placeholder.figure_number
+        assert result.section_id == placeholder.section_id
+
+    def test_tikz_does_not_invoke_svg_generator(self):
+        service, gen, _, _ = _make_service()
+        placeholder = _tikz_placeholder()
+
+        service.generate_figure(placeholder=placeholder)
+
+        assert gen.generate_called_with is None
+
+
+# ---------------------------------------------------------------------------
+# Behavior 13: FigureGenerationResult carries prompt_hash and iteration_count
+# ---------------------------------------------------------------------------
+
+
+class TestFigureGenerationResultNewFields:
+    def test_tikz_result_carries_prompt_hash_and_iteration_count(self):
+        service, _, _, _ = _make_service()
+        placeholder = _tikz_placeholder()
+
+        result = service.generate_figure(placeholder=placeholder)
+
+        assert hasattr(result, "prompt_hash")
+        assert hasattr(result, "iteration_count")
+        assert isinstance(result.prompt_hash, str)
+        assert isinstance(result.iteration_count, int)
+
+    def test_existing_methods_default_prompt_hash_and_iteration_count(self):
+        service, _, _, _ = _make_service()
+        placeholder = _mermaid_placeholder()
+
+        result = service.generate_figure(placeholder=placeholder)
+
+        assert result.prompt_hash == ""
+        assert result.iteration_count == 0
