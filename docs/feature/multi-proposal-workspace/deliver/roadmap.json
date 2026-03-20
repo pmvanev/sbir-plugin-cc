@@ -1,265 +1,228 @@
 {
   "roadmap": {
-    "feature": "multi-proposal-workspace",
-    "stories": ["US-MPW-001", "US-MPW-002", "US-MPW-003", "US-MPW-004", "US-MPW-005", "US-MPW-006"],
+    "project_id": "multi-proposal-workspace",
+    "created_at": "2026-03-20T16:00:00Z",
     "total_steps": 9,
-    "estimated_production_files": 14,
-    "step_ratio": 0.64,
-    "paradigm": "OOP with Ports and Adapters"
+    "phases": 4
   },
-  "delivery_methods": {
-    "code/tdd": "Python code in scripts/pes/. Delivered via /nw:execute with nw-software-crafter. TDD with pytest.",
-    "forge/command": "New command markdown file. Delivered via /nw:forge.",
-    "forge/skill": "New skill markdown file. Delivered via /nw:forge or direct write.",
-    "agent/edit": "Modify existing agent markdown behavioral spec. Direct editing.",
-    "command/edit": "Modify existing command markdown. Direct editing.",
-    "skill/edit": "Modify existing skill markdown. Direct editing.",
-    "batch/agent-edit": "Identical pattern edit across multiple agent markdown files. Direct editing."
-  },
-  "rejected_simple_alternatives": [
-    {
-      "alternative": "Configuration-only: environment variable for active proposal",
-      "expected_impact": "30% -- hooks could resolve paths, but agents and commands would still need filesystem detection",
-      "why_insufficient": "Environment variables are session-scoped. Different terminal sessions could disagree on active proposal. File-based pointer persists across sessions."
-    },
-    {
-      "alternative": "Single-file change: modify hook_adapter.main() only",
-      "expected_impact": "40% -- PES hooks would resolve correctly, but agent dispatch, dashboard, and switch command still missing",
-      "why_insufficient": "Path resolution in hooks alone does not deliver multi-proposal UX. Dashboard enumeration, switch command, and agent path updates are required for usability."
-    },
-    {
-      "alternative": "Python enumeration service for dashboard",
-      "expected_impact": "N/A -- wrong delivery surface",
-      "why_insufficient": "Agents use Claude's tools (Glob, Read) to enumerate proposals. They never call Python directly. PES hooks only fire on Claude Code events, not on agent read operations. Enumeration logic belongs in the agent's behavioral spec and supporting skill."
-    }
-  ],
   "phases": [
     {
       "id": "01",
-      "title": "Foundation: Path Resolution for PES Hooks",
+      "name": "Foundation: Path Resolution for PES Hooks",
       "steps": [
         {
           "id": "01-01",
-          "title": "Path resolution module for PES hooks",
+          "name": "Path resolution module for PES hooks",
           "description": "New Python module in scripts/pes/adapters/ that detects workspace layout (multi/legacy/fresh), reads active-proposal pointer, derives state_dir and artifact_base paths. Legacy fallback returns root paths. Used exclusively by hook_adapter.main().",
           "delivery": "code/tdd",
-          "stories": ["US-MPW-004"],
-          "acceptance_criteria": [
+          "criteria": [
             "Multi-proposal layout detected when .sbir/proposals/ exists",
             "Legacy layout detected when .sbir/proposal-state.json at root without proposals/",
             "Fresh workspace detected when neither exists",
             "Missing active-proposal file in multi-proposal workspace returns error with available proposal list",
             "Legacy mode returns root paths identical to current behavior"
           ],
-          "architectural_constraints": [
-            "Adapter layer only -- no domain imports",
-            "Pure function: CWD input, path strings output",
-            "Consumers: hook_adapter.main() only (agents do their own resolution via Read tool)"
-          ]
+          "files_to_modify": [
+            "scripts/pes/adapters/workspace_resolver.py"
+          ],
+          "test_files": [
+            "tests/unit/test_workspace_resolver.py",
+            "tests/acceptance/multi_proposal_workspace/walking-skeleton.feature",
+            "tests/acceptance/multi_proposal_workspace/milestone-01-path-resolution.feature"
+          ],
+          "dependencies": [],
+          "estimated_hours": 2
         },
         {
           "id": "01-02",
-          "title": "Hook adapter integration with path resolution",
+          "name": "Hook adapter integration with path resolution",
           "description": "Replace hardcoded .sbir path in hook_adapter.main() (line 200) with path resolution module call. All hook events use resolved state_dir.",
           "delivery": "code/tdd",
-          "stories": ["US-MPW-004"],
-          "acceptance_criteria": [
+          "criteria": [
             "Hook adapter resolves state_dir via path resolution module",
             "PES enforcement scoped to active proposal state in multi-proposal workspace",
             "Legacy workspaces produce identical hook behavior to current code",
             "Audit log written to per-proposal audit directory"
           ],
-          "architectural_constraints": [
-            "hook_adapter.main() is the only modification point",
-            "audit_dir derived from resolved state_dir"
-          ]
+          "files_to_modify": [
+            "scripts/pes/adapters/hook_adapter.py"
+          ],
+          "test_files": [
+            "tests/unit/test_hook_adapter_workspace.py"
+          ],
+          "dependencies": ["01-01"],
+          "estimated_hours": 2
         }
       ]
     },
     {
       "id": "02",
-      "title": "Multi-Proposal Creation and Legacy Support",
+      "name": "Multi-Proposal Creation and Legacy Support",
       "steps": [
         {
           "id": "02-01",
-          "title": "Per-proposal namespace creation behavior in orchestrator",
+          "name": "Per-proposal namespace creation behavior in orchestrator",
           "description": "Update sbir-orchestrator agent behavioral spec to create .sbir/proposals/{topic-id}/ and artifacts/{topic-id}/ on new proposal. Set active-proposal pointer. Detect and reject namespace collisions. Update proposal-new command docs.",
           "delivery": "agent/edit + command/edit",
-          "stories": ["US-MPW-001"],
-          "acceptance_criteria": [
+          "criteria": [
             "New proposal creates namespaced directories under .sbir/proposals/ and artifacts/",
             "Active-proposal pointer updated to new proposal",
             "Existing proposal state files unchanged after new proposal creation",
             "Namespace collision produces error with --name suggestion",
             "Fresh workspace uses multi-proposal layout from first proposal"
           ],
-          "architectural_constraints": [
-            "Topic ID lowercased for filesystem safety",
-            "Orchestrator uses Bash/Write tools to create directories and files",
-            "No Python code needed -- this is agent filesystem operations"
-          ]
+          "files_to_modify": [
+            "agents/sbir-orchestrator.md",
+            "commands/proposal-new.md"
+          ],
+          "test_files": [],
+          "dependencies": ["01-01", "01-02"],
+          "estimated_hours": 1
         },
         {
           "id": "02-02",
-          "title": "Legacy workspace detection and opt-in migration",
-          "description": "Add legacy detection behavior to orchestrator agent. When /proposal new runs in legacy workspace, prompt for migration. Migration logic: agent-driven file copy/rename via Bash tool (or Python module if atomicity requires it).",
-          "delivery": "agent/edit (+ code/tdd if Python migration module needed)",
-          "stories": ["US-MPW-005"],
-          "acceptance_criteria": [
+          "name": "Legacy workspace detection and opt-in migration",
+          "description": "Add legacy detection behavior to orchestrator agent. When /proposal new runs in legacy workspace, prompt for migration. Migration logic: agent-driven file copy/rename via Bash tool.",
+          "delivery": "agent/edit",
+          "criteria": [
             "Legacy workspace detected and migration prompt shown on /proposal new",
             "Migration moves state to .sbir/proposals/{topic-id}/",
             "Migration moves artifacts to artifacts/{topic-id}/",
             "Original files preserved as .migrated suffix",
             "Legacy workspaces work unchanged without migration"
           ],
-          "architectural_constraints": [
-            "Migration reads topic.id from existing state to derive namespace",
-            "Copy-then-rename pattern to prevent data loss on interruption",
-            "Design decision for crafter: Bash tool file ops vs Python migration module"
-          ]
+          "files_to_modify": [
+            "agents/sbir-orchestrator.md",
+            "commands/proposal-new.md"
+          ],
+          "test_files": [],
+          "dependencies": ["02-01"],
+          "estimated_hours": 1
         }
       ]
     },
     {
       "id": "03",
-      "title": "Context Switching and Dashboard",
+      "name": "Context Switching and Dashboard",
       "steps": [
         {
           "id": "03-01",
-          "title": "Proposal switch command and orchestrator routing",
-          "description": "Create new commands/proposal-switch.md that dispatches to sbir-orchestrator. Update orchestrator agent to handle switch: validate target exists (Glob .sbir/proposals/{id}/), update .sbir/active-proposal (Write tool), display target status summary.",
+          "name": "Proposal switch command and orchestrator routing",
+          "description": "Create new commands/proposal-switch.md that dispatches to sbir-orchestrator. Update orchestrator agent to handle switch. Update wave-agent-mapping skill with switch routing.",
           "delivery": "forge/command + agent/edit + skill/edit",
-          "stories": ["US-MPW-003"],
-          "acceptance_criteria": [
+          "criteria": [
             "Switch updates .sbir/active-proposal to target proposal",
             "Switch confirmation shows from/to proposals and target status",
             "Nonexistent topic ID produces error listing available proposals",
             "Switching to already-active proposal is idempotent with status display",
             "Completed proposals switchable for Wave 9 debrief"
           ],
-          "architectural_constraints": [
-            "New command markdown follows existing command pattern (see proposal-status.md)",
-            "Orchestrator validates target existence via Glob tool",
-            "wave-agent-mapping skill updated with switch routing"
-          ]
+          "files_to_modify": [
+            "commands/proposal-switch.md",
+            "agents/sbir-orchestrator.md",
+            "skills/orchestrator/wave-agent-mapping.md"
+          ],
+          "test_files": [],
+          "dependencies": ["02-01"],
+          "estimated_hours": 1
         },
         {
           "id": "03-02",
-          "title": "Multi-proposal dashboard skill",
-          "description": "Create new skills/continue/multi-proposal-dashboard.md with enumeration patterns, display templates, corruption handling, and deadline sorting. This skill encodes the dashboard behavior that sbir-continue loads when multi-proposal layout is detected.",
+          "name": "Multi-proposal dashboard skill",
+          "description": "Create new skills/continue/multi-proposal-dashboard.md with enumeration patterns, display templates, corruption handling, and deadline sorting.",
           "delivery": "forge/skill",
-          "stories": ["US-MPW-002"],
-          "acceptance_criteria": [
+          "criteria": [
             "Skill documents enumeration pattern: Glob .sbir/proposals/*/proposal-state.json",
             "Skill provides table display template with topic ID, title, wave, deadline, status columns",
             "Skill encodes active/completed separation logic",
             "Skill encodes per-proposal corruption handling (error row, not crash)",
             "Skill encodes deadline-driven suggestion pattern"
           ],
-          "architectural_constraints": [
-            "Skill is domain knowledge, not executable code",
-            "Follows existing skill pattern (see continue-detection.md)"
-          ]
+          "files_to_modify": [
+            "skills/continue/multi-proposal-dashboard.md"
+          ],
+          "test_files": [],
+          "dependencies": [],
+          "estimated_hours": 1
         },
         {
           "id": "03-03",
-          "title": "Continue agent multi-proposal dashboard behavior",
-          "description": "Update sbir-continue agent behavioral spec and continue-detection skill. Add multi-proposal detection priority. When multi-proposal layout detected, load multi-proposal-dashboard skill and display table view. Single-proposal workspaces show familiar display.",
+          "name": "Continue agent multi-proposal dashboard behavior",
+          "description": "Update sbir-continue agent behavioral spec and continue-detection skill. Add multi-proposal detection priority. When multi-proposal layout detected, load multi-proposal-dashboard skill and display table view.",
           "delivery": "agent/edit + skill/edit",
-          "stories": ["US-MPW-002"],
-          "acceptance_criteria": [
+          "criteria": [
             "Dashboard shows table of all proposals with key fields",
             "Active and completed proposals visually separated",
             "Closest deadline drives suggested action",
             "Corrupted state for one proposal shows error row, not crash",
             "Single-proposal workspace shows familiar non-table display"
           ],
-          "architectural_constraints": [
-            "Read-only operation -- no state modifications",
-            "Per-proposal corruption caught and displayed per-row",
-            "Agent uses Glob + Read tools, not Python"
-          ]
+          "files_to_modify": [
+            "agents/sbir-continue.md",
+            "skills/continue/continue-detection.md"
+          ],
+          "test_files": [],
+          "dependencies": ["03-02"],
+          "estimated_hours": 1
         }
       ]
     },
     {
       "id": "04",
-      "title": "Lifecycle Management and Agent Updates",
+      "name": "Lifecycle Management and Agent Updates",
       "steps": [
         {
           "id": "04-01",
-          "title": "Completed proposal lifecycle and auto-switch",
-          "description": "Update orchestrator agent with auto-switch behavior after Wave 8 submission. Dashboard separation (active/completed) already handled by dashboard skill. Add selection prompt when multiple active remain.",
+          "name": "Completed proposal lifecycle and auto-switch",
+          "description": "Update orchestrator agent with auto-switch behavior after Wave 8 submission. Add selection prompt when multiple active proposals remain.",
           "delivery": "agent/edit",
-          "stories": ["US-MPW-006"],
-          "acceptance_criteria": [
+          "criteria": [
             "Auto-switch occurs when exactly one active proposal remains after submission",
             "Selection prompt when multiple active proposals remain",
             "All-completed workspace shows new-proposal or await-debrief guidance"
           ],
-          "architectural_constraints": [
-            "Completion determined by wave 8 status, archived flag, or no-go decision",
-            "Auto-switch logic in orchestrator's submission confirmation flow"
-          ]
+          "files_to_modify": [
+            "agents/sbir-orchestrator.md"
+          ],
+          "test_files": [],
+          "dependencies": ["03-01"],
+          "estimated_hours": 1
         },
         {
           "id": "04-02",
-          "title": "Wave agent and skill path reference updates",
-          "description": "Batch update all 12 wave agents to reference orchestrator-provided resolved artifact base path instead of hardcoded artifacts/ references. Update proposal-state-patterns skill with multi-proposal path conventions.",
+          "name": "Wave agent and skill path reference updates",
+          "description": "Batch update all 12 wave agents to reference orchestrator-provided resolved artifact base path. Update proposal-state-patterns skill with multi-proposal path conventions.",
           "delivery": "batch/agent-edit + skill/edit",
-          "stories": ["US-MPW-004"],
-          "acceptance_criteria": [
+          "criteria": [
             "All agent markdown files reference resolved paths, not hardcoded .sbir/",
             "proposal-state-patterns skill documents multi-proposal path conventions",
             "Wave agents write artifacts to resolved artifact base path from dispatch context"
           ],
-          "architectural_constraints": [
-            "Agents receive paths from orchestrator dispatch context",
-            "Batched update: all 12 wave agents in single step (identical pattern)",
-            "No Python changes -- these are markdown behavioral spec edits"
+          "files_to_modify": [
+            "agents/sbir-compliance-sheriff.md",
+            "agents/sbir-corpus-librarian.md",
+            "agents/sbir-debrief-analyst.md",
+            "agents/sbir-formatter.md",
+            "agents/sbir-researcher.md",
+            "agents/sbir-reviewer.md",
+            "agents/sbir-solution-shaper.md",
+            "agents/sbir-strategist.md",
+            "agents/sbir-submission-agent.md",
+            "agents/sbir-topic-scout.md",
+            "agents/sbir-tpoc-analyst.md",
+            "agents/sbir-writer.md",
+            "skills/orchestrator/proposal-state-patterns.md"
           ],
-          "notes": "This step batches all agent/skill path reference updates. They follow an identical substitution pattern."
+          "test_files": [],
+          "dependencies": ["01-01"],
+          "estimated_hours": 2
         }
       ]
     }
   ],
-  "implementation_scope": {
-    "python_modules_new": [
-      "Path resolution module (~50-80 lines, adapter layer, PES hooks only)"
-    ],
-    "python_modules_modified": [
-      "hook_adapter.py (main() path resolution, line 200)"
-    ],
-    "python_modules_maybe": [
-      "Migration module (~60-80 lines) -- may be agent-driven Bash ops instead"
-    ],
-    "markdown_new": [
-      "commands/proposal-switch.md (forge/command)",
-      "skills/continue/multi-proposal-dashboard.md (forge/skill)"
-    ],
-    "markdown_modified": [
-      "agents/sbir-continue.md (dashboard behavior)",
-      "agents/sbir-orchestrator.md (switch routing, path conventions, auto-switch)",
-      "commands/proposal-new.md (multi-proposal context, --name flag)",
-      "skills/continue/continue-detection.md (multi-proposal detection priority)",
-      "skills/orchestrator/wave-agent-mapping.md (switch command routing)",
-      "skills/orchestrator/proposal-state-patterns.md (multi-proposal paths)",
-      "12 wave agents (batch path reference update)"
-    ],
-    "estimated_production_files": 14,
-    "delivery_method_summary": {
-      "code/tdd": "2 steps (01-01, 01-02) -- Python path resolution for PES",
-      "forge/command": "1 new command (proposal-switch)",
-      "forge/skill": "1 new skill (multi-proposal-dashboard)",
-      "agent/edit": "4 steps (02-01, 03-03, 04-01, + batch 04-02)",
-      "skill/edit": "3 skills modified (continue-detection, wave-agent-mapping, proposal-state-patterns)",
-      "command/edit": "1 command modified (proposal-new)"
-    }
-  },
   "validation": {
+    "status": "approved",
     "step_ratio_check": "9 steps / 14 production files = 0.64 (under 2.5 threshold)",
-    "batching_applied": "Step 04-02 batches all 12 wave agent path reference updates (identical pattern)",
-    "delivery_surface_separation": "Python steps (01-01, 01-02) are clearly separated from markdown steps. No step mixes code/tdd with forge/agent-edit.",
     "story_traceability": {
       "US-MPW-004": ["01-01", "01-02", "04-02"],
       "US-MPW-001": ["02-01"],
