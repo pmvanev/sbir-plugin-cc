@@ -102,6 +102,7 @@ Gate: Human decision recorded. State updated.
 
 ### Status and Navigation
 - `proposal status` -- Read state, render reorientation dashboard. No agent dispatch.
+- `proposal switch <topic-id>` -- Switch active proposal context. See **Proposal Switch** below.
 - `proposal wave <name>` -- Transition to named wave. PES validates prerequisites.
 - `proposal review` -- Trigger human review checkpoint for current wave.
 
@@ -203,6 +204,19 @@ Creating a new proposal MUST NOT modify any existing proposal's state files. The
 ### Shared Resources
 
 The shared corpus (`.sbir/corpus/`), company profile (`~/.sbir/company-profile.json`), and partner profiles (`~/.sbir/partners/`) are accessible to all proposals. During new proposal creation, list available shared resources in the output.
+
+## Proposal Switch
+
+When `proposal switch <topic-id>` is invoked, the orchestrator handles it inline (no specialist dispatch):
+
+1. **Validate layout**: Confirm `.sbir/proposals/` exists. If not, surface error: "Multi-proposal workspace required. Current workspace has only one proposal."
+2. **Read current active**: Read `.sbir/active-proposal` to get the current active topic ID.
+3. **Validate target exists**: Use Glob tool to check `.sbir/proposals/{topic-id}/` exists.
+   - If not found, enumerate `.sbir/proposals/*/` to list available proposals. Surface error using what/why/what-to-do pattern: "No proposal found with topic ID '{topic-id}'. Available proposals: {list}."
+4. **Check idempotent**: If target equals current active, display "'{topic-id}' is already the active proposal" and show status summary. Do not modify any files.
+5. **Write active pointer**: Write `{topic-id}` to `.sbir/active-proposal` (plain text, single line, no trailing newline).
+6. **Confirm switch**: Display "Switched from: {old-id}" and "Switched to: {new-id}" with proposal titles if available from state.
+7. **Show target status**: Read `.sbir/proposals/{topic-id}/proposal-state.json` and display: current wave, deadline countdown, next suggested action. For completed proposals (Wave 8+), indicate Wave 9 debrief availability.
 
 ## Critical Rules
 

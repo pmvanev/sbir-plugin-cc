@@ -39,6 +39,7 @@ description: Wave definitions, agent routing table, and checkpoint gates for the
 | `proposal debrief ingest <path>` | sbir-debrief-analyst | Wave 9 |
 | `proposal review` | sbir-reviewer | Current wave |
 | `proposal status` | Self (orchestrator reads state directly) | Any wave |
+| `proposal switch <topic-id>` | Self (orchestrator validates target, updates active pointer) | Any wave |
 | `proposal wave <name>` | Self (state transition) | Any wave |
 
 ## Wave Transition Rules
