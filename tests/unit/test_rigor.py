@@ -111,6 +111,13 @@ class TestDiffComputer:
         # iteration_cap unchanged
         assert not any(c[0] == "iteration_cap" for c in diff.param_changes)
 
+    def test_detects_roles_added_or_removed_between_profiles(self):
+        old = self._make_profile("standard", {"writer": "standard"})
+        new = self._make_profile("thorough", {"writer": "standard", "researcher": "strongest"})
+        diff = DiffComputer.compute(old, new)
+        # researcher is new in the new profile — should appear as a change
+        assert ("researcher", None, "strongest") in diff.role_changes
+
     def test_same_profile_produces_empty_diff(self):
         profile = self._make_profile("standard", {"writer": "standard"}, 1, 2, 2)
         diff = DiffComputer.compute(profile, profile)
