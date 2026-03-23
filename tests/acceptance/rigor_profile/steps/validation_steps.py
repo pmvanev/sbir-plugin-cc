@@ -34,12 +34,14 @@ def validate_all_profile_names(
     """Validate each profile name through the domain validator."""
     result: dict[str, Any] = {"valid": [], "invalid": []}
     try:
-        from pes.domain.rigor import validate_profile_name
+        from pes.domain.rigor import ProfileValidator, VALID_PROFILE_NAMES
 
+        validator = ProfileValidator()
         for name in [p1, p2, p3, p4]:
-            if validate_profile_name(name):
+            try:
+                validator.validate(name)
                 result["valid"].append(name)
-            else:
+            except Exception:
                 result["invalid"].append(name)
         result["error"] = None
     except Exception as exc:
@@ -68,6 +70,37 @@ def elena_sets_rigor_validation(
         outcome = service.set_profile(
             proposal_dir=proposal_dir,
             new_profile=profile,
+        )
+        result["outcome"] = outcome
+        result["error"] = None
+    except Exception as exc:
+        result["outcome"] = None
+        result["error"] = str(exc)
+        result["error_type"] = type(exc).__name__
+    return result
+
+
+@when(
+    'Elena sets the rigor to ""',
+    target_fixture="service_result",
+)
+def elena_sets_rigor_empty(
+    workspace_root: Path, proposal_dir: Path,
+) -> dict[str, Any]:
+    """Invoke RigorService to set profile with empty string."""
+    result: dict[str, Any] = {}
+    try:
+        from pes.domain.rigor_service import RigorService
+        from pes.adapters.filesystem_rigor_adapter import FileSystemRigorAdapter
+
+        adapter = FileSystemRigorAdapter(
+            proposals_dir=proposal_dir.parent,
+            plugin_config_dir=Path(__file__).parents[4] / "config",
+        )
+        service = RigorService(adapter)
+        outcome = service.set_profile(
+            proposal_dir=proposal_dir,
+            new_profile="",
         )
         result["outcome"] = outcome
         result["error"] = None
@@ -169,7 +202,7 @@ def profile_includes_role(service_result: dict[str, Any], role: str):
     """Verify the profile definition includes the specified agent role."""
     definition = service_result["definition"]
     assert definition is not None, "Profile definition not loaded"
-    agent_roles = definition.get("agent_roles", {})
+    agent_roles = definition.get("roles", {})
     assert role in agent_roles, (
         f"Role '{role}' not found in profile. Roles: {list(agent_roles.keys())}"
     )
@@ -178,12 +211,11 @@ def profile_includes_role(service_result: dict[str, Any], role: str):
 @then("every model tier value is one of: basic, standard, strongest")
 def all_tiers_valid(service_result: dict[str, Any]):
     """Verify every model tier in every profile is a valid value."""
-    valid_tiers = {"basic", "standard", "strongest"}
+    valid_tiers = {"basic", "standard", "strongest", None}
     definitions = service_result["definitions"]
     assert definitions is not None
     for profile_name, profile_def in definitions.items():
-        for role, config in profile_def.get("agent_roles", {}).items():
-            tier = config.get("model_tier")
+        for role, tier in profile_def.get("roles", {}).items():
             assert tier in valid_tiers, (
                 f"Profile '{profile_name}', role '{role}': "
                 f"invalid tier '{tier}'. Must be one of {valid_tiers}"

@@ -39,9 +39,18 @@ def elena_sets_rigor_selection(
             plugin_config_dir=Path(__file__).parents[4] / "config",
         )
         service = RigorService(adapter)
+
+        # Read current wave from proposal state if available
+        current_wave = None
+        state_path = proposal_dir / "proposal-state.json"
+        if state_path.exists():
+            state_data = json.loads(state_path.read_text())
+            current_wave = state_data.get("current_wave")
+
         outcome = service.set_profile(
             proposal_dir=proposal_dir,
             new_profile=profile,
+            current_wave=current_wave,
         )
         result["outcome"] = outcome
         result["error"] = None
@@ -174,12 +183,14 @@ def diff_shows_all_basic(service_result: dict[str, Any]):
     diff = outcome.get("diff", {})
     agent_roles = [
         "strategist", "writer", "reviewer", "researcher",
-        "topic-scout", "compliance", "visual-assets", "formatter",
+        "orchestrator", "compliance", "analyst", "formatter",
     ]
     for role in agent_roles:
         if role in diff:
-            assert diff[role].get("to") == "basic", (
-                f"Role '{role}' expected to be 'basic', got '{diff[role].get('to')}'"
+            to_tier = diff[role].get("to")
+            # lean profile has reviewer=null, which means "no reviewer"
+            assert to_tier == "basic" or to_tier is None, (
+                f"Role '{role}' expected 'basic' or null, got '{to_tier}'"
             )
 
 

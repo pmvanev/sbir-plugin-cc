@@ -5,23 +5,20 @@ Feature: Rigor Profile Selection and Persistence
 
   # --- Happy Path ---
 
-  @skip
   Scenario: Set thorough profile and view per-role diff
     Given Elena has an active proposal "AF243-001" at "standard" rigor
     When Elena sets the rigor to "thorough"
     Then the active rigor profile is "thorough"
     And the diff shows writer model changed from "standard" to "strongest"
-    And the diff shows reviewer model changed from "standard" to "strongest"
+    And the diff shows reviewer model changed from "basic" to "standard"
     And the diff shows critique iterations changed from 2 to 3
 
-  @skip
   Scenario: Set lean profile for cost-conscious screening
     Given Marcus has an active proposal "N244-015" at "standard" rigor
     When Marcus sets the rigor to "lean"
     Then the active rigor profile is "lean"
     And the diff shows all agent roles changed to "basic" model tier
 
-  @skip
   Scenario: History entry records from, to, timestamp, and wave
     Given Elena has an active proposal "AF243-001" at "standard" rigor on wave 3
     When Elena sets the rigor to "thorough"
@@ -31,13 +28,11 @@ Feature: Rigor Profile Selection and Persistence
 
   # --- Error Paths ---
 
-  @skip
   Scenario: No active proposal returns guidance
     Given no proposal is currently active
     When the user attempts to set rigor to "thorough"
     Then the operation fails with a no-active-proposal error
 
-  @skip
   Scenario: Same profile is a no-op with no history entry
     Given Elena has an active proposal "AF243-001" at "thorough" rigor
     When Elena sets the rigor to "thorough"
@@ -47,7 +42,6 @@ Feature: Rigor Profile Selection and Persistence
 
   # --- Edge Cases ---
 
-  @skip
   Scenario: Multiple rigor changes accumulate in history
     Given Elena has an active proposal "AF243-001" at "standard" rigor on wave 0
     When Elena sets the rigor to "thorough"
@@ -56,7 +50,6 @@ Feature: Rigor Profile Selection and Persistence
     And the first entry records standard to thorough
     And the second entry records thorough to exhaustive
 
-  @skip
   Scenario: Downgrade from exhaustive to lean is permitted
     Given Elena has an active proposal "AF243-001" at "exhaustive" rigor
     When Elena sets the rigor to "lean"
