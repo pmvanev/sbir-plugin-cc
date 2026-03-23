@@ -31,7 +31,11 @@ Start a new proposal from a solicitation document. Creates a per-proposal namesp
 8. **Search corpus** -- Find related past work from ingested documents using keyword matching. List shared resources (corpus, company profile, partners).
 9. **Fit scoring** -- Score fit across subject matter, past performance, and certifications
 10. **Format selection** -- Prompt for output format (LaTeX or DOCX). Default is DOCX (press Enter to accept). If the solicitation hints at PDF submission (e.g. "submit as PDF", "PDF format required"), a LaTeX recommendation is displayed. The choice is recorded as `output_format` in proposal state.
-11. **Go/No-Go checkpoint** -- Present analysis and wait for human decision:
+11. **Initialize rigor profile** -- Create `rigor-profile.json` in the proposal namespace with default profile "standard" and empty history array. Then apply suggestion logic based on parsed metadata:
+    - fit >= 80 AND Phase II -> display tip suggesting "thorough" with rationale (high-fit, higher-value contract)
+    - fit < 70 AND Phase I -> display tip suggesting "lean" with rationale (exploratory screening, cost savings)
+    - Otherwise -> no suggestion; just show "Rigor: standard (default)" in creation summary
+12. **Go/No-Go checkpoint** -- Present analysis and wait for human decision:
     - **go** -- Record decision, unlock Wave 1 for proposal writing
     - **no-go** -- Archive the proposal
     - **defer** -- Save state for later decision
@@ -121,6 +125,7 @@ After parsing, you will see:
 - Shared resources available (corpus document count, company profile, partners)
 - Fit scoring and Go/No-Go recommendation
 - Output format prompt (with LaTeX recommendation if PDF submission hinted)
+- Rigor profile (default "standard") with contextual suggestion if applicable
 
 ## Implementation
 
@@ -138,4 +143,6 @@ The Go/No-Go decision is recorded via `ProposalCreationService.record_decision()
 
 @sbir-orchestrator
 
-Parse the solicitation document, create per-proposal namespace, score fit, and present the Go/No-Go checkpoint for human decision.
+Parse the solicitation document, create per-proposal namespace, score fit, initialize rigor-profile.json with "standard" default, apply rigor suggestion logic (fit >= 80 + Phase II -> suggest thorough; fit < 70 + Phase I -> suggest lean), and present the Go/No-Go checkpoint for human decision.
+
+SKILL_LOADING: Load `skills/orchestrator/rigor-resolution.md` for rigor suggestion rendering logic.
