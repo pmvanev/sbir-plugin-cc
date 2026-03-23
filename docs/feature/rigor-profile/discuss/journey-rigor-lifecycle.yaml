@@ -1,0 +1,380 @@
+# Journey Schema: Rigor Profile Lifecycle
+# Feature: rigor-profile
+# Date: 2026-03-23
+# Phase: 2 -- Journey Visualization
+
+journey:
+  name: "Rigor Profile Lifecycle"
+  goal: "Configure and manage quality/cost tradeoffs across SBIR proposals so that investment matches strategic priority"
+  persona: "Dr. Elena Vasquez, PI at Meridian Defense (12 employees, 2-3 proposals/quarter)"
+  secondary_persona: "Marcus Chen, Proposal Manager at NovaTech Solutions (6+ topics screened/quarter, cost-conscious)"
+
+  emotional_arc:
+    start: "Uncertain -- what does each level mean? Am I overspending or underspending?"
+    middle: "Engaged -- I see rigor controlling agent behavior. My must-win gets the strongest models."
+    end: "Confident -- my rigor allocation matches my strategic priorities. I can explain why."
+
+  job_traceability:
+    - job: "J1 -- Right-Size Quality to Proposal Stakes"
+      steps: [3, 7]
+    - job: "J2 -- Control API Costs During Exploratory Work"
+      steps: [5, 6]
+    - job: "J4 -- Manage Multiple Proposals at Different Priority Levels"
+      steps: [4, 5]
+    - job: "J6 -- Understand What Rigor Actually Changes"
+      steps: [1, 2]
+
+steps:
+  - id: 1
+    name: "Discover Rigor Profiles"
+    trigger: "User creates a new proposal with /proposal new"
+    command: "/proposal new <solicitation-file>"
+    jobs: ["J6"]
+
+    tui_mockup: |
+      +-- /proposal new AF243-001 ------------------------------------------+
+      |                                                                      |
+      |  Proposal created: AF243-001 (Compact Directed Energy)               |
+      |  Phase II | $1.7M ceiling | Deadline: 2026-05-15                     |
+      |  Fit score: 85/100                                                   |
+      |  Format: LaTeX                                                       |
+      |  Decision: GO                                                        |
+      |                                                                      |
+      |  Rigor Profile: standard (default)                                   |
+      |                                                                      |
+      |  Tip: This proposal has a high fit score and Phase II value.         |
+      |  Consider /proposal rigor set thorough for maximum quality.          |
+      |  Run /proposal rigor show to compare profiles.                       |
+      |                                                                      |
+      +----------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "fit_score"
+        source: ".sbir/proposals/{topic-id}/proposal-state.json#fit_score"
+        displayed_as: "${fit_score}"
+        consumers: ["proposal-new output", "rigor suggestion logic", "proposal-status"]
+      - name: "contract_value"
+        source: ".sbir/proposals/{topic-id}/proposal-state.json#contract_value"
+        displayed_as: "${contract_value}"
+        consumers: ["proposal-new output", "rigor suggestion logic"]
+      - name: "active_profile"
+        source: ".sbir/proposals/{topic-id}/rigor-profile.json#profile"
+        displayed_as: "${active_profile}"
+        consumers: ["proposal-new output", "proposal-status", "wave execution", "debrief"]
+
+    emotional_state:
+      entry: "Focused on proposal creation, not thinking about rigor"
+      exit: "Aware rigor exists, curious about options, not blocked"
+
+    integration_checkpoint: |
+      rigor-profile.json created with default "standard" profile.
+      Suggestion logic reads fit_score and contract_value from proposal-state.json.
+      No blocking prompt -- user can proceed without interacting with rigor.
+
+  - id: 2
+    name: "Understand and Select Profile"
+    trigger: "User runs /proposal rigor show to compare options"
+    command: "/proposal rigor show [<profile>]"
+    jobs: ["J6", "J1", "J2"]
+
+    tui_mockup: |
+      +-- /proposal rigor show ----------------------------------------------+
+      |                                                                      |
+      |  Rigor Profiles                                                      |
+      |  Active: standard                   Proposal: AF243-001              |
+      |                                                                      |
+      |  Profile     Quality   Cost/Wave   Review   Critique   Best For      |
+      |  ---------   -------   ---------   ------   --------   -----------   |
+      |  lean        Basic     $2-5        1 pass   Skipped    Screening     |
+      |  standard    Balanced  $8-15       2 pass   2 iter     Most work     |
+      |  thorough    Deep      $20-35      2 pass   3 iter     Must-win      |
+      |  exhaustive  Maximum   $40-60      3 pass   4 iter     Critical bid  |
+      |                                                                      |
+      |  Run /proposal rigor show <profile> for full detail.                 |
+      |                                                                      |
+      +----------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "profile_definitions"
+        source: "rigor-profiles.json (plugin-level, read-only)"
+        displayed_as: "comparison table"
+        consumers: ["rigor show output", "rigor set validation"]
+      - name: "active_profile"
+        source: ".sbir/proposals/{topic-id}/rigor-profile.json#profile"
+        displayed_as: "${active_profile}"
+        consumers: ["rigor show header"]
+
+    emotional_state:
+      entry: "Evaluating -- wants clarity on tradeoffs"
+      exit: "Informed -- understands what each level configures and costs"
+
+    integration_checkpoint: |
+      Profile definitions loaded from plugin-level config (not per-proposal).
+      Active profile shown in header for context.
+      Detail view maps agent roles to model tiers (not specific model names).
+
+  - id: 3
+    name: "Execute Waves with Rigor Applied"
+    trigger: "User runs any wave command (strategy, research, outline, draft, etc.)"
+    command: "/proposal strategy | /proposal draft | /proposal wave visuals | etc."
+    jobs: ["J1"]
+
+    tui_mockup: |
+      +-- /proposal strategy (Wave 1 at thorough) --------------------------+
+      |                                                                      |
+      |  Wave 1: Requirements & Strategy                                     |
+      |  Rigor: thorough                                                     |
+      |                                                                      |
+      |  [1/3] Topic analysis...                                             |
+      |         Model: strongest | Depth: comprehensive                      |
+      |  [2/3] Strategy brief...                                             |
+      |         Model: strongest | Reviewing: 2 passes                       |
+      |  [3/3] Compliance pre-check...                                       |
+      |         Model: strongest | Checking: all criteria                    |
+      |                                                                      |
+      |  Strategy brief saved to artifacts/af243-001/wave-1-strategy/        |
+      |                                                                      |
+      +----------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "active_profile"
+        source: ".sbir/proposals/{topic-id}/rigor-profile.json#profile"
+        displayed_as: "Rigor: ${active_profile} in wave header"
+        consumers: ["wave header display", "agent model resolution"]
+      - name: "model_tier"
+        source: "rigor-profiles.json -> profile -> agent_role -> model_tier"
+        displayed_as: "Model: ${model_tier}"
+        consumers: ["wave step display", "agent frontmatter resolution"]
+      - name: "review_depth"
+        source: "rigor-profiles.json -> profile -> review_passes"
+        displayed_as: "Reviewing: ${review_passes} passes"
+        consumers: ["reviewer agent behavior", "wave step display"]
+
+    emotional_state:
+      entry: "Hopeful -- watching for evidence that rigor makes a difference"
+      exit: "Reassured -- model tier and depth visibly controlled by rigor"
+
+    integration_checkpoint: |
+      Every agent resolves model tier from active rigor profile, not hardcoded frontmatter.
+      Wave header shows active rigor level.
+      Per-step progress shows model tier and depth as evidence of rigor application.
+
+  - id: 4
+    name: "Monitor Portfolio with Rigor Context"
+    trigger: "User runs /proposal status to check progress"
+    command: "/proposal status"
+    jobs: ["J4"]
+
+    tui_mockup: |
+      +-- /proposal status --------------------------------------------------+
+      |                                                                      |
+      |  Active: AF243-001 (Compact Directed Energy)                         |
+      |  Phase II | $1.7M | Fit: 85 | Rigor: thorough                       |
+      |  Wave 3: Discrimination & Outline                                    |
+      |  27 days to deadline                                                 |
+      |  Next: /proposal wave outline                                        |
+      |                                                                      |
+      |  Other proposals:                                                    |
+      |  ---------------------------------------------------------------     |
+      |  N244-012  AUV Navigation      Phase I  $250K  Fit: 72  standard     |
+      |  DA244-003 Sensor Fusion        Phase I  $250K  Fit: 58  lean        |
+      |                                                                      |
+      +----------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "active_profile"
+        source: ".sbir/proposals/{topic-id}/rigor-profile.json#profile"
+        displayed_as: "Rigor: ${active_profile}"
+        consumers: ["status active proposal line", "status other proposals table"]
+      - name: "fit_score"
+        source: ".sbir/proposals/{topic-id}/proposal-state.json#fit_score"
+        displayed_as: "Fit: ${fit_score}"
+        consumers: ["status active proposal line", "status other proposals table"]
+
+    emotional_state:
+      entry: "Managing -- need portfolio overview"
+      exit: "Organized -- rigor allocation visible alongside fit scores and contract values"
+
+    integration_checkpoint: |
+      Status reads rigor from each proposal's rigor-profile.json.
+      Rigor shown inline with fit score and contract value for resource allocation story.
+      /proposal switch preserves per-proposal rigor (reads from target proposal namespace).
+
+  - id: 5
+    name: "Adjust Rigor Mid-Proposal"
+    trigger: "New information changes proposal priority (e.g., stronger fit after research)"
+    command: "/proposal rigor set <profile>"
+    jobs: ["J4", "J2"]
+
+    tui_mockup: |
+      +-- /proposal rigor set standard --------------------------------------+
+      |                                                                      |
+      |  Rigor updated: lean -> standard                                     |
+      |  Proposal: DA244-003 (Sensor Fusion)                                 |
+      |                                                                      |
+      |  Changes:                                                            |
+      |    Writer model:     basic -> standard                               |
+      |    Reviewer model:   basic -> standard                               |
+      |    Review passes:    1 -> 2                                          |
+      |    Critique loops:   Skipped -> 2 iter                               |
+      |                                                                      |
+      |  Waves 0-2 retain their existing artifacts (produced at lean).       |
+      |  Wave 3+ will use standard settings.                                 |
+      |                                                                      |
+      |  Note: Earlier waves were produced at lean rigor.                    |
+      |  Run /proposal iterate <section> to re-process specific sections     |
+      |  at the new rigor level if needed.                                   |
+      |                                                                      |
+      +----------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "active_profile"
+        source: ".sbir/proposals/{topic-id}/rigor-profile.json#profile"
+        displayed_as: "${previous_profile} -> ${new_profile}"
+        consumers: ["rigor set output", "all subsequent wave executions"]
+      - name: "rigor_history"
+        source: ".sbir/proposals/{topic-id}/rigor-profile.json#history"
+        displayed_as: "profile changes array"
+        consumers: ["rigor set output", "debrief summary"]
+      - name: "current_wave"
+        source: ".sbir/proposals/{topic-id}/proposal-state.json#current_wave"
+        displayed_as: "Wave ${current_wave}+"
+        consumers: ["rigor set output (forward-application message)"]
+
+    emotional_state:
+      entry: "Decisive -- new information warrants a priority change"
+      exit: "Confident -- change was smooth, no lost work, clear on what changes"
+
+    integration_checkpoint: |
+      Rigor change is metadata-only write to rigor-profile.json.
+      No re-run triggered. Existing artifacts preserved.
+      History array appended with timestamp, previous profile, new profile, and current wave.
+      Forward-application message uses current_wave from proposal-state.json.
+
+  - id: 6
+    name: "Cost-Conscious Exploration"
+    trigger: "User screening multiple topics, wants cheap go/no-go"
+    command: "/proposal rigor set lean"
+    jobs: ["J2"]
+
+    tui_mockup: |
+      +-- /proposal rigor set lean ------------------------------------------+
+      |                                                                      |
+      |  Rigor updated: standard -> lean                                     |
+      |  Proposal: N244-015 (Undersea Acoustic Sensing)                      |
+      |                                                                      |
+      |  Lean profile optimizes for speed and cost:                          |
+      |    All agents:       basic model tier                                |
+      |    Review passes:    1 (structural only)                             |
+      |    Critique loops:   Skipped                                         |
+      |    Estimated cost:   $2-5 per wave                                   |
+      |                                                                      |
+      +----------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "active_profile"
+        source: ".sbir/proposals/{topic-id}/rigor-profile.json#profile"
+        displayed_as: "${active_profile}"
+        consumers: ["all wave executions for this proposal"]
+
+    emotional_state:
+      entry: "Efficient -- wants speed and low cost for screening"
+      exit: "Smart about spending -- exploration is cheap, deep work is reserved"
+
+    integration_checkpoint: |
+      Lean profile applies basic model tier to all agent roles.
+      Review depth reduced to structural-only (no evaluator scoring).
+      Critique loops skipped entirely.
+
+  - id: 7
+    name: "Debrief with Rigor Context"
+    trigger: "User runs /proposal debrief after submission"
+    command: "/proposal debrief"
+    jobs: ["J1"]
+
+    tui_mockup: |
+      +-- /proposal debrief (Wave 9) ----------------------------------------+
+      |                                                                      |
+      |  Proposal: AF243-001 (Compact Directed Energy)                       |
+      |  Rigor: thorough (used throughout)                                   |
+      |                                                                      |
+      |  Rigor Summary:                                                      |
+      |    Profile:          thorough                                        |
+      |    Waves completed:  10/10                                           |
+      |    Review cycles:    24 total (avg 2.4/section)                      |
+      |    Critique loops:   8 figures, 3 iterations avg                     |
+      |    Profile changes:  None (thorough from start)                      |
+      |                                                                      |
+      |  This information is recorded for future rigor decisions.            |
+      |  If you receive evaluation feedback, re-run debrief to correlate     |
+      |  rigor settings with reviewer scores.                                |
+      |                                                                      |
+      +----------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "rigor_history"
+        source: ".sbir/proposals/{topic-id}/rigor-profile.json#history"
+        displayed_as: "Profile changes: ${change_count}"
+        consumers: ["debrief rigor summary"]
+      - name: "review_cycle_count"
+        source: ".sbir/proposals/{topic-id}/proposal-state.json#review_cycles"
+        displayed_as: "Review cycles: ${total} total"
+        consumers: ["debrief rigor summary"]
+      - name: "critique_loop_count"
+        source: ".sbir/proposals/{topic-id}/proposal-state.json#critique_loops"
+        displayed_as: "Critique loops: ${figure_count} figures"
+        consumers: ["debrief rigor summary"]
+
+    emotional_state:
+      entry: "Reflective -- was the investment worth it?"
+      exit: "Satisfied -- clear record of effort applied, ready to correlate with results"
+
+    integration_checkpoint: |
+      Debrief reads rigor history from rigor-profile.json.
+      Review cycle and critique loop counts from proposal-state.json.
+      Data preserved for future rigor selection (informing Job 6 long-term).
+
+error_paths:
+  - id: "E1"
+    trigger: "Unknown profile name"
+    command: "/proposal rigor set ultra"
+    response: |
+      Error: Unknown rigor profile "ultra".
+      Available profiles: lean, standard, thorough, exhaustive
+      Run /proposal rigor show to compare profiles.
+    emotional_design: "Helpful, not punishing. Lists valid options immediately."
+
+  - id: "E2"
+    trigger: "No active proposal"
+    command: "/proposal rigor set thorough"
+    response: |
+      Error: No active proposal.
+      Start a proposal with /proposal new <solicitation-file>
+      or switch to an existing one with /proposal switch <topic-id>.
+    emotional_design: "Guides to resolution with concrete next steps."
+
+  - id: "E3"
+    trigger: "Profile already active"
+    command: "/proposal rigor set thorough (when already thorough)"
+    response: |
+      Rigor is already set to "thorough" for AF243-001.
+      No changes made.
+    emotional_design: "Reassuring, not an error. Confirms current state."
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "active_profile"
+      must_match_across: [1, 2, 3, 4, 5, 6, 7]
+      failure_message: "Active rigor profile shown in status, wave headers, and rigor commands must all read from the same rigor-profile.json source"
+
+    - artifact: "fit_score"
+      must_match_across: [1, 4]
+      failure_message: "Fit score shown in proposal-new and proposal-status must both read from proposal-state.json"
+
+    - artifact: "profile_definitions"
+      must_match_across: [2, 3]
+      failure_message: "Profile comparison table and agent model resolution must use the same profile definitions source"
+
+    - artifact: "rigor_history"
+      must_match_across: [5, 7]
+      failure_message: "Rigor change history recorded in step 5 must match what debrief displays in step 7"
