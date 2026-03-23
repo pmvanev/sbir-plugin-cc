@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "profiles": {
+    "lean": {
+      "roles": {
+        "writer": "basic",
+        "reviewer": null,
+        "researcher": "basic",
+        "strategist": "basic",
+        "formatter": "basic",
+        "orchestrator": "basic",
+        "compliance": "basic",
+        "analyst": "basic"
+      },
+      "review_passes": 0,
+      "critique_max_iterations": 0,
+      "iteration_cap": 1
+    },
+    "standard": {
+      "roles": {
+        "writer": "standard",
+        "reviewer": "basic",
+        "researcher": "standard",
+        "strategist": "standard",
+        "formatter": "standard",
+        "orchestrator": "standard",
+        "compliance": "standard",
+        "analyst": "standard"
+      },
+      "review_passes": 1,
+      "critique_max_iterations": 2,
+      "iteration_cap": 2
+    },
+    "thorough": {
+      "roles": {
+        "writer": "strongest",
+        "reviewer": "standard",
+        "researcher": "strongest",
+        "strategist": "strongest",
+        "formatter": "standard",
+        "orchestrator": "standard",
+        "compliance": "standard",
+        "analyst": "standard"
+      },
+      "review_passes": 2,
+      "critique_max_iterations": 3,
+      "iteration_cap": 2
+    },
+    "exhaustive": {
+      "roles": {
+        "writer": "strongest",
+        "reviewer": "strongest",
+        "researcher": "strongest",
+        "strategist": "strongest",
+        "formatter": "strongest",
+        "orchestrator": "strongest",
+        "compliance": "strongest",
+        "analyst": "strongest"
+      },
+      "review_passes": 2,
+      "critique_max_iterations": 3,
+      "iteration_cap": 2
+    }
+  }
+}
