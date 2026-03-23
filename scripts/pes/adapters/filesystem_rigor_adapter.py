@@ -104,3 +104,20 @@ class FilesystemRigorAdapter(
         text = config_file.read_text(encoding="utf-8")
         result_config: dict[str, Any] = json.loads(text)
         return result_config
+
+
+class FileSystemRigorAdapter(FilesystemRigorAdapter):
+    """Convenience adapter that stores config paths for RigorService integration.
+
+    Wraps FilesystemRigorAdapter with constructor-injected paths,
+    matching the interface expected by acceptance tests.
+    """
+
+    def __init__(
+        self,
+        proposals_dir: Path,
+        plugin_config_dir: Path,
+    ) -> None:
+        super().__init__()
+        self.proposals_dir = proposals_dir
+        self.plugin_config_dir = plugin_config_dir

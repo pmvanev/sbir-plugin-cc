@@ -117,17 +117,6 @@ def resolve_model_tier_for_role(
 # --- Then steps ---
 
 
-@then(parsers.parse('the active rigor profile is "{profile}"'))
-def rigor_profile_is(proposal_dir: Path, profile: str):
-    """Verify the persisted rigor profile matches expected value."""
-    rigor_path = proposal_dir / "rigor-profile.json"
-    assert rigor_path.exists(), f"rigor-profile.json not found at {rigor_path}"
-    data = json.loads(rigor_path.read_text())
-    assert data["profile"] == profile, (
-        f"Expected profile '{profile}', got '{data['profile']}'"
-    )
-
-
 @then(
     parsers.parse(
         'the change from "{old_profile}" to "{new_profile}" is recorded in history'

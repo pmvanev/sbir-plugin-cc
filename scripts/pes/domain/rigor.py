@@ -76,3 +76,22 @@ class DiffComputer:
             role_changes=role_changes,
             param_changes=param_changes,
         )
+
+
+def compute_rigor_suggestion(
+    fit_score: int,
+    phase: str,
+    contract_value: float | None = None,
+) -> str | None:
+    """Compute a contextual rigor profile suggestion.
+
+    Rules:
+    - fit >= 80 AND Phase II -> suggest "thorough"
+    - fit < 70 AND Phase I -> suggest "lean"
+    - otherwise -> None (no suggestion)
+    """
+    if fit_score >= 80 and phase == "II":
+        return "thorough"
+    if fit_score < 70 and phase == "I":
+        return "lean"
+    return None
