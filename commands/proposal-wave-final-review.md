@@ -36,6 +36,15 @@ Run simulated government evaluator review with red team analysis, debrief cross-
 - `.sbir/proposal-state.json` -- Current wave and proposal context
 - `.sbir/compliance-matrix.md` -- Requirement coverage status
 - Solicitation file (path from proposal state) -- Evaluation criteria for persona construction
+- `.sbir/proposals/{id}/rigor-profile.json` -- Rigor profile used during drafting (default "standard" if missing)
+
+## Rigor Context for Review
+
+Read the rigor profile before beginning the review. This is informational context, not a gate.
+
+- **lean**: Sections were drafted without writer-reviewer iteration (review_passes=0, no critique loops). Expect rougher prose and less-refined arguments. Reviewer should note quality gaps attributable to skipped review passes.
+- **standard**: One review pass was applied. Standard quality baseline.
+- **thorough/exhaustive**: Full critique loops were used during drafting. Sections have been through multiple writer-reviewer iterations. Quality should be higher; focus review on strategic coherence rather than prose polish.
 
 ## Agent Invocation
 

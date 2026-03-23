@@ -112,13 +112,25 @@ Generate the lessons-learned summary using the structured YAML format from the d
 1. Compile strengths (to replicate) and weaknesses (to address)
 2. Draft strategic adjustments for the next cycle
 3. Compute updated win/loss metrics (overall and per-agency)
-4. Write lessons-learned to `{artifact_base}/wave-9-debrief/{proposal_id}-lessons-learned.md`
-5. Update `{state_dir}/proposal-state.json` with analytics data for downstream agents
-6. Present the lessons-learned summary for human checkpoint review
-7. After completing lessons-learned synthesis, suggest quality profile update:
+4. Generate rigor summary section (see below)
+5. Write lessons-learned to `{artifact_base}/wave-9-debrief/{proposal_id}-lessons-learned.md`
+6. Update `{state_dir}/proposal-state.json` with analytics data for downstream agents
+7. Present the lessons-learned summary for human checkpoint review
+8. After completing lessons-learned synthesis, suggest quality profile update:
    "Quality intelligence can be updated with this cycle's results.
    Run /sbir:proposal quality update to incorporate new evaluator feedback
    into your writing quality playbook."
+
+### Rigor Summary in Lessons Learned
+
+Include a "Rigor Profile" section in every lessons-learned artifact. Read `{state_dir}/rigor-profile.json` (default "standard" if missing).
+
+**Contents:**
+- **Active profile**: The rigor level used for this proposal (lean/standard/thorough/exhaustive)
+- **Change history**: If `rigor-profile.json` contains a `history` array, list each change with from/to/timestamp/wave. Mid-proposal rigor changes are a factor in outcome analysis -- highlight them.
+- **Quality steps skipped** (lean profile): No writer-reviewer iteration (review_passes=0), no critique-refine loops (critique_max_iterations=0). Note these explicitly so the user can correlate with evaluator feedback on quality gaps.
+- **Quality steps applied** (thorough/exhaustive): Full critique loops, multiple review passes. Note these so the user can assess ROI of higher rigor.
+- **Calibration insight**: If the proposal lost on quality-related criteria and rigor was lean, note that upgrading rigor may address the gap. If the proposal won with lean rigor, note that lean was sufficient for this topic type.
 
 ## Critical Rules
 
