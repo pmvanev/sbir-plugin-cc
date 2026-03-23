@@ -42,6 +42,33 @@ description: Wave definitions, agent routing table, and checkpoint gates for the
 | `proposal switch <topic-id>` | Self (orchestrator validates target, updates active pointer) | Any wave |
 | `proposal wave <name>` | Self (state transition) | Any wave |
 
+## Agent-Role Mapping for Rigor
+
+Maps each agent to a rigor role for model tier resolution. Used by the orchestrator's rigor resolution chain to determine which model tier applies to each agent dispatch.
+
+| Agent | Rigor Role |
+|-------|-----------|
+| sbir-writer | writer |
+| sbir-reviewer | reviewer |
+| sbir-researcher | researcher |
+| sbir-strategist | strategist |
+| sbir-solution-shaper | strategist |
+| sbir-tpoc-analyst | strategist |
+| sbir-formatter | formatter |
+| sbir-orchestrator | orchestrator |
+| sbir-compliance-sheriff | compliance |
+| sbir-debrief-analyst | analyst |
+| sbir-topic-scout | analyst |
+| sbir-corpus-librarian | analyst |
+| sbir-setup-wizard | analyst |
+| sbir-continue | analyst |
+| sbir-profile-builder | analyst |
+| sbir-partner-builder | analyst |
+| sbir-quality-discoverer | analyst |
+| sbir-submission-agent | analyst |
+
+Unmapped agents (not in this table) default to the `orchestrator` role tier.
+
 ## Wave Transition Rules
 
 Waves are sequential with PES enforcement. The orchestrator does not duplicate enforcement logic -- PES hooks block invalid transitions at the platform level.

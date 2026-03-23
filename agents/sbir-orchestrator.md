@@ -7,6 +7,7 @@ maxTurns: 40
 skills:
   - wave-agent-mapping
   - proposal-state-patterns
+  - rigor-resolution
 ---
 
 # sbir-orchestrator
@@ -40,6 +41,7 @@ You MUST load your skill files before beginning work. Skills encode wave routing
 |-------|------|---------|
 | 1 ORIENT | `proposal-state-patterns` | Always -- state reading and status rendering |
 | 2 ROUTE | `wave-agent-mapping` | Always -- command-to-agent routing |
+| 3 DISPATCH | `rigor-resolution` | Always -- rigor profile resolution before agent dispatch |
 
 ## Workflow
 
@@ -67,13 +69,32 @@ Load: `wave-agent-mapping` -- read it NOW before proceeding.
 Gate: Target agent identified. Context prepared.
 
 ### Phase 3: DISPATCH
+Load: `rigor-resolution` -- read it NOW before proceeding.
 
-1. Invoke the specialist agent via Task tool with command context
+Before dispatching any specialist agent, resolve rigor:
+1. Read active proposal's `rigor-profile.json` from `.sbir/proposals/{topic-id}/rigor-profile.json`. If missing, default to `"standard"` silently -- no error, no prompt to configure.
+2. Read `config/rigor-profiles.json` from the plugin directory to get the profile definition.
+3. Look up the target agent's role using the Agent-Role Mapping table in the rigor-resolution skill.
+4. Get the model tier for that role from the profile definition. If tier is `null`, skip dispatch of that agent entirely.
+5. Resolve model tier to concrete model ID using `config/model-tiers.json` (or `.sbir/model-tiers.json` if user override exists).
+6. Pass the resolved model ID as the `model` parameter in the Task tool invocation.
+7. Include behavioral parameters (`review_passes`, `critique_max_iterations`, `iteration_cap`) from the profile definition in the task prompt context.
+
+Then execute the dispatch:
+1. Invoke the specialist agent via Task tool with command context and resolved model
 2. Pass relevant state and artifact paths
 3. Monitor for completion or errors
 4. Record results in proposal state via PES state adapter (Bash tool)
 
 Gate: Specialist completed successfully. Results captured.
+
+### Wave Header Display
+
+When rendering wave headers in output, display the active rigor level:
+```
+Wave N: {wave-name} [Rigor: {profile}]
+```
+If `rigor-profile.json` is missing (pre-rigor proposal), display `[Rigor: standard]`.
 
 ### Phase 4: CHECKPOINT
 
