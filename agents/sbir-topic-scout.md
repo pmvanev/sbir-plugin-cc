@@ -5,6 +5,7 @@ model: inherit
 tools: Read, Glob, Grep, Bash
 maxTurns: 30
 skills:
+  - dsip-cli-usage
   - solicitation-intelligence
   - dsip-enrichment
   - fit-scoring-methodology
@@ -42,6 +43,7 @@ You MUST load your skill files before beginning any work. Skills encode solicita
 
 | Phase | Load | Trigger |
 |-------|------|---------|
+| 1 INGEST | `dsip-cli-usage` | Always -- exact CLI commands for topic retrieval |
 | 1 INGEST | `solicitation-intelligence` | Always -- source identification, scraping patterns, format parsing |
 | 1 INGEST | `dsip-enrichment` | Always -- DSIP topic detail structure, completeness assessment |
 | 2 PARSE | `solicitation-intelligence` | Already loaded in Phase 1 |
@@ -65,39 +67,52 @@ Use these resolved paths instead of hardcoded `.sbir/` and `artifacts/` referenc
 ## Workflow
 
 ### Phase 1: INGEST
+Load: `dsip-cli-usage` -- read it NOW before proceeding. This skill defines the exact CLI commands.
 Load: `solicitation-intelligence` -- read it NOW before proceeding.
 Load: `dsip-enrichment` -- read it NOW before proceeding.
 
-Identify solicitation sources and gather topic data. For DSIP API sources, check cache freshness and enrich candidates before scoring.
+Identify solicitation sources and gather topic data.
 
-#### 1a. Cache Check (DSIP API source)
-Before fetching from the DSIP API, check whether cached enriched data is available and fresh:
-1. Call `FinderService.search_and_enrich(filters, ttl_hours=24)` which checks `TopicCachePort.is_fresh(ttl_hours)`
-2. If cache is fresh: present the user with a choice:
-   - **Use cached data**: proceed directly to SCORE phase with cached enriched topics
-   - **Re-scrape**: bypass cache and fetch fresh data from DSIP API
-3. If cache is stale or absent: proceed to fetch and enrich (steps 1b-1d below)
+#### 1a. DSIP API Source (primary)
+Use the DSIP CLI (`scripts/dsip_cli.py`) via Bash. **Never import or instantiate Python adapters directly.** The CLI wires all adapters, caching, and error handling internally.
 
-#### 1b. Fetch
-Accept input from one of these sources:
-1. DSIP API: `FinderService.search_and_enrich()` fetches via `TopicFetchPort` with pagination, retry, rate limiting
-2. Local file: solicitation URL, local PDF/text file, or directory of solicitations
-3. For URLs: fetch page content using Bash (curl/wget) | extract solicitation text
-4. For local files: read directly using Read tool
-5. For directories: scan for .pdf, .txt, .md files and process each
+**Quick scan** (metadata only, no detail API calls):
+```bash
+python scripts/dsip_cli.py fetch --status Open
+```
 
-#### 1c. Pre-Filter
-After fetching, `FinderService` applies `KeywordPreFilter` using company profile capabilities to reduce candidates from hundreds to tens.
+**Full enrichment** (descriptions, Q&A, solicitation + component instructions):
+```bash
+python scripts/dsip_cli.py enrich --status Open
+```
 
-#### 1d. Enrich and Report Completeness
-For DSIP API sources, `FinderService.search_and_enrich()` enriches pre-filtered candidates via `TopicEnrichmentPort`:
-1. Per-topic PDF download extracts: description, submission instructions, component instructions, Q&A entries
-2. Per-topic failures are isolated (logged, do not stop batch)
-3. After enrichment, report completeness metrics to the user:
-   ```
-   Enrichment completeness: Descriptions N/M | Instructions N/M | Q&A N/M
-   ```
-4. Enriched data is automatically cached to `{state_dir}/dsip_topics.json` with TTL metadata
+**With capability pre-filter** (eliminates irrelevant topics before enrichment):
+```bash
+python scripts/dsip_cli.py enrich --status Open --capabilities "software,cyber,AI"
+```
+
+**Single topic detail** (drill into one topic by hash ID):
+```bash
+python scripts/dsip_cli.py detail --topic-id 7051b2da4a1e4c52bd0e7daf80d514f7_86352
+```
+
+The CLI outputs JSON to stdout. Parse it to extract topics, messages, and completeness metrics. Cache is automatic -- a second call within 24 hours uses cached data.
+
+#### 1b. Local File Source (fallback)
+When the DSIP API is unavailable or the user provides a file:
+1. For URLs: fetch page content using Bash (curl/wget) | extract solicitation text
+2. For local files: read directly using Read tool
+3. For directories: scan for .pdf, .txt, .md files and process each
+
+#### 1c. Report Completeness
+After DSIP CLI enrichment, report completeness from the JSON output `messages` array. The CLI reports 4 data types:
+```
+Keyword match: N candidate topics (M eliminated)
+Descriptions: N/M
+Q&A: N/M
+Solicitation Instructions: N/M
+Component Instructions: N/M
+```
 
 Gate: Topic data captured from at least one source. For DSIP API sources: enriched candidates with completeness metrics reported.
 
@@ -135,8 +150,12 @@ Score each topic against the company capability profile. When enriched descripti
 5. Compute composite score: weighted average (subject_matter=0.35, past_performance=0.25, certifications=0.15, eligibility=0.15, sttr=0.10)
 6. Generate recommendation per topic: "go" (composite >= 0.6 with no zero-score dimensions) | "evaluate" (composite 0.3-0.6 or any dimension at 0.0) | "no-go" (composite < 0.3 or disqualifying eligibility issue)
 
-**Batch scoring mode**: Use `TopicScoringService` from `scripts/pes/domain/topic_scoring.py`:
-- `score_batch(topics, profile, partner_profile)` scores all candidates and returns sorted by composite descending
+**Batch scoring mode**: Use the DSIP CLI score command which calls TopicScoringService internally:
+```bash
+python scripts/dsip_cli.py score --status Open
+```
+The `score` command runs the full pipeline (fetch + enrich + score) and returns scored results in JSON.
+- `scored` array contains candidates sorted by composite descending
 - When partner profiles exist at `~/.sbir/partners/`, score each topic TWICE: solo and with each partner
 - Disqualifiers (TS clearance gap, STTR without partner) produce immediate NO-GO
 - Missing past performance caps recommendations at EVALUATE (never false NO-GO from data absence)

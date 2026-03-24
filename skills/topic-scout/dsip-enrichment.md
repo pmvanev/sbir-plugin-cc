@@ -5,111 +5,99 @@ description: Domain knowledge for interpreting DSIP topic detail structure, Q&A 
 
 # DSIP Topic Enrichment
 
-## DSIP Topic Detail Structure
+## Data Sources
 
-Each DSIP topic has a detail page/PDF containing structured sections beyond the listing metadata. The enrichment process downloads per-topic PDFs via `GET /topics/api/public/topics/{hash_id}/download/PDF` and extracts these sections.
+Enrichment uses 3 DSIP API endpoints per topic, plus instruction PDF downloads. No browser or PDF-only extraction — all data comes from structured API responses.
 
-### Primary Sections
+| Source | Endpoint | Data |
+|--------|----------|------|
+| Topic Details | `GET /topics/{hash_id}/details` | Description, objective, phases, keywords, technology areas, ITAR, CMMC |
+| Q&A | `GET /topics/{hash_id}/questions` | Structured question/answer entries with HTML content |
+| Solicitation Instructions | `GET /submissions/download/solicitationDocuments?documentType=RELEASE_PREFACE&...` | BAA preface PDF (text extracted) |
+| Component Instructions | `GET /submissions/download/solicitationDocuments?documentType=INSTRUCTIONS&component={comp}&...` | Component-specific PDF (text extracted) |
 
-| Section | Content | Scoring Value |
-|---------|---------|---------------|
-| Description | Full technical description with background, objectives, TRL expectations | High -- primary input for subject matter expertise scoring |
-| Phase I Expected Deliverables | Scope, duration (typically 6 months), funding ceiling, deliverable expectations | Medium -- phase eligibility and feasibility assessment |
-| Phase II Expected Deliverables | Follow-on scope, duration (typically 24 months), funding ceiling | Medium -- long-term alignment assessment |
-| Phase III Potential | Commercialization and transition pathway expectations | Low-Medium -- strategic fit indicator |
-| Keywords | Agency-assigned technical keywords for the topic | High -- direct input for keyword matching and pre-filter validation |
-| References | Published papers, standards, and prior work cited by the topic author | Medium -- indicates expected technical depth and relevant literature |
-| TPOC (Technical Point of Contact) | Name, email, phone of the topic author | Low -- informational, not used in scoring |
+Full API reference: `docs/dsip-api-reference.md`
 
-### Supplementary Sections (When Present)
+## Topic Detail Fields
 
-| Section | Content | Notes |
-|---------|---------|-------|
-| Submission Instructions | Agency- or component-specific submission guidance | May override default BAA instructions |
-| Component Instructions | Branch- or lab-specific requirements (e.g., AFRL, ONR, DARPA) | May include unique formatting, page limits, or evaluation criteria |
-| ITAR/Export Control | Indicates if topic involves controlled technology | Critical for eligibility dimension scoring |
-| Security Classification | Required clearance level (Unclassified, Secret, TS/SCI) | Disqualifier if company lacks required clearance |
+From the `/details` endpoint (structured JSON with HTML content):
 
-## Q&A Format and Parsing
+| Field | Type | Scoring Value |
+|-------|------|---------------|
+| `description` | HTML string | High — primary input for subject matter expertise scoring |
+| `objective` | HTML string | High — concise statement of what the government wants |
+| `phase1_description` | HTML string | Medium — Phase I scope, duration, funding ceiling |
+| `phase2_description` | HTML string | Medium — Phase II follow-on expectations |
+| `phase3_description` | HTML string | Low-Medium — commercialization pathway |
+| `keywords` | string list | High — direct input for keyword matching |
+| `technology_areas` | string list | Medium — broad technical categorization |
+| `focus_areas` | string list | Medium — modernization priorities |
+| `itar` | boolean | Critical — disqualifier if company lacks clearance |
+| `cmmc_level` | string | Critical — cybersecurity maturity requirement |
+| `reference_documents` | list of dicts | Low — cited papers and standards |
 
-DSIP topics may have a Q&A section where proposers ask questions and the topic author responds. Q&A is published during the pre-release or open period.
+## Q&A Format
 
-### Q&A Structure
-- Each entry: question text, answer text, date posted
-- Questions often clarify: scope boundaries, acceptable approaches, TRL expectations, teaming requirements
-- Answers from the TPOC provide authoritative interpretation of the topic description
+From the `/questions` endpoint (JSON array):
 
-### Parsing Guidance
-- Q&A may be embedded in the topic PDF or available via a separate API endpoint
-- The DSIP Angular app loads Q&A dynamically; PDF extraction may not capture all Q&A
-- When Q&A is not extractable from PDF, the enrichment adapter degrades gracefully (records as missing in completeness metrics)
-- Q&A content supplements the description for semantic scoring but is not required for a valid enrichment
+Each entry contains:
+- `question_no` — sequential number
+- `question` — HTML string with the proposer's question
+- `answer` — HTML string with the TPOC's response (parsed from nested JSON `{"content": "..."}`)
+- `submitted_on` — Unix timestamp of when the question was submitted
 
-## Submission Instructions Structure
+Q&A significance for scoring:
+- Clarifies scope boundaries and acceptable technical approaches
+- May narrow or expand the topic beyond what the description states
+- TPOC answers are authoritative interpretations
+- Topics with 0 Q&A are normal (especially pre-release topics)
 
-Submission instructions define the procedural requirements for a proposal:
-- Page limits per volume (Technical Volume, Cost Volume, Company Commercialization Report)
-- Font and formatting requirements
-- Required sections and their order
-- Submission portal and deadline details
-- Any component-specific overrides to the default BAA instructions
+When `published_qa_count` from the search response is 0, the Q&A API call is skipped (no network request).
 
-### Component-Specific Instructions
-Some DoD components (AFRL, ONR, DARPA, MDA, SOCOM) publish additional instructions that supplement or override the base BAA:
-- Additional evaluation criteria or weighting changes
-- Technology readiness level expectations specific to the component
-- Teaming or subcontracting preferences
-- Data rights expectations
+## Instruction Documents
 
-## Completeness Assessment Criteria
+### Solicitation Instructions (BAA Preface)
+- Downloaded as PDF, text extracted via pypdf
+- Contains: page limits, formatting requirements, evaluation criteria, submission portal details
+- Shared across all topics in a solicitation cycle
+- Cached by (cycle_name, release_number) — one download per cycle
 
-After enrichment, assess completeness across three dimensions. Report metrics in the format:
+### Component Instructions
+- Downloaded as PDF, text extracted via pypdf
+- Contains: component-specific submission rules, additional evaluation criteria, TRL expectations
+- Cached by (cycle_name, component, release_number) — one download per component per cycle
+- Components: ARMY, NAVY, USAF, DARPA, CBD, DHA, MDA, SOCOM, OSD, DTRA, NGA, DLA, DCSA
+
+## Completeness Assessment
+
+After enrichment, the CLI reports completeness for all 4 data types:
+
 ```
-Descriptions N/M | Instructions N/M | Q&A N/M
-```
-
-Where N = successfully extracted count, M = total candidates attempted.
-
-### Completeness Levels
-
-| Level | Description Extraction | Instruction Extraction | Q&A Extraction |
-|-------|----------------------|----------------------|----------------|
-| Full | N/M = M/M | N/M = M/M | N/M = M/M |
-| Adequate | N/M >= 80% | N/M >= 50% | Any (best-effort) |
-| Degraded | N/M < 80% | N/M < 50% | N/A |
-| Failed | N/M = 0/M | N/M = 0/M | N/A |
-
-### Assessment Rules
-- **Descriptions** are the critical enrichment component. Below 80% extraction rate warrants a warning: scoring accuracy is reduced for topics without descriptions.
-- **Instructions** are important but not scoring-critical. Missing instructions do not affect fit scoring, but the user should be informed before proposal writing.
-- **Q&A** is best-effort. Many topics have no Q&A (especially pre-release topics). Missing Q&A is expected and does not trigger warnings.
-- Per-topic failures are isolated. A single topic failing enrichment does not invalidate the batch.
-
-## Known API Endpoints and Parameters
-
-### Topic Listing (Existing -- DsipApiAdapter)
-```
-GET /topics/api/public/topics/search
-Parameters: keyword, agency, phase, status, page, size
-Response: { total: int, data: [{ topicId, title, agency, phase, ... }] }
+Descriptions: 24/24
+Q&A: 18/24 (6 topics had no Q&A posted)
+Solicitation Instructions: 24/24
+Component Instructions: 24/24
 ```
 
-### Topic Detail PDF (Enrichment -- DsipEnrichmentAdapter)
-```
-GET /topics/api/public/topics/{hash_id}/download/PDF
-Response: PDF binary content
-Content-Type: application/pdf
-```
+| Level | Descriptions | Q&A | Instructions |
+|-------|-------------|-----|-------------|
+| Full | N/M = M/M | Any (variable) | N/M = M/M |
+| Adequate | >= 80% | Any | >= 50% |
+| Degraded | < 80% | Any | < 50% |
 
-### Rate Limiting
-- DSIP API does not publish rate limits
-- Enrichment adapter uses configurable delay between requests (default: respectful pacing)
-- Exponential backoff on 429 or 5xx responses (reuses DsipApiAdapter retry pattern)
+- **Descriptions** are critical. Below 80% warrants investigation (API may have changed).
+- **Q&A** is inherently variable — many topics have 0 Q&A. This is normal, not a failure.
+- **Instructions** should be near 100% for active solicitations. Failures indicate download issues.
+- Per-topic failures set `enrichment_status: "partial"` — the topic still has other data.
 
-## Enriched Data in Semantic Scoring
+## Enriched Data in Scoring
 
-Enriched descriptions enable deeper semantic scoring in Phase 3 (SCORE):
-- **Title-only scoring** (pre-enrichment): limited to keyword overlap with short title text. Misses TRL expectations, teaming requirements, and phase-specific technical detail.
-- **Enriched scoring** (post-enrichment): full description text enables LLM semantic comparison against company capabilities, past performance narratives, and key personnel expertise. Produces higher-confidence subject matter expertise scores.
+With full enrichment, the topic-scout agent has:
+- **Description + objective** for deep semantic matching against company capabilities
+- **Keywords + technology_areas** for precise keyword overlap scoring
+- **Q&A entries** for scope refinement (e.g., "Phase I can use simulated data")
+- **ITAR flag** for eligibility disqualification
+- **CMMC level** for cybersecurity maturity gating
+- **Instructions** for advising on page limits, formatting, and evaluation criteria
 
-When enriched descriptions are available, the topic scout agent should use them as the primary input for the Subject Matter Expertise dimension (weight 0.35 of composite score). When descriptions are missing for specific topics, fall back to title-only scoring for those topics and note reduced confidence in the per-topic detail drilldown.
+This is a complete picture. The agent should not need to send the user to dodsbirsttr.mil for any topic-level information.
