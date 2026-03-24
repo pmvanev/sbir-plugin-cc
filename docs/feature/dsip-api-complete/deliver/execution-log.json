@@ -1,0 +1,103 @@
+{
+  "project_id": "dsip-api-complete",
+  "feature": "dsip-api-complete",
+  "wave": "distill-to-deliver",
+  "phase": "acceptance-tests-created",
+  "created": "2026-03-24",
+  "scenarios": {
+    "walking_skeletons": 2,
+    "focused_scenarios": 25,
+    "total": 27,
+    "error_edge_ratio": "44%",
+    "by_story": {
+      "US-DSIP-01": {
+        "happy": 4,
+        "error": 3,
+        "total": 7
+      },
+      "US-DSIP-02": {
+        "happy": 3,
+        "error": 2,
+        "total": 5
+      },
+      "US-DSIP-03": {
+        "happy": 2,
+        "error": 3,
+        "total": 5
+      },
+      "US-DSIP-04": {
+        "happy": 3,
+        "error": 2,
+        "total": 5
+      },
+      "US-DSIP-05": {
+        "happy": 2,
+        "error": 1,
+        "total": 3
+      }
+    }
+  },
+  "files_created": [
+    "tests/acceptance/dsip_api_complete/walking-skeleton.feature",
+    "tests/acceptance/dsip_api_complete/step-01-search-fix.feature",
+    "tests/acceptance/dsip_api_complete/step-02-details.feature",
+    "tests/acceptance/dsip_api_complete/step-03-qa.feature",
+    "tests/acceptance/dsip_api_complete/step-04-instructions.feature",
+    "tests/acceptance/dsip_api_complete/step-05-cli-output.feature",
+    "tests/acceptance/dsip_api_complete/conftest.py",
+    "tests/acceptance/dsip_api_complete/steps/conftest.py",
+    "tests/acceptance/dsip_api_complete/steps/common_steps.py",
+    "tests/acceptance/dsip_api_complete/steps/walking_skeleton_steps.py",
+    "tests/acceptance/dsip_api_complete/steps/search_steps.py"
+  ],
+  "first_scenario_status": "fails_for_business_reason",
+  "first_scenario_failure": "Missing release_number -- _normalize_topic does not yet map releaseNumber from corrected API response",
+  "driving_ports_used": [
+    "TopicFetchPort.fetch() via DsipApiAdapter",
+    "TopicEnrichmentPort.enrich() via DsipEnrichmentAdapter (planned)",
+    "FinderService.search_and_enrich() (planned)"
+  ],
+  "mandate_compliance": {
+    "CM-A": "All step imports use DsipApiAdapter, DsipEnrichmentAdapter, FinderService -- driving ports only",
+    "CM-B": "Gherkin uses business terms: topics, enrichment, Q&A, instructions, completeness. Zero HTTP/JSON/API terms in scenarios.",
+    "CM-C": "2 walking skeletons (user value E2E) + 25 focused scenarios (boundary tests)"
+  },
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "PREPARE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-24T22:36:43Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED_ACCEPTANCE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-24T22:37:38Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED_UNIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-24T22:39:56Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-24T22:44:56Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-24T22:46:35Z"
+    }
+  ],
+  "schema_version": "3.0"
+}

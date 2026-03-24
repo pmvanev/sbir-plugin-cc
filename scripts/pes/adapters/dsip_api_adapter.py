@@ -12,6 +12,7 @@ Features:
 
 from __future__ import annotations
 
+import json
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -26,6 +27,19 @@ DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_RATE_LIMIT_MIN = 1.0
 DEFAULT_RATE_LIMIT_MAX = 2.0
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; sbir-plugin/1.0)",
+    "Accept": "application/json",
+}
+
+# DSIP topicReleaseStatus IDs (from dropdown API)
+STATUS_ID_PRE_RELEASE = 591
+STATUS_ID_OPEN = 592
+
+_STATUS_TO_IDS: dict[str, list[int]] = {
+    "Open": [STATUS_ID_OPEN],
+    "Pre-Release": [STATUS_ID_PRE_RELEASE],
+}
 
 
 def _unix_ms_to_iso(unix_ms: int | None) -> str:
@@ -34,6 +48,20 @@ def _unix_ms_to_iso(unix_ms: int | None) -> str:
         return ""
     dt = datetime.fromtimestamp(unix_ms / 1000, tz=UTC)
     return dt.isoformat()
+
+
+def _normalize_baa_instructions(raw_instructions: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Normalize baaInstructions array to snake_case dicts."""
+    if not raw_instructions:
+        return []
+    return [
+        {
+            "upload_id": inst.get("uploadId"),
+            "file_name": inst.get("fileName", ""),
+            "upload_type_code": inst.get("uploadTypeCode", ""),
+        }
+        for inst in raw_instructions
+    ]
 
 
 def _normalize_topic(raw: dict[str, Any]) -> dict[str, Any]:
@@ -47,10 +75,13 @@ def _normalize_topic(raw: dict[str, Any]) -> dict[str, Any]:
         "component": raw.get("component", ""),
         "solicitation_number": raw.get("solicitationNumber", ""),
         "cycle_name": raw.get("cycleName", ""),
+        "release_number": raw.get("releaseNumber"),
         "start_date": _unix_ms_to_iso(raw.get("topicStartDate")),
         "deadline": _unix_ms_to_iso(raw.get("topicEndDate")),
         "cmmc_level": raw.get("cmmcLevel", ""),
         "phase": raw.get("phaseHierarchy", ""),
+        "published_qa_count": raw.get("noOfPublishedQuestions", 0),
+        "baa_instructions": _normalize_baa_instructions(raw.get("baaInstructions")),
     }
 
 
@@ -64,6 +95,7 @@ class DsipApiAdapter(TopicFetchPort):
         max_retries: Maximum retry attempts per request.
         rate_limit_min: Minimum delay in seconds between page requests.
         rate_limit_max: Maximum delay in seconds between page requests.
+        max_pages: Maximum number of pages to fetch (0 = no limit).
     """
 
     def __init__(
@@ -74,6 +106,7 @@ class DsipApiAdapter(TopicFetchPort):
         max_retries: int = DEFAULT_MAX_RETRIES,
         rate_limit_min: float = DEFAULT_RATE_LIMIT_MIN,
         rate_limit_max: float = DEFAULT_RATE_LIMIT_MAX,
+        max_pages: int = 0,
     ) -> None:
         self._base_url = base_url
         self._page_size = page_size
@@ -81,6 +114,7 @@ class DsipApiAdapter(TopicFetchPort):
         self._max_retries = max_retries
         self._rate_limit_min = rate_limit_min
         self._rate_limit_max = rate_limit_max
+        self._max_pages = max_pages
 
     def fetch(
         self,
@@ -101,14 +135,29 @@ class DsipApiAdapter(TopicFetchPort):
         total = 0
         error: str | None = None
 
-        params: dict[str, Any] = {
-            "numPerPage": self._page_size,
+        # Build searchParam JSON -- correct format used by DSIP Angular app
+        status_filter = filters.get("topicStatus") if filters else None
+        status_ids = _STATUS_TO_IDS.get(
+            status_filter, [STATUS_ID_PRE_RELEASE, STATUS_ID_OPEN],
+        ) if status_filter else [STATUS_ID_PRE_RELEASE, STATUS_ID_OPEN]
+
+        search_param = {
+            "searchText": None,
+            "components": None,
+            "programYear": None,
+            "solicitationCycleNames": ["openTopics"],
+            "releaseNumbers": [],
+            "topicReleaseStatus": status_ids,
+            "modernizationPriorities": None,
+            "sortBy": "finalTopicCode,asc",
         }
-        if filters:
-            params.update(filters)
 
         while True:
-            params["page"] = page
+            params: dict[str, Any] = {
+                "searchParam": json.dumps(search_param),
+                "size": self._page_size,
+                "page": page,
+            }
 
             try:
                 data = self._fetch_page(params)
@@ -140,8 +189,10 @@ class DsipApiAdapter(TopicFetchPort):
             if on_progress is not None:
                 on_progress({"fetched": len(all_topics), "total": total})
 
-            # Check if we have all topics
+            # Check if we have all topics or hit page cap
             if len(all_topics) >= total or len(raw_topics) < self._page_size:
+                break
+            if self._max_pages > 0 and page + 1 >= self._max_pages:
                 break
 
             # Rate limiting between pages
@@ -177,6 +228,7 @@ class DsipApiAdapter(TopicFetchPort):
                     self._base_url,
                     params=params,
                     timeout=self._timeout,
+                    headers=DEFAULT_HEADERS,
                 )
                 response.raise_for_status()
                 result: dict[str, Any] = response.json()
