@@ -11,10 +11,17 @@ Raw topic PDF:    tests/fixtures/dsip_live/raw_topic_68491.pdf
 
 from __future__ import annotations
 
+import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+# Add scripts/ to path so dsip_cli can be imported directly
+_scripts_dir = str(Path(__file__).resolve().parent.parent.parent / "scripts")
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
 
 import pytest
 
@@ -28,6 +35,9 @@ from pes.domain.finder_service import FinderService
 from pes.domain.keyword_prefilter import KeywordPreFilter
 from pes.domain.topic_enrichment import combine_topics_with_enrichment, completeness_report
 from pes.domain.topic_scoring import TopicScoringService
+
+# For detail command tests
+from dsip_cli import PROFILE_PATH
 
 FIXTURE_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "dsip_live"
 
@@ -870,3 +880,106 @@ class TestResultsPersistence:
         assert result is not None
         assert len(result.topics) == 1
         assert result.topics[0]["topic_id"] == "456"
+
+
+# ===================================================================
+# Test 7: Detail command with hash ID format (step 03-01)
+# ===================================================================
+
+
+class TestDetailCommand:
+    """Tests for cmd_detail CLI command with hash ID and API enrichment.
+
+    Test Budget: 2 behaviors x 2 = 4 unit tests max.
+    Behaviors:
+      1. Detail command passes topic dict to enricher (not topic_ids kwarg)
+      2. Detail command works with hash ID format containing underscores
+    """
+
+    def _make_enrichment_result(
+        self,
+        topic_id: str,
+    ) -> Any:
+        from pes.ports.topic_enrichment_port import EnrichmentResult
+        return EnrichmentResult(
+            enriched=[{
+                "topic_id": topic_id,
+                "description": "Test description",
+                "objective": "Test objective",
+                "keywords": ["radar", "AI"],
+                "technology_areas": ["Information Systems"],
+                "focus_areas": ["Autonomy"],
+                "itar": False,
+                "cmmc_level": None,
+                "qa_entries": [{"question_no": 1, "question": "Q?", "answer": "A.", "status": "COMPLETED"}],
+                "instructions": None,
+                "component_instructions": None,
+                "solicitation_instructions": None,
+                "enrichment_status": "ok",
+            }],
+            errors=[],
+            completeness={"descriptions": 1, "qa": 1, "total": 1},
+        )
+
+    def test_detail_passes_topic_dict_to_enricher(self) -> None:
+        """Detail command constructs a topic dict and passes it via topics= kwarg."""
+        hash_id = "7051b2da4a1e4c52bd0e7daf80d514f7_86352"
+        enrichment_result = self._make_enrichment_result(hash_id)
+
+        with patch(
+            "dsip_cli.DsipEnrichmentAdapter",
+        ) as MockAdapter:
+            mock_instance = MockAdapter.return_value
+            mock_instance.enrich.return_value = enrichment_result
+
+            # Capture stdout
+            import io
+            captured = io.StringIO()
+            with patch("sys.stdout", captured):
+                from dsip_cli import cmd_detail
+                args = argparse.Namespace(topic_id=hash_id, profile=str(PROFILE_PATH), state_dir=".sbir")
+                cmd_detail(args)
+
+            # Verify enricher was called with topics=[{...}], not topic_ids=[...]
+            mock_instance.enrich.assert_called_once()
+            call_kwargs = mock_instance.enrich.call_args
+            # Must use topics= keyword with a list of dicts
+            if call_kwargs.kwargs:
+                topics_arg = call_kwargs.kwargs.get("topics")
+            else:
+                topics_arg = call_kwargs.args[0] if call_kwargs.args else None
+            assert topics_arg is not None, "enricher.enrich must be called with topics argument"
+            assert isinstance(topics_arg, list), "topics must be a list"
+            assert len(topics_arg) == 1
+            assert topics_arg[0]["topic_id"] == hash_id
+
+            # Verify output contains enriched data
+            output = json.loads(captured.getvalue())
+            assert output["topic_id"] == hash_id
+            assert len(output["enriched"]) == 1
+            assert output["enriched"][0]["objective"] == "Test objective"
+            assert output["enriched"][0]["keywords"] == ["radar", "AI"]
+
+    @pytest.mark.parametrize("topic_id", [
+        "7051b2da4a1e4c52bd0e7daf80d514f7_86352",  # hash ID with underscore
+        "68492",  # legacy numeric ID
+        "abc_def_123",  # multi-underscore ID
+    ])
+    def test_detail_works_with_various_id_formats(self, topic_id: str) -> None:
+        """Detail command accepts hash IDs, numeric IDs, and multi-underscore IDs."""
+        enrichment_result = self._make_enrichment_result(topic_id)
+
+        with patch("dsip_cli.DsipEnrichmentAdapter") as MockAdapter:
+            mock_instance = MockAdapter.return_value
+            mock_instance.enrich.return_value = enrichment_result
+
+            import io
+            captured = io.StringIO()
+            with patch("sys.stdout", captured):
+                from dsip_cli import cmd_detail
+                args = argparse.Namespace(topic_id=topic_id, profile=str(PROFILE_PATH), state_dir=".sbir")
+                cmd_detail(args)
+
+            output = json.loads(captured.getvalue())
+            assert output["topic_id"] == topic_id
+            assert output["enriched"][0]["topic_id"] == topic_id
