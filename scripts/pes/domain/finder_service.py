@@ -321,9 +321,8 @@ class FinderService:
 
         # Step 4: Enrich
         if self._enrichment_port is not None and candidates:
-            candidate_ids = [c.get("topic_id", "") for c in candidates]
             enrichment_result = self._enrichment_port.enrich(
-                topic_ids=candidate_ids,
+                topics=candidates,
                 on_progress=on_progress,
             )
 

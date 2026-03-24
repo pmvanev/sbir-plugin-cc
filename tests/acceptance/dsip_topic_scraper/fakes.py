@@ -123,7 +123,7 @@ class InMemoryTopicEnrichmentAdapter(TopicEnrichmentPort):
 
     def enrich(
         self,
-        topic_ids: list[str],
+        topics: list[dict[str, Any]],
         on_progress: Any | None = None,
     ) -> EnrichmentResult:
         """Enrich topics and return enrichment result."""
@@ -132,6 +132,10 @@ class InMemoryTopicEnrichmentAdapter(TopicEnrichmentPort):
         desc_count = 0
         instr_count = 0
         qa_count = 0
+        sol_instr_count = 0
+        comp_instr_count = 0
+
+        topic_ids = [t.get("topic_id", "") for t in topics]
 
         for i, topic_id in enumerate(topic_ids):
             progress = {
@@ -183,6 +187,9 @@ class InMemoryTopicEnrichmentAdapter(TopicEnrichmentPort):
                 desc_count += 1
                 if data.get("instructions"):
                     instr_count += 1
+                    sol_instr_count += 1
+                if data.get("component_instructions"):
+                    comp_instr_count += 1
                 qa_count += 1 if data.get("qa_entries") else 0
 
             self.progress_log.append(progress)
@@ -194,8 +201,9 @@ class InMemoryTopicEnrichmentAdapter(TopicEnrichmentPort):
             errors=errors,
             completeness={
                 "descriptions": desc_count,
-                "instructions": instr_count,
                 "qa": qa_count,
+                "solicitation_instructions": sol_instr_count,
+                "component_instructions": comp_instr_count,
                 "total": len(topic_ids),
             },
         )

@@ -30,7 +30,10 @@ logger = logging.getLogger(__name__)
 DSIP_TOPIC_PDF_URL = "https://www.dodsbirsttr.mil/topics/api/public/topics"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 DEFAULT_RATE_LIMIT_SECONDS = 1.0
-
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; sbir-plugin/1.0)",
+    "Accept": "application/pdf",
+}
 
 DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_BASE_SECONDS = 5.0
@@ -63,17 +66,21 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._rate_limit_seconds = rate_limit_seconds
-        self._client = http_client or httpx.Client(timeout=timeout)
+        self._client = http_client or httpx.Client(
+            timeout=timeout, headers=DEFAULT_HEADERS,
+        )
         self._max_retries = max_retries
         self._retry_base_seconds = retry_base_seconds
 
     def enrich(
         self,
-        topic_ids: list[str],
+        topics: list[dict[str, Any]],
         on_progress: Any | None = None,
     ) -> EnrichmentResult:
         """Enrich topics by downloading PDFs and extracting detail data.
 
+        Accepts full topic dicts (with topic_id, cycle_name, etc.).
+        Extracts topic_ids and continues with PDF download logic.
         Per-topic failures are isolated: logged in errors, do not stop batch.
         Progress callback invoked per topic with status updates.
         """
@@ -82,6 +89,11 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
         desc_count = 0
         instr_count = 0
         qa_count = 0
+        sol_instr_count = 0
+        comp_instr_count = 0
+
+        # Extract topic_ids from dicts for PDF download
+        topic_ids = [t.get("topic_id", "") for t in topics]
 
         for i, topic_id in enumerate(topic_ids):
             progress: dict[str, Any] = {
@@ -126,6 +138,8 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
             desc_count += 1 if data.get("description") else 0
             instr_count += 1 if data.get("instructions") else 0
             qa_count += 1 if data.get("qa_entries") else 0
+            sol_instr_count += 1 if data.get("instructions") else 0
+            comp_instr_count += 1 if data.get("component_instructions") else 0
 
             self._notify_and_delay(on_progress, progress, i, len(topic_ids))
 
@@ -134,8 +148,9 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
             errors=errors,
             completeness={
                 "descriptions": desc_count,
-                "instructions": instr_count,
                 "qa": qa_count,
+                "solicitation_instructions": sol_instr_count,
+                "component_instructions": comp_instr_count,
                 "total": len(topic_ids),
             },
         )

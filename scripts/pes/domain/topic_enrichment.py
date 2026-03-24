@@ -41,6 +41,13 @@ def combine_topics_with_enrichment(
         merged["instructions"] = enrichment.get("instructions")
         merged["component_instructions"] = enrichment.get("component_instructions")
         merged["qa_entries"] = enrichment.get("qa_entries", [])
+        merged["keywords"] = enrichment.get("keywords", [])
+        merged["technology_areas"] = enrichment.get("technology_areas", [])
+        merged["focus_areas"] = enrichment.get("focus_areas", [])
+        merged["objective"] = enrichment.get("objective")
+        merged["itar"] = enrichment.get("itar")
+        merged["cmmc_level"] = enrichment.get("cmmc_level")
+        merged["solicitation_instructions"] = enrichment.get("solicitation_instructions")
         merged["enrichment_status"] = "ok"
         combined.append(merged)
 
@@ -63,14 +70,17 @@ def completeness_report(
     messages: list[str] = []
     total = completeness.get("total", 0)
     desc = completeness.get("descriptions", 0)
-    instr = completeness.get("instructions", 0)
     qa = completeness.get("qa", 0)
+    sol_instr = completeness.get("solicitation_instructions", 0)
+    comp_instr = completeness.get("component_instructions", 0)
 
     messages.append(f"Descriptions: {desc}/{total}")
-    if instr > 0:
-        messages.append(f"Instructions: {instr}/{total}")
     if qa > 0:
         messages.append(f"Q&A: {qa}/{total}")
+    if sol_instr > 0:
+        messages.append(f"Solicitation Instructions: {sol_instr}/{total}")
+    if comp_instr > 0:
+        messages.append(f"Component Instructions: {comp_instr}/{total}")
 
     if errors:
         failed_ids = [e.get("topic_id", "unknown") for e in errors]

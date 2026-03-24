@@ -210,7 +210,8 @@ def enrich_batch(count: int, scraper_context: dict[str, Any]):
     )
 
     progress_log: list[dict[str, Any]] = []
-    result = adapter.enrich(candidate_ids, on_progress=lambda p: progress_log.append(p))
+    topic_dicts = [{"topic_id": tid} for tid in candidate_ids]
+    result = adapter.enrich(topic_dicts, on_progress=lambda p: progress_log.append(p))
     scraper_context["enrichment_result"] = result
     scraper_context["progress_log"] = progress_log
 

@@ -51,6 +51,13 @@ class TestCombineMergesFields:
         assert merged["instructions"] == "Submit by Friday"
         assert merged["component_instructions"] == "Component A details"
         assert merged["qa_entries"] == [{"question": "Q1", "answer": "A1"}]
+        assert merged["keywords"] == []
+        assert merged["technology_areas"] == []
+        assert merged["focus_areas"] == []
+        assert merged["objective"] is None
+        assert merged["itar"] is None
+        assert merged["cmmc_level"] is None
+        assert merged["solicitation_instructions"] is None
         assert merged["enrichment_status"] == "ok"
 
     def test_missing_enrichment_fields_default_to_empty(self) -> None:
@@ -66,6 +73,13 @@ class TestCombineMergesFields:
         assert merged["instructions"] is None
         assert merged["component_instructions"] is None
         assert merged["qa_entries"] == []
+        assert merged["keywords"] == []
+        assert merged["technology_areas"] == []
+        assert merged["focus_areas"] == []
+        assert merged["objective"] is None
+        assert merged["itar"] is None
+        assert merged["cmmc_level"] is None
+        assert merged["solicitation_instructions"] is None
         assert merged["enrichment_status"] == "ok"
 
 
@@ -128,28 +142,33 @@ class TestCompletenessReportConditionalLines:
     @pytest.mark.parametrize(
         "completeness,expected_messages",
         [
-            # Only descriptions (instructions=0, qa=0): 1 line
+            # Only descriptions (all others=0): 1 line
             (
-                {"descriptions": 3, "instructions": 0, "qa": 0, "total": 5},
+                {"descriptions": 3, "qa": 0, "solicitation_instructions": 0,
+                 "component_instructions": 0, "total": 5},
                 ["Descriptions: 3/5"],
             ),
-            # Descriptions + instructions=1 (boundary for > 0 vs > 1): 2 lines
+            # Descriptions + solicitation_instructions=1 (boundary): 2 lines
             (
-                {"descriptions": 3, "instructions": 1, "qa": 0, "total": 5},
-                ["Descriptions: 3/5", "Instructions: 1/5"],
+                {"descriptions": 3, "qa": 0, "solicitation_instructions": 1,
+                 "component_instructions": 0, "total": 5},
+                ["Descriptions: 3/5", "Solicitation Instructions: 1/5"],
             ),
-            # Descriptions + QA=1 (boundary for > 0 vs > 1): 2 lines
+            # Descriptions + QA=1 (boundary): 2 lines
             (
-                {"descriptions": 3, "instructions": 0, "qa": 1, "total": 5},
+                {"descriptions": 3, "qa": 1, "solicitation_instructions": 0,
+                 "component_instructions": 0, "total": 5},
                 ["Descriptions: 3/5", "Q&A: 1/5"],
             ),
-            # All three present: 3 lines
+            # All four present: 4 lines
             (
-                {"descriptions": 5, "instructions": 3, "qa": 2, "total": 5},
-                ["Descriptions: 5/5", "Instructions: 3/5", "Q&A: 2/5"],
+                {"descriptions": 5, "qa": 2, "solicitation_instructions": 3,
+                 "component_instructions": 1, "total": 5},
+                ["Descriptions: 5/5", "Q&A: 2/5",
+                 "Solicitation Instructions: 3/5", "Component Instructions: 1/5"],
             ),
         ],
-        ids=["desc-only", "desc+instr-boundary", "desc+qa-boundary", "all-three"],
+        ids=["desc-only", "desc+instr-boundary", "desc+qa-boundary", "all-four"],
     )
     def test_conditional_lines_based_on_counts(
         self,
@@ -178,7 +197,8 @@ class TestCompletenessReportErrors:
 
     def test_errors_appended_with_exact_format(self) -> None:
         """When errors present, message has exact format with count and comma-joined IDs."""
-        completeness = {"descriptions": 2, "instructions": 0, "qa": 0, "total": 4}
+        completeness = {"descriptions": 2, "qa": 0, "solicitation_instructions": 0,
+                        "component_instructions": 0, "total": 4}
         errors = [
             {"topic_id": "T-002", "error": "download failed"},
             {"topic_id": "T-004", "error": "timeout"},
@@ -192,7 +212,8 @@ class TestCompletenessReportErrors:
 
     def test_error_without_topic_id_uses_unknown_default(self) -> None:
         """Error dict missing topic_id defaults to 'unknown'."""
-        completeness = {"descriptions": 0, "instructions": 0, "qa": 0, "total": 1}
+        completeness = {"descriptions": 0, "qa": 0, "solicitation_instructions": 0,
+                        "component_instructions": 0, "total": 1}
         errors = [{"error": "some failure"}]
 
         messages = completeness_report(completeness, errors)
@@ -202,7 +223,8 @@ class TestCompletenessReportErrors:
 
     def test_no_errors_produces_no_failure_message(self) -> None:
         """When errors list is empty, no failure message is appended."""
-        completeness = {"descriptions": 3, "instructions": 0, "qa": 0, "total": 3}
+        completeness = {"descriptions": 3, "qa": 0, "solicitation_instructions": 0,
+                        "component_instructions": 0, "total": 3}
 
         messages = completeness_report(completeness, errors=[])
 
@@ -210,7 +232,8 @@ class TestCompletenessReportErrors:
 
     def test_zero_total_produces_zero_denominators(self) -> None:
         """Edge case: total=0 produces 0/0 denominators without error."""
-        completeness = {"descriptions": 0, "instructions": 0, "qa": 0, "total": 0}
+        completeness = {"descriptions": 0, "qa": 0, "solicitation_instructions": 0,
+                        "component_instructions": 0, "total": 0}
 
         messages = completeness_report(completeness, errors=[])
 

@@ -231,7 +231,7 @@ class TestRetryWithBackoff:
             retry_base_seconds=0.01,  # Fast for tests
         )
 
-        result = adapter.enrich(["TOPIC-001"])
+        result = adapter.enrich([{"topic_id": "TOPIC-001"}])
 
         assert len(result.enriched) == 1
         assert len(result.errors) == 0
@@ -249,7 +249,7 @@ class TestRetryWithBackoff:
             retry_base_seconds=0.05,
         )
 
-        result = adapter.enrich(["TOPIC-001"])
+        result = adapter.enrich([{"topic_id": "TOPIC-001"}])
 
         assert len(result.enriched) == 1
         assert transport.attempt_count == 3
@@ -279,7 +279,7 @@ class TestRetriesExhausted:
             retry_base_seconds=0.01,
         )
 
-        result = adapter.enrich(["TOPIC-001"])
+        result = adapter.enrich([{"topic_id": "TOPIC-001"}])
 
         assert len(result.enriched) == 0
         assert len(result.errors) == 1

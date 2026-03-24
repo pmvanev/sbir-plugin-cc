@@ -197,7 +197,7 @@ class TestDsipEnrichmentAdapterParsing:
         assert "command" in data["description"].lower() or "control" in data["description"].lower()
 
     def test_enrich_with_mocked_http(self, raw_pdf_bytes: bytes) -> None:
-        """DsipEnrichmentAdapter.enrich() with mocked HTTP returns parsed sections."""
+        """DsipEnrichmentAdapter.enrich() with topic dicts returns parsed sections."""
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.content = raw_pdf_bytes
@@ -205,7 +205,13 @@ class TestDsipEnrichmentAdapterParsing:
         mock_client.get.return_value = mock_response
 
         adapter = DsipEnrichmentAdapter(http_client=mock_client, rate_limit_seconds=0)
-        result = adapter.enrich(topic_ids=["68491"])
+        result = adapter.enrich(topics=[{
+            "topic_id": "68491",
+            "cycle_name": "DOD_SBIR_2025_P1_C4",
+            "release_number": 12,
+            "component": "ARMY",
+            "published_qa_count": 7,
+        }])
 
         assert len(result.enriched) == 1
         assert result.errors == []
@@ -215,8 +221,11 @@ class TestDsipEnrichmentAdapterParsing:
         assert "instructions" in entry
         assert "component_instructions" in entry
         assert "qa_entries" in entry
+        # Completeness tracks 4 data types
         assert result.completeness["descriptions"] == 1
         assert result.completeness["total"] == 1
+        assert "solicitation_instructions" in result.completeness
+        assert "component_instructions" in result.completeness
 
     def test_enrich_isolates_http_failure(self, raw_pdf_bytes: bytes) -> None:
         """Bad topic doesn't crash the batch."""
@@ -237,7 +246,12 @@ class TestDsipEnrichmentAdapterParsing:
         adapter = DsipEnrichmentAdapter(
             http_client=mock_client, rate_limit_seconds=0, max_retries=1,
         )
-        result = adapter.enrich(topic_ids=["68491", "BAD_ID"])
+        result = adapter.enrich(topics=[
+            {"topic_id": "68491", "cycle_name": "C4", "release_number": 12,
+             "component": "ARMY", "published_qa_count": 0},
+            {"topic_id": "BAD_ID", "cycle_name": "C4", "release_number": 12,
+             "component": "ARMY", "published_qa_count": 0},
+        ])
 
         assert len(result.enriched) == 1
         assert len(result.errors) == 1
@@ -341,6 +355,62 @@ class TestFullPipelineMocked:
         # Cache should have been written
         assert cache.exists()
         assert cache.is_fresh(ttl_hours=1)
+
+    def test_completeness_report_includes_four_data_types(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Completeness messages report descriptions, Q&A, solicitation and component instructions."""
+        from pes.ports.topic_enrichment_port import EnrichmentResult
+
+        # Stub enrichment port returning known completeness
+        mock_enrichment = MagicMock()
+        mock_enrichment.enrich.return_value = EnrichmentResult(
+            enriched=[
+                {"topic_id": "T1", "description": "desc", "instructions": "instr",
+                 "component_instructions": "comp", "qa_entries": [{"q": "?", "a": "!"}],
+                 "keywords": [], "technology_areas": [], "focus_areas": [],
+                 "objective": None, "itar": False, "cmmc_level": None,
+                 "solicitation_instructions": "sol_instr"},
+            ],
+            errors=[],
+            completeness={
+                "descriptions": 1, "qa": 1,
+                "solicitation_instructions": 1, "component_instructions": 1,
+                "total": 1,
+            },
+        )
+
+        # Stub fetch port returning one topic
+        mock_fetch = MagicMock()
+        from pes.ports.topic_fetch_port import FetchResult
+        mock_fetch.fetch.return_value = FetchResult(
+            topics=[{"topic_id": "T1", "title": "Test", "topic_code": "X",
+                     "status": "Open", "program": "SBIR", "component": "ARMY",
+                     "cycle_name": "C4", "release_number": 12,
+                     "published_qa_count": 1, "baa_instructions": []}],
+            total=1,
+            source="dsip_api",
+        )
+
+        service = FinderService(
+            topic_fetch=mock_fetch,
+            profile={"company_name": "X", "capabilities": ["test"]},
+            enrichment_port=mock_enrichment,
+        )
+        result = service.search_and_enrich()
+
+        # Verify 4 completeness lines in messages
+        assert any("Descriptions:" in m for m in result.messages)
+        assert any("Q&A:" in m for m in result.messages)
+        assert any("Solicitation Instructions:" in m for m in result.messages)
+        assert any("Component Instructions:" in m for m in result.messages)
+
+        # Verify combined topics include new enrichment fields
+        assert len(result.topics) == 1
+        t = result.topics[0]
+        assert t.get("solicitation_instructions") == "sol_instr"
+        assert t.get("keywords") == []
 
     def test_cache_hit_skips_fetch(self, tmp_path: Path) -> None:
         """When cache is fresh, FinderService returns cached data."""

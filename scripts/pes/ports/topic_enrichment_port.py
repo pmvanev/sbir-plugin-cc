@@ -37,7 +37,7 @@ class TopicEnrichmentPort(ABC):
     @abstractmethod
     def enrich(
         self,
-        topic_ids: list[str],
+        topics: list[dict[str, Any]],
         on_progress: Any | None = None,
     ) -> EnrichmentResult:
         """Enrich topics by fetching and extracting detail data.
@@ -49,7 +49,9 @@ class TopicEnrichmentPort(ABC):
         Progress callback invoked per topic with status updates.
 
         Args:
-            topic_ids: List of topic IDs to enrich.
+            topics: List of topic dicts containing at minimum topic_id,
+                plus cycle_name, release_number, component,
+                published_qa_count, baa_instructions.
             on_progress: Optional callback invoked per topic with a dict
                 containing: index, total, topic_id, status.
 

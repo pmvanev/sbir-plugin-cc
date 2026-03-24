@@ -129,7 +129,7 @@ class TestEnrichHappyPath:
             rate_limit_seconds=0.0,
             http_client=httpx.Client(transport=transport),
         )
-        result = adapter.enrich(["TOPIC-001"])
+        result = adapter.enrich([{"topic_id": "TOPIC-001"}])
 
         assert len(result.enriched) == 1
         topic = result.enriched[0]
@@ -158,7 +158,7 @@ class TestBatchWithProgress:
 
         progress_log: list[dict[str, Any]] = []
         result = adapter.enrich(
-            ["T-001", "T-002", "T-003"],
+            [{"topic_id": "T-001"}, {"topic_id": "T-002"}, {"topic_id": "T-003"}],
             on_progress=lambda p: progress_log.append(p),
         )
 
@@ -192,7 +192,7 @@ class TestExtractionFailureIsolation:
             rate_limit_seconds=0.0,
             http_client=httpx.Client(transport=transport),
         )
-        result = adapter.enrich(["T-001", "T-002", "T-003"])
+        result = adapter.enrich([{"topic_id": "T-001"}, {"topic_id": "T-002"}, {"topic_id": "T-003"}])
 
         assert len(result.enriched) == 2
         assert len(result.errors) == 1
@@ -222,7 +222,7 @@ class TestDownloadFailureIsolation:
             rate_limit_seconds=0.0,
             http_client=httpx.Client(transport=transport),
         )
-        result = adapter.enrich(["T-001", "T-002", "T-003"])
+        result = adapter.enrich([{"topic_id": "T-001"}, {"topic_id": "T-002"}, {"topic_id": "T-003"}])
 
         assert len(result.enriched) == 2
         assert len(result.errors) == 1
@@ -245,10 +245,10 @@ class TestCompletenessMetrics:
         self, topic_count: int, fail_count: int, expected_desc: int
     ) -> None:
         transport = MockTransport()
-        topic_ids = []
+        topic_dicts = []
         for i in range(1, topic_count + 1):
             tid = f"T-{i:03d}"
-            topic_ids.append(tid)
+            topic_dicts.append({"topic_id": tid})
             if i <= fail_count:
                 transport.add_response(tid, status_code=500, content=b"Error")
             else:
@@ -264,7 +264,7 @@ class TestCompletenessMetrics:
             rate_limit_seconds=0.0,
             http_client=httpx.Client(transport=transport),
         )
-        result = adapter.enrich(topic_ids)
+        result = adapter.enrich(topic_dicts)
 
         assert result.completeness["total"] == topic_count
         assert result.completeness["descriptions"] == expected_desc
@@ -287,6 +287,6 @@ class TestRateLimiting:
             rate_limit_seconds=0.0,
             http_client=httpx.Client(transport=transport),
         )
-        adapter.enrich(["T-001", "T-002", "T-003"])
+        adapter.enrich([{"topic_id": "T-001"}, {"topic_id": "T-002"}, {"topic_id": "T-003"}])
 
         assert len(transport.request_log) == 3
