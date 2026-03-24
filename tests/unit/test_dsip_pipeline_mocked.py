@@ -18,6 +18,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import httpx
+
 from pes.adapters.dsip_api_adapter import DsipApiAdapter, _normalize_topic
 from pes.adapters.dsip_enrichment_adapter import DsipEnrichmentAdapter
 from pes.adapters.json_finder_results_adapter import JsonFinderResultsAdapter
@@ -50,6 +52,34 @@ def raw_api_response_legacy() -> dict[str, Any]:
 @pytest.fixture
 def raw_pdf_bytes() -> bytes:
     path = FIXTURE_DIR / "raw_topic_68491.pdf"
+    return path.read_bytes()
+
+
+@pytest.fixture
+def raw_details_response() -> dict[str, Any]:
+    """Recorded details API response for topic A254-049."""
+    path = FIXTURE_DIR / "raw_api_details_response.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def raw_qa_response() -> list[dict[str, Any]]:
+    """Recorded Q&A API response for topic A254-049 (7 entries)."""
+    path = FIXTURE_DIR / "raw_api_qa_response.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def raw_component_instructions_pdf() -> bytes:
+    """Recorded ARMY component instructions PDF."""
+    path = FIXTURE_DIR / "raw_component_instructions_army.pdf"
+    return path.read_bytes()
+
+
+@pytest.fixture
+def raw_solicitation_instructions_pdf() -> bytes:
+    """Recorded BAA preface PDF."""
+    path = FIXTURE_DIR / "raw_solicitation_instructions.pdf"
     return path.read_bytes()
 
 
@@ -185,77 +215,374 @@ class TestDsipApiAdapterNormalization:
 
 
 class TestDsipEnrichmentAdapterParsing:
+    """Legacy PDF-based tests removed in step 02-01 (replaced by API-based enrichment).
 
-    def test_extract_description_from_real_pdf(self, raw_pdf_bytes: bytes) -> None:
-        """Parse the recorded PDF and verify description extraction."""
-        adapter = DsipEnrichmentAdapter()
-        data = adapter._extract_from_pdf(raw_pdf_bytes)
+    The adapter no longer downloads topic PDFs -- it uses 3 API endpoints.
+    See TestDsipEnrichmentAdapterApiEnrichment for the replacement tests.
+    """
 
-        assert data["description"], "Description should not be empty"
-        assert len(data["description"]) > 100
-        # This PDF is for topic 68491 (Distributed Command, Control, ...)
-        assert "command" in data["description"].lower() or "control" in data["description"].lower()
+    pass
 
-    def test_enrich_with_mocked_http(self, raw_pdf_bytes: bytes) -> None:
-        """DsipEnrichmentAdapter.enrich() with topic dicts returns parsed sections."""
+
+# ===================================================================
+# Test 2b: DsipEnrichmentAdapter — API-based enrichment (step 02-01)
+# ===================================================================
+
+
+class TestDsipEnrichmentAdapterApiEnrichment:
+    """Tests for API-based enrichment: details, Q&A, and instruction PDFs.
+
+    Test Budget: 8 behaviors x 2 = 16 unit tests max.
+    All tests invoke through DsipEnrichmentAdapter.enrich() (driving port).
+    HTTP client is mocked at the port boundary.
+    """
+
+    def _make_topic(
+        self,
+        topic_id: str = "7051b2da4a1e4c52bd0e7daf80d514f7_86352",
+        cycle_name: str = "DOD_SBIR_2025_P1_C4",
+        release_number: int = 12,
+        component: str = "ARMY",
+        published_qa_count: int = 7,
+    ) -> dict[str, Any]:
+        return {
+            "topic_id": topic_id,
+            "topic_code": "A254-049",
+            "title": "Affordable Ka-Band Radar",
+            "cycle_name": cycle_name,
+            "release_number": release_number,
+            "component": component,
+            "published_qa_count": published_qa_count,
+            "baa_instructions": [{"upload_id": 1715189, "file_name": "Army_SBIR_254_R12.pdf",
+                                   "upload_type_code": "COMPONENT_FINAL_DOCUMENT_UPLOAD"}],
+        }
+
+    def _mock_client_for_api(
+        self,
+        details_json: dict[str, Any] | None = None,
+        qa_json: list[dict[str, Any]] | None = None,
+        component_pdf: bytes | None = None,
+        solicitation_pdf: bytes | None = None,
+        details_error: Exception | None = None,
+        qa_error: Exception | None = None,
+        component_error: Exception | None = None,
+        solicitation_error: Exception | None = None,
+    ) -> MagicMock:
+        """Build a mock httpx.Client that routes by URL pattern."""
         mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = raw_pdf_bytes
-        mock_response.raise_for_status = MagicMock()
-        mock_client.get.return_value = mock_response
 
-        adapter = DsipEnrichmentAdapter(http_client=mock_client, rate_limit_seconds=0)
-        result = adapter.enrich(topics=[{
-            "topic_id": "68491",
-            "cycle_name": "DOD_SBIR_2025_P1_C4",
-            "release_number": 12,
-            "component": "ARMY",
-            "published_qa_count": 7,
-        }])
+        def route_get(url: str, **kwargs: Any) -> MagicMock:
+            resp = MagicMock()
+            resp.raise_for_status = MagicMock()
+
+            if "/details" in url:
+                if details_error:
+                    resp.raise_for_status.side_effect = details_error
+                else:
+                    resp.json.return_value = details_json or {}
+                    resp.status_code = 200
+            elif "/questions" in url:
+                if qa_error:
+                    resp.raise_for_status.side_effect = qa_error
+                else:
+                    resp.json.return_value = qa_json or []
+                    resp.status_code = 200
+            elif "documentType=INSTRUCTIONS&component=" in url or "component=" in url and "INSTRUCTIONS" in url:
+                if component_error:
+                    resp.raise_for_status.side_effect = component_error
+                else:
+                    resp.content = component_pdf or b""
+                    resp.status_code = 200
+            elif "RELEASE_PREFACE" in url:
+                if solicitation_error:
+                    resp.raise_for_status.side_effect = solicitation_error
+                else:
+                    resp.content = solicitation_pdf or b""
+                    resp.status_code = 200
+            else:
+                resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+                    "404 Not Found", request=MagicMock(), response=MagicMock(),
+                )
+            return resp
+
+        mock_client.get.side_effect = route_get
+        return mock_client
+
+    # --- Behavior 1: Details endpoint returns structured fields ---
+
+    def test_details_returns_description_objective_keywords(
+        self,
+        raw_details_response: dict[str, Any],
+        raw_qa_response: list[dict[str, Any]],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """Enrichment fetches details API and returns structured fields."""
+        client = self._mock_client_for_api(
+            details_json=raw_details_response,
+            qa_json=raw_qa_response,
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
+        )
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0)
+        result = adapter.enrich(topics=[self._make_topic()])
 
         assert len(result.enriched) == 1
-        assert result.errors == []
         entry = result.enriched[0]
-        assert entry["topic_id"] == "68491"
-        assert entry["description"]
-        assert "instructions" in entry
-        assert "component_instructions" in entry
-        assert "qa_entries" in entry
-        # Completeness tracks 4 data types
-        assert result.completeness["descriptions"] == 1
-        assert result.completeness["total"] == 1
-        assert "solicitation_instructions" in result.completeness
-        assert "component_instructions" in result.completeness
+        # Description: HTML tags stripped, contains "Ka band" or "Ka-Band"
+        assert "Ka" in entry["description"] or "metamaterials" in entry["description"].lower()
+        # Objective is present
+        assert entry.get("objective")
+        assert "low-cost" in entry["objective"].lower() or "Ka-Band" in entry["objective"]
+        # Keywords is a list (parsed from semicolons)
+        assert isinstance(entry["keywords"], list)
+        assert len(entry["keywords"]) >= 3
+        assert "Radar" in entry["keywords"]
+        # Technology areas
+        assert isinstance(entry["technology_areas"], list)
+        assert "Information Systems" in entry["technology_areas"]
+        assert "Materials" in entry["technology_areas"]
+        # Focus areas
+        assert isinstance(entry["focus_areas"], list)
+        assert len(entry["focus_areas"]) > 0
+        # ITAR and CMMC
+        assert entry["itar"] is False
 
-    def test_enrich_isolates_http_failure(self, raw_pdf_bytes: bytes) -> None:
-        """Bad topic doesn't crash the batch."""
-        import httpx
+    # --- Behavior 2: Keywords parsed from semicolon-separated string ---
 
-        mock_client = MagicMock()
-        ok_response = MagicMock()
-        ok_response.content = raw_pdf_bytes
-        ok_response.raise_for_status = MagicMock()
-
-        fail_response = MagicMock()
-        fail_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "403", request=MagicMock(), response=MagicMock(),
+    def test_keywords_parsed_into_trimmed_list(
+        self,
+        raw_details_response: dict[str, Any],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """Keywords semicolon-separated string becomes a trimmed list."""
+        client = self._mock_client_for_api(
+            details_json=raw_details_response,
+            qa_json=[],
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
         )
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0)
+        result = adapter.enrich(topics=[self._make_topic(published_qa_count=0)])
 
-        mock_client.get.side_effect = [ok_response, fail_response]
+        keywords = result.enriched[0]["keywords"]
+        assert len(keywords) == 5  # "Radar; antenna; metamaterials; scanning; array"
+        for kw in keywords:
+            assert kw == kw.strip(), f"Keyword '{kw}' has leading/trailing whitespace"
 
-        adapter = DsipEnrichmentAdapter(
-            http_client=mock_client, rate_limit_seconds=0, max_retries=1,
+    # --- Behavior 3: Q&A entries parsed with double-JSON answer ---
+
+    def test_qa_entries_parsed_with_nested_json_answer(
+        self,
+        raw_details_response: dict[str, Any],
+        raw_qa_response: list[dict[str, Any]],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """Q&A answers with nested JSON {"content": "<HTML>"} are parsed."""
+        client = self._mock_client_for_api(
+            details_json=raw_details_response,
+            qa_json=raw_qa_response,
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
         )
-        result = adapter.enrich(topics=[
-            {"topic_id": "68491", "cycle_name": "C4", "release_number": 12,
-             "component": "ARMY", "published_qa_count": 0},
-            {"topic_id": "BAD_ID", "cycle_name": "C4", "release_number": 12,
-             "component": "ARMY", "published_qa_count": 0},
-        ])
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0)
+        result = adapter.enrich(topics=[self._make_topic()])
+
+        qa_entries = result.enriched[0]["qa_entries"]
+        assert len(qa_entries) == 7
+        # First entry: question_no, question, answer, status
+        first = qa_entries[0]
+        assert first["question_no"] == 1
+        assert first["question"]  # non-empty
+        assert "seeker design is not of interest" in first["answer"]
+        assert first["status"] == "COMPLETED"
+
+    # --- Behavior 4: Malformed answer falls back to raw string ---
+
+    def test_malformed_qa_answer_falls_back_to_raw(
+        self,
+        raw_details_response: dict[str, Any],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """If answer field is not valid JSON, raw string is used."""
+        malformed_qa = [{
+            "questionId": 999,
+            "questionNo": 1,
+            "question": "<p>Test question</p>",
+            "questionStatus": "COMPLETED",
+            "questionStatusDisplay": "Completed",
+            "questionSubmittedOn": 1762366997779,
+            "answers": [{"answerId": 1, "answer": "not valid json at all"}],
+        }]
+        client = self._mock_client_for_api(
+            details_json=raw_details_response,
+            qa_json=malformed_qa,
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
+        )
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0)
+        result = adapter.enrich(topics=[self._make_topic()])
+
+        qa_entries = result.enriched[0]["qa_entries"]
+        assert len(qa_entries) == 1
+        assert qa_entries[0]["answer"] == "not valid json at all"
+
+    # --- Behavior 5: Q&A skipped for topics with published_qa_count == 0 ---
+
+    def test_qa_skipped_when_published_count_zero(
+        self,
+        raw_details_response: dict[str, Any],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """No Q&A request when published_qa_count == 0."""
+        client = self._mock_client_for_api(
+            details_json=raw_details_response,
+            qa_json=[],  # should not be called
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
+        )
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0)
+        result = adapter.enrich(topics=[self._make_topic(published_qa_count=0)])
+
+        # Verify no Q&A request was made
+        calls = [str(c) for c in client.get.call_args_list]
+        qa_calls = [c for c in calls if "/questions" in c]
+        assert len(qa_calls) == 0, f"Q&A endpoint should not be called: {qa_calls}"
+        # Q&A entries empty
+        assert result.enriched[0]["qa_entries"] == []
+        # Q&A completeness not incremented
+        assert result.completeness.get("qa", 0) == 0
+
+    # --- Behavior 6: Instruction PDFs cached within batch ---
+
+    def test_instruction_pdfs_cached_per_cycle_component(
+        self,
+        raw_details_response: dict[str, Any],
+        raw_qa_response: list[dict[str, Any]],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """Two topics with same cycle+component download instructions only once."""
+        client = self._mock_client_for_api(
+            details_json=raw_details_response,
+            qa_json=raw_qa_response,
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
+        )
+        topic1 = self._make_topic(topic_id="hash_A")
+        topic2 = self._make_topic(topic_id="hash_B")
+
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0)
+        result = adapter.enrich(topics=[topic1, topic2])
+
+        assert len(result.enriched) == 2
+        # Both topics should have the same instruction text
+        text1 = result.enriched[0].get("component_instructions")
+        text2 = result.enriched[1].get("component_instructions")
+        assert text1 is not None, "Component instructions should be present"
+        assert text1 == text2, "Same cycle+component should share cached instructions"
+
+        # Count instruction download calls (component + solicitation)
+        calls = [str(c) for c in client.get.call_args_list]
+        component_calls = [c for c in calls if "INSTRUCTIONS" in c and "component" in c.lower()]
+        solicitation_calls = [c for c in calls if "RELEASE_PREFACE" in c]
+        # Each should be called only once despite 2 topics
+        assert len(component_calls) == 1, f"Expected 1 component download, got {len(component_calls)}"
+        assert len(solicitation_calls) == 1, f"Expected 1 solicitation download, got {len(solicitation_calls)}"
+
+    # --- Behavior 7: Per-endpoint failure isolation ---
+
+    def test_details_failure_does_not_block_qa_or_instructions(
+        self,
+        raw_qa_response: list[dict[str, Any]],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """If details endpoint fails, Q&A and instructions still retrieved."""
+        client = self._mock_client_for_api(
+            details_error=httpx.HTTPStatusError("500", request=MagicMock(), response=MagicMock()),
+            qa_json=raw_qa_response,
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
+        )
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0, max_retries=1)
+        result = adapter.enrich(topics=[self._make_topic()])
 
         assert len(result.enriched) == 1
-        assert len(result.errors) == 1
-        assert result.errors[0]["topic_id"] == "BAD_ID"
+        entry = result.enriched[0]
+        # Details failed: description/objective empty
+        assert entry.get("description", "") == ""
+        # Q&A and instructions still present
+        assert len(entry["qa_entries"]) == 7
+        assert entry.get("component_instructions") is not None
+        assert entry.get("solicitation_instructions") is not None
+
+    def test_qa_failure_does_not_block_details_or_instructions(
+        self,
+        raw_details_response: dict[str, Any],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """If Q&A endpoint fails, details and instructions still returned."""
+        client = self._mock_client_for_api(
+            details_json=raw_details_response,
+            qa_error=httpx.HTTPStatusError("500", request=MagicMock(), response=MagicMock()),
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
+        )
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0, max_retries=1)
+        result = adapter.enrich(topics=[self._make_topic()])
+
+        assert len(result.enriched) == 1
+        entry = result.enriched[0]
+        assert entry["description"]  # details still present
+        assert entry["qa_entries"] == []  # Q&A failed
+        assert entry.get("component_instructions") is not None
+
+    # --- Behavior 8: Enrichment status "partial" ---
+
+    def test_enrichment_status_partial_when_data_source_fails(
+        self,
+        raw_qa_response: list[dict[str, Any]],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """Topic gets enrichment_status 'partial' when any data source fails."""
+        client = self._mock_client_for_api(
+            details_error=httpx.HTTPStatusError("500", request=MagicMock(), response=MagicMock()),
+            qa_json=raw_qa_response,
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
+        )
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0, max_retries=1)
+        result = adapter.enrich(topics=[self._make_topic()])
+
+        entry = result.enriched[0]
+        assert entry.get("enrichment_status") == "partial"
+
+    def test_all_sources_ok_gives_status_ok(
+        self,
+        raw_details_response: dict[str, Any],
+        raw_qa_response: list[dict[str, Any]],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
+    ) -> None:
+        """Topic gets enrichment_status 'ok' when all data sources succeed."""
+        client = self._mock_client_for_api(
+            details_json=raw_details_response,
+            qa_json=raw_qa_response,
+            component_pdf=raw_component_instructions_pdf,
+            solicitation_pdf=raw_solicitation_instructions_pdf,
+        )
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0)
+        result = adapter.enrich(topics=[self._make_topic()])
+
+        entry = result.enriched[0]
+        assert entry.get("enrichment_status") == "ok"
 
 
 # ===================================================================
@@ -299,37 +626,60 @@ class TestKeywordPreFilter:
 
 class TestFullPipelineMocked:
 
-    def test_search_and_enrich_matches_live_output(
+    def test_search_and_enrich_pipeline_with_api_enrichment(
         self,
-        raw_api_response_legacy: dict[str, Any],
-        raw_pdf_bytes: bytes,
+        raw_api_response: dict[str, Any],
+        raw_details_response: dict[str, Any],
+        raw_qa_response: list[dict[str, Any]],
+        raw_component_instructions_pdf: bytes,
+        raw_solicitation_instructions_pdf: bytes,
         sample_profile: dict[str, Any],
-        expected_enrich: dict[str, Any],
         tmp_path: Path,
     ) -> None:
-        """Full pipeline with mocked HTTP should match recorded live output."""
+        """Full pipeline with API-based enrichment produces enriched topics."""
         # Mock fetch adapter
         mock_http_response = MagicMock()
-        mock_http_response.json.return_value = raw_api_response_legacy
+        mock_http_response.json.return_value = raw_api_response
         mock_http_response.raise_for_status = MagicMock()
 
-        # Mock enrichment HTTP client (returns same PDF for any topic)
-        mock_client = MagicMock()
-        mock_pdf_response = MagicMock()
-        mock_pdf_response.content = raw_pdf_bytes
-        mock_pdf_response.raise_for_status = MagicMock()
-        mock_client.get.return_value = mock_pdf_response
+        # Mock enrichment HTTP client -- route by URL
+        mock_enrich_client = MagicMock()
+
+        def route_get(url: str, **kwargs: Any) -> MagicMock:
+            resp = MagicMock()
+            resp.raise_for_status = MagicMock()
+            if "/details" in url:
+                resp.json.return_value = raw_details_response
+                resp.status_code = 200
+            elif "/questions" in url:
+                resp.json.return_value = raw_qa_response
+                resp.status_code = 200
+            elif "RELEASE_PREFACE" in url:
+                resp.content = raw_solicitation_instructions_pdf
+                resp.status_code = 200
+            elif "INSTRUCTIONS" in url:
+                resp.content = raw_component_instructions_pdf
+                resp.status_code = 200
+            else:
+                resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+                    "404", request=MagicMock(), response=MagicMock(),
+                )
+            return resp
+
+        mock_enrich_client.get.side_effect = route_get
 
         with patch("pes.adapters.dsip_api_adapter.httpx.get", return_value=mock_http_response):
-            fetcher = DsipApiAdapter(page_size=10, max_pages=1)
+            fetcher = DsipApiAdapter(page_size=100, max_pages=1)
             enricher = DsipEnrichmentAdapter(
-                http_client=mock_client, rate_limit_seconds=0,
+                http_client=mock_enrich_client, rate_limit_seconds=0,
             )
             cache = JsonTopicCacheAdapter(str(tmp_path))
 
-            # Override capabilities to match live run
+            # Use capabilities that match all 3 topics in fixture
             profile = dict(sample_profile)
-            profile["capabilities"] = ["software", "sensor", "AI", "intelligence"]
+            profile["capabilities"] = [
+                "radar", "metamaterials", "battery", "respirator",
+            ]
 
             service = FinderService(
                 topic_fetch=fetcher,
@@ -340,17 +690,17 @@ class TestFullPipelineMocked:
 
             result = service.search_and_enrich()
 
-        # Verify against recorded live output
+        # Pipeline should complete without error
         assert result.error is None
         assert result.source == "dsip_api"
-        assert result.total_fetched == expected_enrich["total_fetched"]
-        assert result.candidates_count == expected_enrich["candidates_count"]
-        assert result.eliminated_count == expected_enrich["eliminated_count"]
+        assert result.total_fetched == 3  # 3 topics from correct-format fixture
 
-        # Enriched topics should have descriptions
+        # All candidates should be enriched with API data
         for topic in result.topics:
             assert topic.get("enrichment_status") == "ok"
             assert topic["description"]
+            assert isinstance(topic.get("keywords"), list)
+            assert isinstance(topic.get("technology_areas"), list)
 
         # Cache should have been written
         assert cache.exists()
