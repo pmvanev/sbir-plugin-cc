@@ -1,0 +1,95 @@
+{
+  "source": "dsip_api",
+  "total": 10,
+  "total_fetched": 10,
+  "candidates_count": 2,
+  "eliminated_count": 8,
+  "partial": false,
+  "error": null,
+  "messages": [
+    "Keyword match: 2 candidate topics (8 eliminated)",
+    "Descriptions: 2/2"
+  ],
+  "topics": [
+    {
+      "topic_id": "68491",
+      "topic_code": "A83-002",
+      "title": "Distributed Command, Control, Communications, and Intelligence",
+      "status": "Closed",
+      "program": "SBIR",
+      "component": "ARMY",
+      "solicitation_number": "83.3",
+      "cycle_name": "DOD_SBIR_83_P1_C3",
+      "start_date": "1983-06-01T08:00:00+00:00",
+      "deadline": "1983-07-01T08:00:00+00:00",
+      "cmmc_level": "",
+      "phase": "{\"config\": [{\"phase\": \"1\", \"displayValue\": \"I\", \"hasConfiguration\": \"N\"}, {\"phase\": \"2\", \"displayValue\": \"II\", \"hasConfiguration\": \"U\"}, {\"phase\": \"2S\", \"displayValue\": \"SPII\", \"hasConfiguration\": \"U\"}]}",
+      "matched_keywords": [
+        "intelligence"
+      ],
+      "description": ":\nDevelopment of dispersed, survivable command and control nodes with application down to the small unit level. \nThe ultimate objective of this thrust is to design the architecture and systems to integrate battlefield information \nfrom all assets on the battlefield, distribute what each commander needs, and provide the opportunity for him to \ninteract with a display/computer to permit precision fighting. Microchip technology, mass storage media, and \ninteractive display technologies provide the technological development to accomplish dispersion command and \ncontrol. (5) Conceptual approaches to novel netted communication systems exploiting technological \nbreakthroughs in microprocessors to yield orders of magnitude improvement in survivability against electronic \nand physical threats. (6) Methods of exploiting short-term phenomena for reducing propagational losses, and \ntranslating these effects to product reliable special mode of communications techniques (for example, ducting, \nmeteor burst, etc.). (7) Improved low frequency air/metal coupling techniques to yield higher efficiency and higher \ngain without resorting to larger array sizes, larger radiating elements, enlarged reflectors, etc. (8) Self-adjusting \nfailure prevention techniques associated with analytical behavior of solid-state component designs. (9) ADP \nhardware and software techniques (commonly vs. special purpose) for cells of a fluidly changing command post. \n(10) Development of a machine for the composition and typesetting of Chinese text. This requirement is for \npsychological operations. (9)\n \nPHASE I:\nN/A\n \nPHASE II:\nN/A\n \nPHASE III DUAL USE APPLICATIONS:\nN/A\n \nREFERENCES:\nN/A\n \nTECHNICAL POINT OF CONTACT (TPOC):\nNone",
+      "instructions": null,
+      "component_instructions": null,
+      "qa_entries": [],
+      "enrichment_status": "ok"
+    },
+    {
+      "topic_id": "68492",
+      "topic_code": "A83-003",
+      "title": "Self-Containing Munitions",
+      "status": "Closed",
+      "program": "SBIR",
+      "component": "ARMY",
+      "solicitation_number": "83.3",
+      "cycle_name": "DOD_SBIR_83_P1_C3",
+      "start_date": "1983-06-01T08:00:00+00:00",
+      "deadline": "1983-07-01T08:00:00+00:00",
+      "cmmc_level": "",
+      "phase": "{\"config\": [{\"phase\": \"1\", \"displayValue\": \"I\", \"hasConfiguration\": \"N\"}, {\"phase\": \"2\", \"displayValue\": \"II\", \"hasConfiguration\": \"U\"}, {\"phase\": \"2S\", \"displayValue\": \"SPII\", \"hasConfiguration\": \"U\"}]}",
+      "matched_keywords": [
+        "AI"
+      ],
+      "description": ":\nOperations on future battlefields require the employment of self-contained (brilliant) munitions that can seek out \nand destroy the target in a lock-on-after-launch mode without operator (gunner) assistance. These terminal \nhoming munitions (weapon systems) must be viable in the adverse battlefield environments of smoke, dust, haze, \nfog, rain, and active/passive countermeasures. Targets will be both hard and soft ground targets and a wide \nvariety of platforms. Launch of the engagement system may be from ground on air platforms. Specific technology \nareas of interest include: a. Indirect fire antiarmor submunitions (8,14) b. Autonomous acquisition algorithms and \nprocessors (8) c. Midcourse inertial guidance techniques and components (8) d. Minimum signature propulsion (8) \ne. Air-breathing propulsion (8) f. Fiber composite structures and materials applications (8) g. Fiber optic guidance \ntechnologies (8) h. Kinetic energy kill mechanisms (8,14) i. Millimeter wave and submillimeter wave technology (8, \n14,15) j. Aerodynamics of maneuvering projectiles (8) k. Passive sensing (14) l. Automatic control (14) m. Artificial \nintelligence (12) n. Automatic recognition (8, 14, 15) o. Propellant Chemistry (14) p. Electro-optics (15) q. Dynamics \nof Projectile Penetration in Snow (2) Develop constitutive equations for projectile penetrations in snow. Must \nconsider both blast effects as well as physics of projectile penetration of explosive munitions. Final form should be \nsimplified for engineering applications.\n \nPHASE I:\nN/A\n \nPHASE II:\nN/A\n \nPHASE III DUAL USE APPLICATIONS:\nN/A\n \nREFERENCES:\nN/A\n \nTECHNICAL POINT OF CONTACT (TPOC):\nNone",
+      "instructions": null,
+      "component_instructions": null,
+      "qa_entries": [],
+      "enrichment_status": "ok"
+    }
+  ],
+  "scored": [
+    {
+      "topic_id": "68491",
+      "composite_score": 0.67,
+      "recommendation": "GO",
+      "dimensions": {
+        "subject_matter": 0.7,
+        "past_performance": 0.4,
+        "certifications": 1.0,
+        "eligibility": 0.5,
+        "sttr": 1.0
+      },
+      "disqualifiers": [],
+      "warnings": [],
+      "key_personnel_match": [
+        "John Smith"
+      ]
+    },
+    {
+      "topic_id": "68492",
+      "composite_score": 0.57,
+      "recommendation": "EVALUATE",
+      "dimensions": {
+        "subject_matter": 0.7,
+        "past_performance": 0.0,
+        "certifications": 1.0,
+        "eligibility": 0.5,
+        "sttr": 1.0
+      },
+      "disqualifiers": [],
+      "warnings": [],
+      "key_personnel_match": [
+        "Jane Doe"
+      ]
+    }
+  ]
+}

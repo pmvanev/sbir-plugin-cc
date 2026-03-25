@@ -1,0 +1,44 @@
+{
+  "company_name": "Acme Defense Tech",
+  "capabilities": [
+    "software",
+    "sensor",
+    "AI",
+    "intelligence",
+    "data processing"
+  ],
+  "certifications": {
+    "sam_gov": {
+      "active": true
+    }
+  },
+  "past_performance": [
+    {
+      "agency": "army",
+      "topic_area": "sensor data processing",
+      "outcome": "awarded"
+    },
+    {
+      "agency": "navy",
+      "topic_area": "intelligence software",
+      "outcome": "awarded"
+    }
+  ],
+  "key_personnel": [
+    {
+      "name": "Jane Doe",
+      "expertise": [
+        "software",
+        "AI"
+      ]
+    },
+    {
+      "name": "John Smith",
+      "expertise": [
+        "sensor",
+        "intelligence"
+      ]
+    }
+  ],
+  "employee_count": 25
+}
