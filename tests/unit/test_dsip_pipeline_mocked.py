@@ -594,6 +594,29 @@ class TestDsipEnrichmentAdapterApiEnrichment:
         entry = result.enriched[0]
         assert entry.get("enrichment_status") == "ok"
 
+    def test_bare_topic_id_skips_instructions_without_crash(
+        self,
+        raw_details_response: dict[str, Any],
+    ) -> None:
+        """When topic dict has only topic_id (no cycle metadata), skip instruction downloads."""
+        bare_topic = {"topic_id": "7051b2da4a1e4c52bd0e7daf80d514f7_86352"}
+
+        client = self._mock_client_for_api(details_json=raw_details_response)
+        adapter = DsipEnrichmentAdapter(http_client=client, rate_limit_seconds=0)
+        result = adapter.enrich(topics=[bare_topic])
+
+        assert len(result.enriched) == 1
+        assert result.errors == []
+        entry = result.enriched[0]
+        # Description should come from details API
+        assert entry["description"]
+        # Instructions should be None (skipped, not crashed)
+        assert entry["solicitation_instructions"] is None
+        assert entry["component_instructions"] is None
+        # Q&A skipped because published_qa_count defaults to 0
+        assert entry["qa_entries"] == []
+        assert entry["enrichment_status"] == "ok"
+
 
 # ===================================================================
 # Test 3: KeywordPreFilter matches expected topics

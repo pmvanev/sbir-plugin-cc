@@ -161,52 +161,55 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
                     has_failure = True
 
             # --- Source 3a: Solicitation instructions PDF ---
-            sol_key = (cycle_name, release_number)
-            if sol_key in solicitation_cache:
-                entry["solicitation_instructions"] = solicitation_cache[sol_key]
-                entry["instructions"] = solicitation_cache[sol_key]
-                if solicitation_cache[sol_key] is not None:
-                    sol_instr_count += 1
-            else:
-                try:
-                    sol_text = self._fetch_solicitation_instructions(
-                        cycle_name, release_number,
-                    )
-                    solicitation_cache[sol_key] = sol_text
-                    entry["solicitation_instructions"] = sol_text
-                    entry["instructions"] = sol_text
-                    if sol_text:
+            # Skip if cycle metadata is missing (e.g., detail command with bare topic_id)
+            if cycle_name and release_number:
+                sol_key = (cycle_name, release_number)
+                if sol_key in solicitation_cache:
+                    entry["solicitation_instructions"] = solicitation_cache[sol_key]
+                    entry["instructions"] = solicitation_cache[sol_key]
+                    if solicitation_cache[sol_key] is not None:
                         sol_instr_count += 1
-                except Exception as exc:
-                    logger.warning(
-                        "Solicitation instructions fetch failed for %s: %s",
-                        cycle_name, exc,
-                    )
-                    solicitation_cache[sol_key] = None
-                    has_failure = True
+                else:
+                    try:
+                        sol_text = self._fetch_solicitation_instructions(
+                            cycle_name, release_number,
+                        )
+                        solicitation_cache[sol_key] = sol_text
+                        entry["solicitation_instructions"] = sol_text
+                        entry["instructions"] = sol_text
+                        if sol_text:
+                            sol_instr_count += 1
+                    except Exception as exc:
+                        logger.warning(
+                            "Solicitation instructions fetch failed for %s: %s",
+                            cycle_name, exc,
+                        )
+                        solicitation_cache[sol_key] = None
+                        has_failure = True
 
             # --- Source 3b: Component instructions PDF ---
-            comp_key = (cycle_name, component, release_number)
-            if comp_key in instruction_cache:
-                entry["component_instructions"] = instruction_cache[comp_key]
-                if instruction_cache[comp_key] is not None:
-                    comp_instr_count += 1
-            else:
-                try:
-                    comp_text = self._fetch_component_instructions(
-                        cycle_name, component, release_number,
-                    )
-                    instruction_cache[comp_key] = comp_text
-                    entry["component_instructions"] = comp_text
-                    if comp_text:
+            if cycle_name and component and release_number:
+                comp_key = (cycle_name, component, release_number)
+                if comp_key in instruction_cache:
+                    entry["component_instructions"] = instruction_cache[comp_key]
+                    if instruction_cache[comp_key] is not None:
                         comp_instr_count += 1
-                except Exception as exc:
-                    logger.warning(
-                        "Component instructions fetch failed for %s/%s: %s",
-                        cycle_name, component, exc,
-                    )
-                    instruction_cache[comp_key] = None
-                    has_failure = True
+                else:
+                    try:
+                        comp_text = self._fetch_component_instructions(
+                            cycle_name, component, release_number,
+                        )
+                        instruction_cache[comp_key] = comp_text
+                        entry["component_instructions"] = comp_text
+                        if comp_text:
+                            comp_instr_count += 1
+                    except Exception as exc:
+                        logger.warning(
+                            "Component instructions fetch failed for %s/%s: %s",
+                            cycle_name, component, exc,
+                        )
+                        instruction_cache[comp_key] = None
+                        has_failure = True
 
             # Set enrichment status
             entry["enrichment_status"] = "partial" if has_failure else "ok"
