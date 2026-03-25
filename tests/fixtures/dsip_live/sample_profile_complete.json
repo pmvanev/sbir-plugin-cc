@@ -1,0 +1,32 @@
+{
+  "company_name": "Acme Defense Tech",
+  "capabilities": [
+    "radar",
+    "sensor",
+    "AI",
+    "metamaterials",
+    "batteries"
+  ],
+  "certifications": {
+    "sam_gov": {
+      "active": true
+    }
+  },
+  "past_performance": [
+    {
+      "agency": "army",
+      "topic_area": "radar sensor processing",
+      "outcome": "awarded"
+    }
+  ],
+  "key_personnel": [
+    {
+      "name": "Jane Doe",
+      "expertise": [
+        "radar",
+        "sensor"
+      ]
+    }
+  ],
+  "employee_count": 25
+}
