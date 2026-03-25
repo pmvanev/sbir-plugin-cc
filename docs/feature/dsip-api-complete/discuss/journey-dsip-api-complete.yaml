@@ -1,0 +1,158 @@
+journey:
+  name: "DSIP API Complete"
+  goal: "Retrieve complete topic intelligence (descriptions, Q&A, solicitation instructions, component instructions) from DSIP API using correct query format"
+  persona: "sbir-topic-scout agent (primary); Dr. Sarah Chen, proposal manager (indirect beneficiary)"
+  feature_id: "dsip-api-complete"
+  job_type: "brownfield-fix"
+
+  emotional_arc:
+    start: "Routine -- agent executes standard scan command"
+    middle: "Precision -- correct search returns only relevant topics; enrichment adds all 4 data types"
+    end: "Confidence -- complete data enables accurate GO/EVALUATE/NO-GO recommendation"
+
+steps:
+  - id: 1
+    name: "Search with Correct Format"
+    action: "DsipApiAdapter.fetch() builds JSON searchParam instead of flat query params"
+
+    shared_artifacts:
+      - name: "topic_hash_id"
+        source: "DSIP search API response field: topicId"
+        displayed_as: "${topic_hash_id}"
+        consumers: ["details endpoint", "Q&A endpoint", "PDF download endpoint"]
+      - name: "cycle_name"
+        source: "DSIP search API response field: cycleName"
+        displayed_as: "${cycle_name}"
+        consumers: ["instruction download URL construction"]
+      - name: "release_number"
+        source: "DSIP search API response field: releaseNumber"
+        displayed_as: "${release_number}"
+        consumers: ["instruction download URL construction"]
+      - name: "component"
+        source: "DSIP search API response field: component"
+        displayed_as: "${component}"
+        consumers: ["component instruction download URL construction"]
+      - name: "published_qa_count"
+        source: "DSIP search API response field: noOfPublishedQuestions"
+        displayed_as: "${published_qa_count}"
+        consumers: ["Q&A fetch skip optimization"]
+
+    emotional_state:
+      entry: "Neutral -- executing routine scan"
+      exit: "Precise -- only relevant topics returned (24 vs 32K)"
+
+    integration_checkpoint: |
+      Search response contains hash IDs (not numeric).
+      Response includes cycleName, releaseNumber, component for every topic.
+      Total count matches expected range for current solicitation cycle.
+
+  - id: 2
+    name: "Fetch Topic Details via API"
+    action: "DsipEnrichmentAdapter calls /topics/{hash_id}/details for structured JSON"
+
+    shared_artifacts:
+      - name: "description"
+        source: "DSIP details API response field: description (HTML)"
+        displayed_as: "${description}"
+        consumers: ["enriched topic output", "scoring service", "agent analysis"]
+      - name: "objective"
+        source: "DSIP details API response field: objective (HTML)"
+        displayed_as: "${objective}"
+        consumers: ["enriched topic output", "agent analysis"]
+      - name: "technology_areas"
+        source: "DSIP details API response field: technologyAreas (array)"
+        displayed_as: "${technology_areas}"
+        consumers: ["enriched topic output", "scoring service"]
+      - name: "itar_flag"
+        source: "DSIP details API response field: itar (boolean)"
+        displayed_as: "${itar}"
+        consumers: ["enriched topic output", "disqualifier check"]
+
+    emotional_state:
+      entry: "Focused -- fetching per-topic details"
+      exit: "Informed -- structured description data available"
+
+    integration_checkpoint: |
+      Details response contains description, objective, phase descriptions.
+      HTML content is preserved (not lossy PDF extraction).
+      Technology areas and focus areas populated for scoring.
+
+  - id: 3
+    name: "Fetch Topic Q&A"
+    action: "DsipEnrichmentAdapter calls /topics/{hash_id}/questions"
+
+    shared_artifacts:
+      - name: "qa_entries"
+        source: "DSIP Q&A API response (array of question/answer objects)"
+        displayed_as: "${qa_entries}"
+        consumers: ["enriched topic output", "agent analysis"]
+
+    emotional_state:
+      entry: "Curious -- Q&A reveals government intent"
+      exit: "Thorough -- government clarifications now visible"
+
+    integration_checkpoint: |
+      Q&A count matches noOfPublishedQuestions from search.
+      Nested answer JSON (content field) correctly parsed.
+      Topics with zero published questions skipped without error.
+
+  - id: 4
+    name: "Fetch Instruction Documents"
+    action: "DsipEnrichmentAdapter downloads solicitation + component instruction PDFs"
+
+    shared_artifacts:
+      - name: "solicitation_instructions"
+        source: "BAA preface PDF via /submissions/api/public/download/solicitationDocuments"
+        displayed_as: "${solicitation_instructions}"
+        consumers: ["enriched topic output", "agent analysis"]
+      - name: "component_instructions"
+        source: "Component annex PDF via same endpoint with component param"
+        displayed_as: "${component_instructions}"
+        consumers: ["enriched topic output", "agent analysis"]
+
+    emotional_state:
+      entry: "Methodical -- completing the data picture"
+      exit: "Complete -- all 4 data types gathered"
+
+    integration_checkpoint: |
+      Instruction URLs constructed from search response fields (cycleName, releaseNumber, component).
+      PDF downloaded and text extracted via pypdf.
+      Missing instruction PDFs (404) isolated per-topic, not batch-failing.
+
+  - id: 5
+    name: "Combine and Output"
+    action: "FinderService merges search metadata + enrichment into complete JSON on stdout"
+
+    shared_artifacts:
+      - name: "enriched_topic_output"
+        source: "FinderService.search_and_enrich() combining all previous steps"
+        displayed_as: "JSON stdout"
+        consumers: ["agent stdout parsing", "topic cache", "scoring service"]
+      - name: "completeness_metrics"
+        source: "EnrichmentResult.completeness dict"
+        displayed_as: "${completeness}"
+        consumers: ["agent confidence assessment", "CLI output messages"]
+
+    emotional_state:
+      entry: "Assembling -- merging 4 data streams"
+      exit: "Confident -- complete intelligence package ready for recommendation"
+
+    integration_checkpoint: |
+      Every enriched topic has enrichment_status field.
+      Completeness metrics report counts for all 4 data types.
+      Cache updated with enriched data for subsequent calls.
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "topic_hash_id"
+      must_match_across: [1, 2, 3, 4]
+      failure_message: "Hash ID from search must be used consistently for details, Q&A, and PDF endpoints"
+    - artifact: "cycle_name"
+      must_match_across: [1, 4]
+      failure_message: "cycleName from search must match solicitation param in instruction download URL"
+    - artifact: "release_number"
+      must_match_across: [1, 4]
+      failure_message: "releaseNumber from search must match release param in instruction download URL"
+    - artifact: "component"
+      must_match_across: [1, 4]
+      failure_message: "component from search must match component param in instruction download URL"

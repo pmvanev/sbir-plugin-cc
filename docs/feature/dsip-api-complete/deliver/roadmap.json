@@ -1,0 +1,132 @@
+{
+  "roadmap": {
+    "project_id": "dsip-api-complete",
+    "created_at": "2026-03-24T23:00:00Z",
+    "total_steps": 5,
+    "phases": 4
+  },
+  "validation": {
+    "status": "approved",
+    "approved_at": "2026-03-24T23:00:00Z",
+    "notes": "Lean roadmap from architecture.md. 4 Python TDD steps + 1 markdown forge step. Sequential dependency chain."
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Search and Port Foundation",
+      "description": "Fix search query format and widen enrichment port",
+      "default_agent": "nw-software-crafter",
+      "default_deps_strategy": "sequential",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Fix search query format and normalize new fields",
+          "criteria": [
+            "Search requests use JSON searchParam format with size pagination",
+            "Status Open maps to topicReleaseStatus [592], Pre-Release to [591], no filter to [591, 592]",
+            "Normalized topics include cycle_name, release_number, published_qa_count",
+            "Topic IDs are hash format (contain underscore)",
+            "Existing pagination, retry, and rate-limiting behavior preserved"
+          ],
+          "files_to_modify": [
+            "scripts/pes/adapters/dsip_api_adapter.py",
+            "tests/unit/test_dsip_pipeline_mocked.py"
+          ],
+          "implementation_notes": "delivery: code/tdd. Fix _build_search_params to construct searchParam JSON. Fix _normalize_topic to map cycleName->cycle_name, releaseNumber->release_number, noOfPublishedQuestions->published_qa_count, baaInstructions->baa_instructions. Use recorded fixture raw_api_search_correct_format.json for tests."
+        },
+        {
+          "id": "01-02",
+          "name": "Widen enrichment port signature and update integration points",
+          "criteria": [
+            "Enrichment port accepts topic dicts with topic_id, cycle_name, release_number, component, published_qa_count",
+            "Completeness metrics track descriptions, qa, solicitation_instructions, component_instructions separately",
+            "Combined topics include all new enrichment fields",
+            "Completeness report messages include all 4 data types"
+          ],
+          "files_to_modify": [
+            "scripts/pes/ports/topic_enrichment_port.py",
+            "scripts/pes/domain/topic_enrichment.py",
+            "scripts/pes/domain/finder_service.py",
+            "tests/unit/test_dsip_pipeline_mocked.py"
+          ],
+          "implementation_notes": "delivery: code/tdd. Per ADR-DSIP-01: change enrich(topic_ids: list[str]) to enrich(topics: list[dict]). Update FinderService to pass full candidate dicts. Update combine_topics_with_enrichment for new fields. Update completeness_report for 4 data types."
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Enrichment Data Sources",
+      "description": "API-first enrichment with details, Q&A, and instruction PDFs",
+      "default_agent": "nw-software-crafter",
+      "default_deps_strategy": "sequential",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "API-first enrichment (details + Q&A + instruction PDFs)",
+          "criteria": [
+            "Details endpoint returns description, objective, keywords, technology_areas, focus_areas, itar, cmmc_level",
+            "Q&A entries parsed with double-JSON answer format; malformed answers fall back to raw string",
+            "Q&A skipped for topics with published_qa_count == 0",
+            "Instruction PDFs downloaded per cycle+component, text extracted via pypdf, cached within batch",
+            "Per-endpoint failure isolated: one failing data source does not block others",
+            "Enrichment status partial when any data source fails for a topic"
+          ],
+          "files_to_modify": [
+            "scripts/pes/adapters/dsip_enrichment_adapter.py",
+            "tests/unit/test_dsip_pipeline_mocked.py"
+          ],
+          "implementation_notes": "delivery: code/tdd. Replace PDF-only enrichment with 3 API calls: GET /topics/{hash}/details, GET /topics/{hash}/questions, GET /submissions/api/public/download/solicitationDocuments. Use recorded fixtures: raw_api_details_response.json, raw_api_qa_response.json, raw_component_instructions_army.pdf, raw_solicitation_instructions.pdf. Keep pypdf only for instruction PDF text extraction."
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "CLI Integration",
+      "description": "Update CLI output and detail command",
+      "default_agent": "nw-software-crafter",
+      "default_deps_strategy": "sequential",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "CLI output and detail command update",
+          "criteria": [
+            "Enriched topic JSON includes objective, keywords, technology_areas, focus_areas, itar, cmmc_level, qa_entries, solicitation_instructions, component_instructions, enrichment_status",
+            "Detail command works with hash ID format",
+            "Completeness metrics show all 4 data type counts",
+            "Existing fetch/enrich/score commands work with updated adapters"
+          ],
+          "files_to_modify": [
+            "scripts/dsip_cli.py",
+            "tests/unit/test_dsip_pipeline_mocked.py"
+          ],
+          "implementation_notes": "delivery: code/tdd. Update _build_filters to map status names to IDs. Update CLI output schema for new fields. Update detail command to accept hash IDs. Run CLI manually, record output, update fixtures."
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Skills and Agent Update",
+      "description": "Update markdown files for new data availability",
+      "default_agent": "nw-software-crafter",
+      "default_deps_strategy": "sequential",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "Update skills and agent for new data availability",
+          "criteria": [
+            "dsip-cli-usage shows hash ID format in examples and documents all new output fields",
+            "dsip-enrichment describes API-first strategy with details/Q&A/instructions endpoints",
+            "Topic scout agent references Q&A, technology_areas, itar in recommendation logic",
+            "No stale references to numeric topic IDs or PDF-only enrichment"
+          ],
+          "files_to_modify": [
+            "skills/topic-scout/dsip-cli-usage.md",
+            "skills/topic-scout/dsip-enrichment.md",
+            "agents/sbir-topic-scout.md"
+          ],
+          "implementation_notes": "delivery: markdown/forge. Markdown edits only. <!-- DES-ENFORCEMENT : exempt -->"
+        }
+      ]
+    }
+  ]
+}

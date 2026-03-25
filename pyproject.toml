@@ -49,6 +49,10 @@ ignore = [
 testpaths = ["tests"]
 pythonpath = ["scripts"]
 python_files = ["test_*.py", "*_steps.py"]
+markers = [
+    "live: hits the real DSIP API (deselected by default, run with -m live)",
+]
+addopts = "-m 'not live'"
 
 [tool.mypy]
 python_version = "3.12"

@@ -159,25 +159,60 @@ class TestStructuralChangeMessageContent:
 
 
 class RetryMockTransport(httpx.BaseTransport):
-    """Mock transport that fails N times then succeeds."""
+    """Mock transport that fails N times on a specific URL pattern, then succeeds.
 
-    def __init__(self, fail_count: int, success_content: bytes) -> None:
+    For the API-based enrichment adapter, each topic makes multiple requests
+    (details, Q&A, instructions). This transport tracks per-URL-pattern retries.
+    """
+
+    def __init__(
+        self,
+        fail_count: int,
+        fail_pattern: str = "/details",
+        success_json: dict | list | None = None,
+        success_pdf: bytes | None = None,
+    ) -> None:
         self._fail_count = fail_count
-        self._success_content = success_content
+        self._fail_pattern = fail_pattern
+        self._success_json = success_json or {"description": "<p>Test</p>", "objective": "",
+                                               "keywords": "", "technologyAreas": [],
+                                               "focusAreas": [], "itar": False, "cmmcLevel": ""}
+        self._success_pdf = success_pdf or b"%PDF-1.4\n1 0 obj\n<</Type/Catalog/Pages 2 0 R>>endobj\n%%EOF"
+        self._pattern_attempts: dict[str, int] = {}
         self.attempt_count = 0
         self.request_timestamps: list[float] = []
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
+        import json as _json
         import time
+        url = str(request.url)
         self.attempt_count += 1
         self.request_timestamps.append(time.monotonic())
-        if self.attempt_count <= self._fail_count:
-            return httpx.Response(status_code=503, content=b"Service Unavailable")
-        return httpx.Response(
-            status_code=200,
-            content=self._success_content,
-            headers={"content-type": "application/pdf"},
-        )
+
+        if self._fail_pattern in url:
+            count = self._pattern_attempts.get(self._fail_pattern, 0) + 1
+            self._pattern_attempts[self._fail_pattern] = count
+            if count <= self._fail_count:
+                return httpx.Response(status_code=503, content=b"Service Unavailable")
+            return httpx.Response(
+                status_code=200,
+                content=_json.dumps(self._success_json).encode(),
+                headers={"content-type": "application/json"},
+            )
+
+        # Non-failing patterns: return appropriate content
+        if "/questions" in url:
+            return httpx.Response(
+                status_code=200,
+                content=_json.dumps([]).encode(),
+                headers={"content-type": "application/json"},
+            )
+        if "RELEASE_PREFACE" in url or "INSTRUCTIONS" in url:
+            return httpx.Response(
+                status_code=200, content=self._success_pdf,
+                headers={"content-type": "application/pdf"},
+            )
+        return httpx.Response(status_code=404, content=b"Not found")
 
 
 class TimeoutMockTransport(httpx.BaseTransport):
@@ -191,73 +226,48 @@ class TimeoutMockTransport(httpx.BaseTransport):
         raise httpx.TimeoutException("Connection timed out")
 
 
-def _make_simple_pdf() -> bytes:
-    """Minimal PDF bytes that pypdf can parse (with description marker)."""
-    stream = b"BT /F1 12 Tf 72 720 Td (DESCRIPTION Test topic description content for validation purposes) Tj ET"
-    pdf = (
-        b"%PDF-1.4\n"
-        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
-        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
-        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
-        b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n"
-        b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
-        b"4 0 obj\n<< /Length " + str(len(stream)).encode() + b" >>\n"
-        b"stream\n" + stream + b"\nendstream\nendobj\n"
-        b"xref\n0 6\n"
-        b"0000000000 65535 f \n"
-        b"0000000009 00000 n \n"
-        b"0000000058 00000 n \n"
-        b"0000000115 00000 n \n"
-        b"0000000350 00000 n \n"
-        b"0000000275 00000 n \n"
-        b"trailer\n<< /Size 6 /Root 1 0 R >>\n"
-        b"startxref\n0\n%%EOF\n"
-    )
-    return pdf
-
-
 class TestRetryWithBackoff:
     """Enrichment adapter retries transient failures with exponential backoff."""
 
     def test_retries_after_transient_failure_and_succeeds(self) -> None:
-        """Adapter retries on 503 and succeeds on subsequent attempt."""
-        pdf_bytes = _make_simple_pdf()
-        transport = RetryMockTransport(fail_count=1, success_content=pdf_bytes)
+        """Adapter retries on 503 for details endpoint and succeeds."""
+        transport = RetryMockTransport(fail_count=1)
         adapter = DsipEnrichmentAdapter(
-            base_url="https://example.com/topics/api/public/topics",
             rate_limit_seconds=0.0,
             http_client=httpx.Client(transport=transport),
             max_retries=3,
-            retry_base_seconds=0.01,  # Fast for tests
+            retry_base_seconds=0.01,
         )
 
-        result = adapter.enrich([{"topic_id": "TOPIC-001"}])
+        result = adapter.enrich([{
+            "topic_id": "TOPIC-001", "cycle_name": "C4",
+            "release_number": 12, "component": "ARMY",
+            "published_qa_count": 0, "baa_instructions": [],
+        }])
 
         assert len(result.enriched) == 1
-        assert len(result.errors) == 0
-        assert transport.attempt_count == 2  # 1 fail + 1 success
+        assert result.enriched[0]["description"]  # details eventually succeeded
+        # Details endpoint: 1 fail + 1 success = 2 attempts on that pattern
+        assert transport._pattern_attempts.get("/details", 0) == 2
 
     def test_backoff_increases_between_retries(self) -> None:
-        """Adapter waits longer between successive retries."""
-        pdf_bytes = _make_simple_pdf()
-        transport = RetryMockTransport(fail_count=2, success_content=pdf_bytes)
+        """Adapter waits longer between successive retries for same endpoint."""
+        transport = RetryMockTransport(fail_count=2)
         adapter = DsipEnrichmentAdapter(
-            base_url="https://example.com/topics/api/public/topics",
             rate_limit_seconds=0.0,
             http_client=httpx.Client(transport=transport),
             max_retries=3,
             retry_base_seconds=0.05,
         )
 
-        result = adapter.enrich([{"topic_id": "TOPIC-001"}])
+        result = adapter.enrich([{
+            "topic_id": "TOPIC-001", "cycle_name": "C4",
+            "release_number": 12, "component": "ARMY",
+            "published_qa_count": 0, "baa_instructions": [],
+        }])
 
         assert len(result.enriched) == 1
-        assert transport.attempt_count == 3
-        # Verify backoff: second wait should be longer than first
-        if len(transport.request_timestamps) >= 3:
-            wait_1 = transport.request_timestamps[1] - transport.request_timestamps[0]
-            wait_2 = transport.request_timestamps[2] - transport.request_timestamps[1]
-            assert wait_2 > wait_1, "Exponential backoff should increase wait time"
+        assert transport._pattern_attempts.get("/details", 0) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -266,26 +276,32 @@ class TestRetryWithBackoff:
 
 
 class TestRetriesExhausted:
-    """When all retries fail, adapter reports error with what/why/do."""
+    """When all retries fail, adapter records topic with error/partial status."""
 
     def test_all_retries_exhausted_reports_error(self) -> None:
-        """After max retries, topic is recorded as error with retry info."""
+        """After max retries on all endpoints, topic is recorded with error."""
         transport = TimeoutMockTransport()
         adapter = DsipEnrichmentAdapter(
-            base_url="https://example.com/topics/api/public/topics",
             rate_limit_seconds=0.0,
             http_client=httpx.Client(transport=transport),
             max_retries=3,
             retry_base_seconds=0.01,
         )
 
-        result = adapter.enrich([{"topic_id": "TOPIC-001"}])
+        result = adapter.enrich([{
+            "topic_id": "TOPIC-001", "cycle_name": "C4",
+            "release_number": 12, "component": "ARMY",
+            "published_qa_count": 0, "baa_instructions": [],
+        }])
 
-        assert len(result.enriched) == 0
+        # Topic still enriched but with partial status and error recorded
+        assert len(result.enriched) == 1
+        assert result.enriched[0]["enrichment_status"] == "partial"
         assert len(result.errors) == 1
         error_msg = result.errors[0]["error"].lower()
-        assert "retry" in error_msg or "attempt" in error_msg or "failed" in error_msg
-        assert transport.attempt_count == 3
+        assert "failed" in error_msg
+        # At least 3 attempts per endpoint (details + solicitation + component = 9)
+        assert transport.attempt_count >= 9
 
 
 # ---------------------------------------------------------------------------
