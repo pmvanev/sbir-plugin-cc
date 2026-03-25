@@ -1,0 +1,175 @@
+{
+  "roadmap": {
+    "project_id": "rigor-profile",
+    "created_at": "2026-03-23T18:15:00Z",
+    "total_steps": 8,
+    "phases": 4
+  },
+  "validation": {
+    "status": "approved",
+    "approved_at": "2026-03-23T18:15:00Z",
+    "notes": "Roadmap derived from architecture.md roadmap section. Two delivery surfaces: Python TDD (steps 01-01 through 02-01) and markdown forge (steps 02-02 through 04-01)."
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Config and Domain Foundation",
+      "description": "Profile definitions, domain value objects, port, adapter",
+      "default_agent": "nw-software-crafter",
+      "default_deps_strategy": "sequential",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Rigor profile definitions and tier mapping config",
+          "criteria": [
+            "Four profiles defined: lean, standard, thorough, exhaustive",
+            "Each profile specifies model tier for all 8 agent roles",
+            "Three tiers mapped to concrete model IDs: basic, standard, strongest",
+            "Schema version present for future evolution"
+          ],
+          "files_to_modify": [
+            "config/rigor-profiles.json",
+            "config/model-tiers.json"
+          ],
+          "implementation_notes": "delivery: code/tdd. JSON config files. Read-only plugin-level config. Model tier names abstract over concrete model IDs."
+        },
+        {
+          "id": "01-02",
+          "name": "RigorProfile domain objects and validation",
+          "criteria": [
+            "RigorProfile value object is frozen (immutable dataclass)",
+            "Profile name validated against known set (lean, standard, thorough, exhaustive)",
+            "Invalid profile name produces domain error with valid profile list",
+            "Missing rigor-profile.json resolves to standard default"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/rigor.py",
+            "tests/unit/test_rigor.py"
+          ],
+          "implementation_notes": "delivery: code/tdd. Pure domain objects, no infrastructure imports. Frozen dataclass for RigorProfile. ProfileValidator and DiffComputer also in this module."
+        },
+        {
+          "id": "01-03",
+          "name": "Rigor port and filesystem adapter",
+          "criteria": [
+            "Per-proposal rigor file readable and writable via port interface",
+            "Atomic write follows .tmp/.bak/rename protocol",
+            "Profile definitions loadable from plugin config directory",
+            "Model tier mapping loadable with .sbir/ override detection"
+          ],
+          "files_to_modify": [
+            "scripts/pes/ports/rigor_port.py",
+            "scripts/pes/adapters/filesystem_rigor_adapter.py",
+            "tests/unit/test_filesystem_rigor_adapter.py"
+          ],
+          "implementation_notes": "delivery: code/tdd. Port interfaces: RigorProfileReader, RigorProfileWriter, RigorDefinitionsReader, ModelTierReader. Adapter implements all four. Atomic write via .tmp/.bak/rename."
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Service and Resolution Skill",
+      "description": "Application service for profile management, orchestrator resolution skill",
+      "default_agent": "nw-software-crafter",
+      "default_deps_strategy": "sequential",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Rigor service with diff computation and history",
+          "criteria": [
+            "Profile change produces per-agent-role diff showing what changes",
+            "History entry appended with from/to/timestamp/wave fields",
+            "Same-profile set returns no-op confirmation message",
+            "No-active-proposal returns guidance error"
+          ],
+          "files_to_modify": [
+            "scripts/pes/domain/rigor_service.py",
+            "tests/unit/test_rigor_service.py"
+          ],
+          "implementation_notes": "delivery: code/tdd. Application service using rigor port. No direct file I/O. Computes diff via DiffComputer from rigor.py."
+        },
+        {
+          "id": "02-02",
+          "name": "Rigor resolution skill for orchestrator",
+          "criteria": [
+            "Resolution chain documented: read profile -> lookup definitions -> resolve tier -> model ID",
+            "Comparison table rendering logic for /proposal rigor show",
+            "Detail view rendering for /proposal rigor show <profile>",
+            "Agent-role-to-agent-name mapping table included"
+          ],
+          "files_to_modify": [
+            "skills/orchestrator/rigor-resolution.md"
+          ],
+          "implementation_notes": "delivery: forge/skill. Markdown skill loaded by orchestrator. Display uses model tier names (basic/standard/strongest), not concrete model IDs."
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Commands and Orchestrator Integration",
+      "description": "New rigor command, proposal-new integration, orchestrator rigor-aware dispatch",
+      "default_agent": "nw-agent-builder",
+      "default_deps_strategy": "sequential",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Rigor command and proposal-new integration",
+          "criteria": [
+            "/proposal rigor show displays comparison table of all profiles",
+            "/proposal rigor show <profile> displays detail view for one profile",
+            "/proposal rigor set <profile> updates rigor with diff display",
+            "/proposal new creates rigor-profile.json with standard default",
+            "Contextual suggestion based on fit score and phase"
+          ],
+          "files_to_modify": [
+            "commands/proposal-rigor.md",
+            "commands/proposal-new.md"
+          ],
+          "implementation_notes": "delivery: forge/command. New proposal-rigor.md command. Modify proposal-new.md to create rigor-profile.json and show suggestion."
+        },
+        {
+          "id": "03-02",
+          "name": "Orchestrator rigor-aware agent dispatch",
+          "criteria": [
+            "Orchestrator loads rigor-resolution skill before agent dispatch",
+            "Every agent dispatch includes model parameter from rigor resolution",
+            "Behavioral params (review passes, critique iterations) included in task prompt",
+            "Wave header displays active rigor level",
+            "Missing rigor-profile.json defaults to standard behavior"
+          ],
+          "files_to_modify": [
+            "agents/sbir-orchestrator.md",
+            "skills/orchestrator/wave-agent-mapping.md"
+          ],
+          "implementation_notes": "delivery: forge/agent-edit. Add rigor skill to orchestrator frontmatter. Add resolution logic to dispatch section. Add agent-role mapping to wave-agent-mapping skill."
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Status, Debrief, and Polish",
+      "description": "Rigor visibility in status, switch, and debrief outputs",
+      "default_agent": "nw-agent-builder",
+      "default_deps_strategy": "sequential",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "Rigor in status, switch, and debrief",
+          "criteria": [
+            "Active proposal status line includes rigor level",
+            "Portfolio view shows rigor for each proposal",
+            "Switch loads target proposal's rigor config",
+            "Debrief shows rigor summary with change history",
+            "Lean-only proposals show skipped critique loops in debrief"
+          ],
+          "files_to_modify": [
+            "commands/proposal-status.md",
+            "commands/proposal-wave-final-review.md",
+            "agents/sbir-debrief-analyst.md"
+          ],
+          "implementation_notes": "delivery: forge/command-edit + agent-edit. Modify existing commands and agent to read and display rigor state."
+        }
+      ]
+    }
+  ]
+}
