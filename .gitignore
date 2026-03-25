@@ -36,7 +36,11 @@ Thumbs.db
 # DES runtime (session-specific, not persisted)
 .nwave/des/deliver-session.json
 .nwave/des/des-task-active
+.nwave/des/des-task-active-*
 .mutmut-cache
+
+# mutmut HTML report
+html/
 
 # Runtime state (per-project, not checked in)
 .sbir/
