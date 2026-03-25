@@ -233,8 +233,14 @@ def test_all_none_inputs_produce_valid_snapshot():
         )
     assert snapshot.proposal_id is None
     assert snapshot.current_wave is None
+    assert snapshot.topic_id is None
+    assert snapshot.topic_title is None
+    assert snapshot.topic_agency is None
+    assert snapshot.topic_deadline is None
+    assert snapshot.topic_phase is None
     assert snapshot.completed_waves == []
     assert snapshot.skipped_waves == []
+    assert snapshot.generated_artifacts == []
     assert snapshot.rigor_profile is None
     assert snapshot.company_name is None
     assert snapshot.company_profile_age_days is None
@@ -261,3 +267,89 @@ def test_mtime_age_days_computed_from_mtime():
             cwd="/some/project",
         )
     assert snapshot.company_profile_age_days == 3
+
+
+# ---------- Additional mutation-coverage tests ----------
+
+def test_state_topic_fields_extracted_into_snapshot():
+    """Verify all topic fields are read from the correct state keys."""
+    state = {
+        "id": "prop-001",
+        "topic_id": "N00-001",
+        "topic_title": "Advanced Radar",
+        "topic_agency": "Navy",
+        "topic_deadline": "2026-06-01",
+        "topic_phase": "I",
+        "generated_artifacts": ["draft.md", "exec-summary.md"],
+        "waves": {},
+    }
+    svc = FeedbackSnapshotService()
+    with patch("pes.domain.feedback_service.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "abc1234\n"
+        snapshot = svc.build_snapshot(
+            state=state,
+            rigor=None,
+            profile=None,
+            finder=None,
+            mtimes=_make_mtimes(),
+            cwd="/some/project",
+        )
+    assert snapshot.topic_id == "N00-001"
+    assert snapshot.topic_title == "Advanced Radar"
+    assert snapshot.topic_agency == "Navy"
+    assert snapshot.topic_deadline == "2026-06-01"
+    assert snapshot.topic_phase == "I"
+    assert snapshot.generated_artifacts == ["draft.md", "exec-summary.md"]
+
+
+def test_non_integer_wave_keys_are_skipped_not_aborting_loop():
+    """Non-integer wave keys trigger continue, not break."""
+    waves = {
+        "0": {"status": "completed"},
+        "not-a-wave": {"status": "completed"},  # should be skipped, not abort
+        "2": {"status": "completed"},
+    }
+    svc = FeedbackSnapshotService()
+    with patch("pes.domain.feedback_service.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 1
+        mock_run.return_value.stdout = ""
+        snapshot = svc.build_snapshot(
+            state=_make_state(waves=waves),
+            rigor=None,
+            profile=None,
+            finder=None,
+            mtimes=_make_mtimes(),
+            cwd="/some/project",
+        )
+    assert sorted(snapshot.completed_waves) == [0, 2]
+
+
+def test_plugin_version_subprocess_called_with_correct_args():
+    """Git subprocess invoked with exact expected command and kwargs."""
+    svc = FeedbackSnapshotService()
+    with patch("pes.domain.feedback_service.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = "abc1234\n"
+        svc.build_snapshot(
+            state=None,
+            rigor=None,
+            profile=None,
+            finder=None,
+            mtimes=_make_mtimes(),
+            cwd="/my/project",
+        )
+    mock_run.assert_called_once_with(
+        ["git", "rev-parse", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        cwd="/my/project",
+    )
+
+
+def test_age_days_exactly_one_day_boundary():
+    """_age_days uses 86400 seconds per day (not 86401 or other)."""
+    from pes.domain.feedback_service import _age_days
+    now = time.time()
+    assert _age_days(now - 86400, now) == 1   # exactly 1 day → 1
+    assert _age_days(now - 86399, now) == 0   # 1 second short → still 0
