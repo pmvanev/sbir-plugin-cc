@@ -37,3 +37,9 @@ Thumbs.db
 .nwave/des/deliver-session.json
 .nwave/des/des-task-active
 .mutmut-cache
+
+# Runtime state (per-project, not checked in)
+.sbir/
+
+# Scratch/debug output
+out.txt
