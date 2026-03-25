@@ -66,27 +66,25 @@ def active_proposal_with_rigor(
     proposals_dir.mkdir(parents=True, exist_ok=True)
 
     state = {
-        "proposal_id": f"proposal-{topic_id.lower()}",
-        "topic": {
-            "id": topic_id,
-            "title": f"Test Topic {topic_id}",
-            "agency": "ARMY",
-            "deadline": "2025-11-15",
-            "phase": "I",
-        },
-        "current_wave": wave,
+        "id": f"proposal-{topic_id.lower()}",
+        "topic_id": topic_id,
+        "topic_title": f"Test Topic {topic_id}",
+        "topic_agency": "ARMY",
+        "topic_deadline": "2025-11-15",
+        "topic_phase": "I",
         "waves": {
             "0": {"status": "completed", "completed_at": "2026-01-01T00:00:00Z"},
             "1": {"status": "completed", "completed_at": "2026-01-02T00:00:00Z"},
             "2": {"status": "completed", "completed_at": "2026-01-03T00:00:00Z"},
             str(wave): {"status": "active", "completed_at": None},
         },
+        "generated_artifacts": [],
     }
     (proposals_dir / "proposal-state.json").write_text(
         json.dumps(state), encoding="utf-8"
     )
 
-    rigor_data = {"profile_name": rigor, "model_tier": "standard"}
+    rigor_data = {"profile": rigor, "model_tier": "standard"}
     (proposals_dir / "rigor-profile.json").write_text(
         json.dumps(rigor_data), encoding="utf-8"
     )
@@ -221,7 +219,7 @@ def _run_feedback_cli(
         capture_output=True,
         text=True,
         timeout=30,
-        cwd=str(Path(__file__).resolve().parent.parent.parent.parent),
+        cwd=str(Path(__file__).resolve().parent.parent.parent.parent.parent),
     )
     ctx["cli_result"] = result
     if result.returncode == 0:
