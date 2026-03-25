@@ -185,12 +185,28 @@ def cmd_score(args: argparse.Namespace) -> None:
 
 
 def cmd_detail(args: argparse.Namespace) -> None:
-    """Enrich a single topic by ID."""
+    """Enrich a single topic by ID.
+
+    Fetches the topic's metadata from the search API first so we have
+    cycle_name, release_number, and component for instruction downloads.
+    Falls back to bare enrichment if the topic isn't found in search.
+    """
+    topic_id = args.topic_id
+
+    # Try to find the full topic metadata via search
+    fetcher = DsipApiAdapter(page_size=100, max_pages=0)
+    fetch_result = fetcher.fetch()
+    topic_dict: dict[str, Any] = {"topic_id": topic_id}
+    for t in fetch_result.topics:
+        if t.get("topic_id") == topic_id:
+            topic_dict = t
+            break
+
     enricher = DsipEnrichmentAdapter(rate_limit_seconds=0.5)
-    result = enricher.enrich(topics=[{"topic_id": args.topic_id}])
+    result = enricher.enrich(topics=[topic_dict])
 
     output: dict[str, Any] = {
-        "topic_id": args.topic_id,
+        "topic_id": topic_id,
         "enriched": result.enriched,
         "errors": result.errors,
         "completeness": result.completeness,
