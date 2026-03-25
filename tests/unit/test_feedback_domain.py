@@ -7,8 +7,10 @@ Behaviors:
   3. FeedbackSnapshot has all 14 required fields
   4. FeedbackEntry.to_dict() is json.dumps()-safe
   5. to_dict() round-trip preserves all fields
+  (Additional: immutability, defaults, to_dict key completeness — mutation coverage)
 """
 
+import dataclasses
 import json
 
 import pytest
@@ -140,3 +142,76 @@ def test_to_dict_round_trip_preserves_all_fields():
     assert snapshot_d["skipped_waves"] == []
     assert snapshot_d["company_name"] == "Acme Defense"
     assert snapshot_d["generated_artifacts"] == ["draft.md", "exec-summary.md"]
+
+
+# ---------- Immutability ----------
+
+def test_quality_ratings_is_immutable():
+    r = QualityRatings(past_performance=3)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        r.past_performance = 4  # type: ignore[misc]
+
+
+def test_feedback_snapshot_is_immutable():
+    s = _make_snapshot()
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        s.current_wave = 9  # type: ignore[misc]
+
+
+def test_feedback_entry_is_immutable():
+    e = _make_entry()
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        e.free_text = "changed"  # type: ignore[misc]
+
+
+# ---------- Default values ----------
+
+def test_quality_ratings_defaults_to_none():
+    r = QualityRatings()
+    assert r.past_performance is None
+    assert r.image_quality is None
+    assert r.writing_quality is None
+    assert r.topic_scoring is None
+
+
+def _make_minimal_snapshot() -> FeedbackSnapshot:
+    """Construct snapshot without optional fields to verify defaults."""
+    return FeedbackSnapshot(
+        plugin_version="abc1234",
+        proposal_id=None,
+        topic_id=None,
+        topic_title=None,
+        topic_agency=None,
+        topic_deadline=None,
+        topic_phase=None,
+        current_wave=None,
+    )
+
+
+def test_feedback_snapshot_optional_scalar_fields_default_to_none():
+    s = _make_minimal_snapshot()
+    assert s.rigor_profile is None
+    assert s.company_name is None
+    assert s.company_profile_age_days is None
+    assert s.finder_results_age_days is None
+
+
+def test_feedback_snapshot_list_fields_default_to_empty_list():
+    s = _make_minimal_snapshot()
+    assert s.completed_waves == []
+    assert s.skipped_waves == []
+    assert s.top_scored_topics == []
+    assert s.generated_artifacts == []
+
+
+# ---------- to_dict() key completeness ----------
+
+def test_snapshot_to_dict_contains_all_topic_and_scored_keys():
+    snapshot = _make_snapshot()
+    d = snapshot.to_dict()
+    assert d["topic_id"] == "N00-001"
+    assert d["topic_title"] == "Advanced Radar"
+    assert d["topic_agency"] == "Navy"
+    assert d["topic_deadline"] == "2026-06-01"
+    assert d["topic_phase"] == "I"
+    assert d["top_scored_topics"] == [{"topic_id": "N00-001", "composite_score": 85, "recommendation": "apply"}]
