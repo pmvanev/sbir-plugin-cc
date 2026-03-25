@@ -944,18 +944,37 @@ class TestDetailCommand:
             completeness={"descriptions": 1, "qa": 1, "total": 1},
         )
 
-    def test_detail_passes_topic_dict_to_enricher(self) -> None:
-        """Detail command constructs a topic dict and passes it via topics= kwarg."""
+    def _mock_fetcher_with_topic(self, topic_id: str) -> MagicMock:
+        """Create a mock DsipApiAdapter that returns one topic with full metadata."""
+        from pes.ports.topic_fetch_port import FetchResult
+        mock_fetch_result = FetchResult(
+            topics=[{
+                "topic_id": topic_id,
+                "topic_code": "A254-049",
+                "title": "Test Topic",
+                "status": "Pre-Release",
+                "component": "ARMY",
+                "cycle_name": "DOD_SBIR_2025_P1_C4",
+                "release_number": 12,
+                "published_qa_count": 7,
+                "baa_instructions": [],
+            }],
+            total=1,
+            source="dsip_api",
+        )
+        return mock_fetch_result
+
+    def test_detail_fetches_metadata_then_enriches_with_full_context(self) -> None:
+        """Detail command looks up topic metadata from search, passes full dict to enricher."""
         hash_id = "7051b2da4a1e4c52bd0e7daf80d514f7_86352"
         enrichment_result = self._make_enrichment_result(hash_id)
+        fetch_result = self._mock_fetcher_with_topic(hash_id)
 
-        with patch(
-            "dsip_cli.DsipEnrichmentAdapter",
-        ) as MockAdapter:
-            mock_instance = MockAdapter.return_value
-            mock_instance.enrich.return_value = enrichment_result
+        with patch("dsip_cli.DsipApiAdapter") as MockFetcher, \
+             patch("dsip_cli.DsipEnrichmentAdapter") as MockEnricher:
+            MockFetcher.return_value.fetch.return_value = fetch_result
+            MockEnricher.return_value.enrich.return_value = enrichment_result
 
-            # Capture stdout
             import io
             captured = io.StringIO()
             with patch("sys.stdout", captured):
@@ -963,38 +982,63 @@ class TestDetailCommand:
                 args = argparse.Namespace(topic_id=hash_id, profile=str(PROFILE_PATH), state_dir=".sbir")
                 cmd_detail(args)
 
-            # Verify enricher was called with topics=[{...}], not topic_ids=[...]
-            mock_instance.enrich.assert_called_once()
-            call_kwargs = mock_instance.enrich.call_args
-            # Must use topics= keyword with a list of dicts
-            if call_kwargs.kwargs:
-                topics_arg = call_kwargs.kwargs.get("topics")
-            else:
-                topics_arg = call_kwargs.args[0] if call_kwargs.args else None
-            assert topics_arg is not None, "enricher.enrich must be called with topics argument"
-            assert isinstance(topics_arg, list), "topics must be a list"
-            assert len(topics_arg) == 1
-            assert topics_arg[0]["topic_id"] == hash_id
+            # Verify enricher received full topic dict (not bare ID)
+            enrich_call = MockEnricher.return_value.enrich.call_args
+            topics_arg = enrich_call.kwargs.get("topics") or enrich_call.args[0]
+            assert topics_arg[0]["cycle_name"] == "DOD_SBIR_2025_P1_C4"
+            assert topics_arg[0]["release_number"] == 12
+            assert topics_arg[0]["component"] == "ARMY"
 
-            # Verify output contains enriched data
+            output = json.loads(captured.getvalue())
+            assert output["enriched"][0]["objective"] == "Test objective"
+
+    def test_detail_falls_back_to_bare_id_when_topic_not_in_search(self) -> None:
+        """If topic ID isn't found in search, detail still works with bare ID."""
+        hash_id = "unknown_topic_not_in_search_12345"
+        enrichment_result = self._make_enrichment_result(hash_id)
+        empty_fetch = __import__("pes.ports.topic_fetch_port", fromlist=["FetchResult"]).FetchResult(
+            topics=[], total=0, source="dsip_api",
+        )
+
+        with patch("dsip_cli.DsipApiAdapter") as MockFetcher, \
+             patch("dsip_cli.DsipEnrichmentAdapter") as MockEnricher:
+            MockFetcher.return_value.fetch.return_value = empty_fetch
+            MockEnricher.return_value.enrich.return_value = enrichment_result
+
+            import io
+            captured = io.StringIO()
+            with patch("sys.stdout", captured):
+                from dsip_cli import cmd_detail
+                args = argparse.Namespace(topic_id=hash_id, profile=str(PROFILE_PATH), state_dir=".sbir")
+                cmd_detail(args)
+
+            # Enricher should still be called, just with bare topic_id
+            enrich_call = MockEnricher.return_value.enrich.call_args
+            topics_arg = enrich_call.kwargs.get("topics") or enrich_call.args[0]
+            assert topics_arg[0]["topic_id"] == hash_id
+            # No cycle metadata
+            assert "cycle_name" not in topics_arg[0] or topics_arg[0].get("cycle_name") is None
+
             output = json.loads(captured.getvalue())
             assert output["topic_id"] == hash_id
             assert len(output["enriched"]) == 1
-            assert output["enriched"][0]["objective"] == "Test objective"
-            assert output["enriched"][0]["keywords"] == ["radar", "AI"]
 
     @pytest.mark.parametrize("topic_id", [
-        "7051b2da4a1e4c52bd0e7daf80d514f7_86352",  # hash ID with underscore
-        "68492",  # legacy numeric ID
-        "abc_def_123",  # multi-underscore ID
+        "7051b2da4a1e4c52bd0e7daf80d514f7_86352",
+        "68492",
+        "abc_def_123",
     ])
     def test_detail_works_with_various_id_formats(self, topic_id: str) -> None:
         """Detail command accepts hash IDs, numeric IDs, and multi-underscore IDs."""
         enrichment_result = self._make_enrichment_result(topic_id)
+        empty_fetch = __import__("pes.ports.topic_fetch_port", fromlist=["FetchResult"]).FetchResult(
+            topics=[], total=0, source="dsip_api",
+        )
 
-        with patch("dsip_cli.DsipEnrichmentAdapter") as MockAdapter:
-            mock_instance = MockAdapter.return_value
-            mock_instance.enrich.return_value = enrichment_result
+        with patch("dsip_cli.DsipApiAdapter") as MockFetcher, \
+             patch("dsip_cli.DsipEnrichmentAdapter") as MockEnricher:
+            MockFetcher.return_value.fetch.return_value = empty_fetch
+            MockEnricher.return_value.enrich.return_value = enrichment_result
 
             import io
             captured = io.StringIO()
