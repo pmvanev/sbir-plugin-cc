@@ -1,0 +1,107 @@
+journey:
+  name: sbir-developer-feedback
+  persona: Maya (proposal writer, non-developer plugin user)
+  trigger: Observes suboptimal AI output during proposal writing
+  jobs_covered:
+    - job1_capture_friction_in_context
+    - job2_receive_actionable_developer_feedback
+    - job3_rate_specific_ai_output_quality
+
+steps:
+  - id: invoke
+    name: Invoke command
+    actor: user
+    action: "Types /sbir:developer-feedback in Claude Code"
+    inputs: []
+    outputs: [command_launched]
+    emotion: frustrated_but_hopeful
+    shared_artifacts: []
+
+  - id: type_selection
+    name: Select feedback type
+    actor: agent
+    action: "Presents choice: Bug / Suggestion / Quality Issue"
+    inputs: [command_launched]
+    outputs: [feedback_type]
+    emotion: acknowledged
+    shared_artifacts: [feedback_type]
+
+  - id: quality_ratings
+    name: Rate quality dimensions
+    actor: user
+    condition: feedback_type == quality_issue
+    action: "Rates 1–5 per applicable dimension (past_performance, images, writing, topic_scoring)"
+    inputs: [feedback_type]
+    outputs: [ratings]
+    emotion: efficient
+    shared_artifacts: [ratings]
+
+  - id: free_text
+    name: Enter free text
+    actor: user
+    action: "Optional free-text description of what went wrong or what to improve"
+    inputs: [ratings]
+    outputs: [free_text]
+    emotion: relieved
+    shared_artifacts: [free_text]
+
+  - id: auto_snapshot
+    name: Capture context snapshot
+    actor: agent
+    action: "Reads .sbir/proposals/{id}/proposal-state.json, rigor-profile.json, ~/.sbir/company-profile.json, .sbir/finder-results.json; collects git SHA; lists artifacts"
+    inputs: [free_text]
+    outputs: [context_snapshot]
+    emotion: nothing_to_do_automatic
+    shared_artifacts: [context_snapshot]
+
+  - id: persist_confirm
+    name: Persist and confirm
+    actor: agent
+    action: "Writes .sbir/feedback/feedback-{timestamp}.json; confirms with feedback ID and file path"
+    inputs: [feedback_type, ratings, free_text, context_snapshot]
+    outputs: [feedback_entry, confirmation_message]
+    emotion: done
+    shared_artifacts: [feedback_entry]
+
+feedback_schema:
+  feedback_id: uuid-v4
+  timestamp: ISO-8601
+  type: "bug | suggestion | quality"
+  ratings:
+    past_performance_relevance: "1–5 | null"
+    image_quality: "1–5 | null"
+    writing_quality: "1–5 | null"
+    topic_scoring_accuracy: "1–5 | null"
+  free_text: "string | null"
+  context_snapshot:
+    plugin_version: git-sha
+    proposal_id: "string | null"
+    topic:
+      id: "string | null"
+      title: "string | null"
+      agency: "string | null"
+      deadline: "ISO-8601 | null"
+      phase: "string | null"
+    current_wave: "int | null"
+    completed_waves: "list[int]"
+    skipped_waves: "list[int]"
+    rigor_profile: "lean | standard | thorough | exhaustive | null"
+    company_profile_age_days: "int | null"
+    company_name: "string | null"
+    finder_results_age_days: "int | null"
+    top_scored_topics:
+      - topic_id: string
+        composite_score: float
+        recommendation: "GO | EVALUATE | NO-GO"
+    generated_artifacts: "list[string]"
+
+output:
+  path: ".sbir/feedback/feedback-{timestamp}.json"
+  format: json
+  privacy_note: "Company profile contents NOT included — only metadata (name, age). Topic titles included — treat as business-sensitive."
+
+error_paths:
+  no_active_proposal: "context_snapshot.proposal_id = null; all proposal fields null; feedback still saved"
+  no_company_profile: "company_profile_age_days = null, company_name = null"
+  finder_not_run: "finder_results_age_days = null, top_scored_topics = []"
+  skip_ratings_and_text: "Agent prompts confirmation once, then allows"
