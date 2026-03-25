@@ -1,5 +1,18 @@
 # Test Scenarios — sbir-developer-feedback
 
+## Two Delivery Surfaces
+
+This feature has two distinct delivery surfaces with different quality gates:
+
+| Surface | Files | Quality Gate |
+|---------|-------|-------------|
+| **Python (PES)** | `scripts/pes/domain/feedback.py`, `feedback_service.py`, `scripts/pes/ports/feedback_port.py`, `scripts/pes/adapters/filesystem_feedback_adapter.py`, `scripts/sbir_feedback_cli.py` | pytest-bdd acceptance tests + unit tests + mutation testing (≥80% kill rate) |
+| **Markdown (agents/commands)** | `commands/proposal-developer-feedback.md`, `agents/sbir-feedback-collector.md` | `/nw:forge` validation checklist — not pytest |
+
+The acceptance tests in this directory cover **Python only**. The markdown agent and command are validated separately via forge during delivery.
+
+---
+
 ## Coverage Map
 
 | User Story | Milestone | Scenario Count | Coverage |
@@ -33,14 +46,16 @@
 ## Implementation Order (Outside-In TDD)
 
 ```
-Walking Skeleton 1  →  M01 domain model  →  M02 adapter  →  M03 CLI  →  M04 privacy
-       ↓                     ↓                   ↓              ↓             ↓
-  Full pipeline         FeedbackEntry      FilesystemFb    sbir_feedback   Privacy
-  smoke test           FeedbackSnapshot    Adapter write   _cli.py save    boundary
-                       FeedbackService     atomic + name   full wiring     enforcement
+Walking Skeleton 1  →  M01 domain model  →  M02 adapter  →  M03 CLI  →  M04 privacy  →  Forge: command + agent
+       ↓                     ↓                   ↓              ↓             ↓                    ↓
+  Full pipeline         FeedbackEntry      FilesystemFb    sbir_feedback   Privacy         /nw:forge for
+  smoke test           FeedbackSnapshot    Adapter write   _cli.py save    boundary        command.md +
+                       FeedbackService     atomic + name   full wiring     enforcement     agent.md
 ```
 
-**Rule**: Remove `@skip` from each scenario only after the production code it exercises is written and the scenario passes. Never skip forward.
+**Python rule**: Remove `@skip` from each scenario only after the production code it exercises is written and the scenario passes. Never skip forward.
+
+**Markdown rule**: After Python is complete, create `commands/proposal-developer-feedback.md` and `agents/sbir-feedback-collector.md` and validate each with `/nw:forge`. The agent's interactive flow (type selection, ratings prompts, empty-submission guard) is validated by forge scenario walkthroughs, not pytest.
 
 ---
 
