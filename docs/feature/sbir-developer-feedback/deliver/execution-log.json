@@ -1,0 +1,42 @@
+{
+  "schema_version": "3.0",
+  "project_id": "sbir-developer-feedback",
+  "feature_id": "sbir-developer-feedback",
+  "events": [
+    {
+      "sid": "01-01",
+      "p": "PREPARE",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-25T21:49:25Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED_ACCEPTANCE",
+      "s": "SKIPPED",
+      "d": "APPROVED_SKIP: acceptance tests pre-written with @skip markers",
+      "t": "2026-03-25T21:49:33Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "RED_UNIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-25T21:50:20Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "GREEN",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-25T21:51:28Z"
+    },
+    {
+      "sid": "01-01",
+      "p": "COMMIT",
+      "s": "EXECUTED",
+      "d": "PASS",
+      "t": "2026-03-25T21:51:47Z"
+    }
+  ]
+}
