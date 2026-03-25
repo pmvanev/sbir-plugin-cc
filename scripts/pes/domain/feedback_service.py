@@ -57,7 +57,6 @@ class FeedbackSnapshotService:
 
         plugin_version = self._get_plugin_version(cwd)
 
-        # --- From state ---
         proposal_id: str | None = None
         topic_id: str | None = None
         topic_title: str | None = None
@@ -92,21 +91,18 @@ class FeedbackSnapshotService:
                 elif status == "active":
                     current_wave = wave_num
 
-        # --- From rigor ---
         rigor_profile: str | None = None
         if rigor is not None:
             rigor_profile = rigor.get("profile")
 
-        # --- From profile (privacy boundary: only company_name extracted) ---
+        # Privacy boundary: only company_name extracted from profile
         company_name: str | None = None
         if profile is not None:
             company_name = profile.get("company_name")
 
-        # --- Age days from mtimes ---
         company_profile_age_days: int | None = _age_days(mtimes.get("profile"), now)
         finder_results_age_days: int | None = _age_days(mtimes.get("finder"), now)
 
-        # --- From finder (top topics, limited and filtered) ---
         top_scored_topics: list[dict[str, Any]] = []
         if finder is not None:
             raw_topics: list[dict[str, Any]] = finder.get("topics") or []

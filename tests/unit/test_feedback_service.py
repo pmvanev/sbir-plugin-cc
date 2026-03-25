@@ -11,6 +11,7 @@ Behaviors:
 
 from __future__ import annotations
 
+import json
 import time
 from unittest.mock import patch
 
@@ -117,7 +118,6 @@ def test_privacy_boundary_excludes_sensitive_profile_fields():
     # company_name is allowed
     assert snapshot.company_name == "Acme Defense"
     # sensitive profile content is NOT embedded in snapshot at all
-    import json
     serialized = json.dumps(snapshot_dict)
     assert "radar, sensor fusion" not in serialized
     assert "Sensitive work." not in serialized
@@ -136,7 +136,6 @@ def test_privacy_boundary_does_not_include_draft_content():
         mtimes=_make_mtimes(),
         cwd="/some/project",
     )
-    import json
     serialized = json.dumps(snapshot.to_dict())
     assert "secret approach details" not in serialized
 

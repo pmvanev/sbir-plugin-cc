@@ -11,6 +11,7 @@ Filesystem is controlled via pytest tmp_path -- no real .sbir/ is read or writte
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone, timedelta
@@ -128,7 +129,6 @@ def company_profile_with_age(
 
     # Backdate the mtime to simulate age
     mtime = datetime.now(timezone.utc) - timedelta(days=age)
-    import os
     os.utime(profile_path, (mtime.timestamp(), mtime.timestamp()))
 
     ctx["profile_path"] = profile_path
@@ -152,7 +152,7 @@ def finder_results_with_age(
     sbir_dir.mkdir(parents=True, exist_ok=True)
     results_path = sbir_dir / "finder-results.json"
 
-    scored = [
+    topics = [
         {
             "topic_id": f"TOPIC-{i:03d}",
             "composite_score": round(0.9 - i * 0.1, 2),
@@ -161,11 +161,10 @@ def finder_results_with_age(
         }
         for i in range(count)
     ]
-    results = {"source": "dsip_api", "scored": scored}
+    results = {"source": "dsip_api", "topics": topics}
     results_path.write_text(json.dumps(results), encoding="utf-8")
 
     mtime = datetime.now(timezone.utc) - timedelta(days=age)
-    import os
     os.utime(results_path, (mtime.timestamp(), mtime.timestamp()))
 
     ctx["finder_results_age_days"] = age

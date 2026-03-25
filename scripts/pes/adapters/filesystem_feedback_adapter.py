@@ -17,14 +17,6 @@ class FilesystemFeedbackAdapter(FeedbackWriterPort):
     """JSON file-based feedback persistence with atomic writes."""
 
     def write(self, entry: FeedbackEntry, output_dir: Path) -> Path:
-        """Persist a feedback entry atomically.
-
-        Creates output_dir if absent.
-        Filename: feedback-{timestamp}.json with colons replaced by hyphens.
-        Writes to .tmp, backs up existing to .bak, renames .tmp to target.
-
-        Returns the Path of the written file.
-        """
         output_dir.mkdir(parents=True, exist_ok=True)
 
         filename = "feedback-" + entry.timestamp.replace(":", "-") + ".json"

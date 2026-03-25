@@ -139,7 +139,6 @@ def _parse_ratings(ratings_json: str | None) -> QualityRatings:
 
 def cmd_save(args: argparse.Namespace) -> None:
     """Assemble and persist a feedback entry with full context snapshot."""
-    # Validate feedback type
     if args.type not in VALID_FEEDBACK_TYPES:
         print(
             f"Error: unrecognized feedback type '{args.type}'. "
@@ -153,14 +152,12 @@ def cmd_save(args: argparse.Namespace) -> None:
     profile_path = Path(args.profile_path)
     feedback_dir = Path(args.feedback_dir)
 
-    # Load all context data — all degrade to None gracefully
     state_dict = _load_state(state_dir)
     rigor_dict = _load_rigor(state_dir)
     profile_dict = _load_profile(profile_path)
     finder_dict = _load_finder(state_dir)
     mtimes_dict = _build_mtimes(state_dir, profile_path)
 
-    # Build context snapshot
     snapshot_service = FeedbackSnapshotService()
     snapshot = snapshot_service.build_snapshot(
         state=state_dict,
@@ -171,7 +168,6 @@ def cmd_save(args: argparse.Namespace) -> None:
         cwd=str(Path.cwd()),
     )
 
-    # Build feedback entry
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     feedback_id = f"feedback-{timestamp.replace(':', '-')}"
     ratings = _parse_ratings(getattr(args, "ratings", None))
@@ -186,20 +182,15 @@ def cmd_save(args: argparse.Namespace) -> None:
         context_snapshot=snapshot,
     )
 
-    # Persist
     writer = FilesystemFeedbackAdapter()
     file_path = writer.write(entry, feedback_dir)
 
-    # Output JSON result
     output = {
         "feedback_id": file_path.stem,
         "file_path": str(file_path),
     }
     json.dump(output, sys.stdout, indent=2)
     sys.stdout.write("\n")
-
-
-# --- Argument parsing ---
 
 
 def main() -> None:
