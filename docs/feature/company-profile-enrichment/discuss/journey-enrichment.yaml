@@ -1,0 +1,329 @@
+journey:
+  name: "Company Profile Enrichment from Federal APIs"
+  goal: "Pre-populate company profile fields from SAM.gov, SBIR.gov, and USASpending.gov using the company UEI, then let the user confirm each field before it enters the profile draft"
+  persona: "Rafael Medina -- small business technical founder, Radiant Defense Systems (23 employees), SAM.gov registered, UEI DKJF84NXLE73"
+  extends: "company-profile-builder journey (Steps 1-5)"
+  insertion_point: "Between existing Step 1 (MODE SELECT) and Step 3 (INTERVIEW)"
+
+  emotional_arc:
+    start: "Frustrated -- dreading manual data entry from government websites"
+    middle: "Impressed -- system pulled data from three APIs in seconds, found a forgotten award"
+    end: "Confident/relieved -- authoritative data confirmed, half the profile done without typing"
+
+steps:
+  - id: 1
+    name: "API Key Check and Setup"
+    command: "Integrated into profile builder agent flow"
+
+    tui_mockup: |
+      +-- Enrichment Available -------------------------------------------+
+      |  I can pre-populate your profile from federal databases.          |
+      |  With just your UEI, I can pull legal name, CAGE, NAICS,         |
+      |  certifications, and SBIR award history.                         |
+      |                                                                   |
+      |  Checking for SAM.gov API key...                                  |
+      |  ${api_key_status}                                                |
+      +-------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "sam_gov_api_key"
+        source: "~/.sbir/api-keys.json"
+        displayed_as: "${api_key_status}"
+        consumers:
+          - "Step 1 (key check)"
+          - "Step 3 (SAM.gov API call)"
+          - "Python enrichment service"
+
+    emotional_state:
+      entry: "Mild friction -- another setup step?"
+      exit: "Quick relief -- key found or entered easily"
+
+    integration_checkpoint: |
+      API key file exists at ~/.sbir/api-keys.json with restricted permissions.
+      Key validated with test call to SAM.gov (HTTP 200).
+      If no key: user can skip enrichment entirely.
+
+    gherkin: |
+      Scenario: SAM.gov API key found in config
+        Given Rafael has a SAM.gov API key stored in ~/.sbir/api-keys.json
+        When the profile builder offers enrichment
+        Then the system confirms the key is available
+        And prompts Rafael for his UEI
+
+      Scenario: SAM.gov API key not found
+        Given no SAM.gov API key exists in ~/.sbir/api-keys.json
+        When the profile builder offers enrichment
+        Then the system explains how to get a free API key
+        And provides the URL https://sam.gov/profile/details
+        And offers to accept the key now or skip enrichment
+
+  - id: 2
+    name: "User Provides UEI"
+    command: "Conversational -- user enters UEI"
+
+    tui_mockup: |
+      User: ${uei_input}
+
+      +-- UEI Received ---------------------------------------------------+
+      |  UEI: ${uei_input}                                                |
+      |  Fetching from federal databases...                               |
+      |    SAM.gov Entity API         [####] ${sam_status}                |
+      |    SBIR.gov Awards API        [####] ${sbir_status}               |
+      |    USASpending.gov            [####] ${usa_status}                 |
+      +-------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "uei_input"
+        source: "User input during enrichment"
+        displayed_as: "${uei_input}"
+        consumers:
+          - "Step 2 (display)"
+          - "Step 3 (SAM.gov query parameter)"
+          - "Step 3 (SBIR.gov query filter)"
+          - "Step 3 (USASpending query)"
+          - "Profile draft certifications.sam_gov.uei"
+
+    emotional_state:
+      entry: "Expectant -- will this work?"
+      exit: "Impressed -- three APIs called simultaneously"
+
+    integration_checkpoint: |
+      UEI validated as 12 alphanumeric characters.
+      UEI passed to Python enrichment service as primary lookup key.
+      All three API calls attempted; partial results acceptable.
+
+    gherkin: |
+      Scenario: Valid UEI triggers three-API enrichment
+        Given Rafael has a valid SAM.gov API key
+        When Rafael enters UEI "DKJF84NXLE73"
+        Then the system calls SAM.gov Entity API with that UEI
+        And the system calls SBIR.gov Company API with the resolved company name
+        And the system calls USASpending.gov with the resolved company name
+        And progress is displayed for each API call
+
+  - id: 3
+    name: "Three-API Enrichment Cascade"
+    command: "python scripts/pes/enrichment_cli.py --uei {UEI}"
+
+    tui_mockup: |
+      +-- Enrichment Results -------------------------------------------+
+      |  Found data from ${api_count} federal sources:                  |
+      |                                                                 |
+      |  From SAM.gov:                                                  |
+      |    Legal name:     ${legal_name}                                |
+      |    CAGE code:      ${cage_code}                                 |
+      |    NAICS codes:    ${naics_codes}                               |
+      |    Registration:   ${registration_status}                       |
+      |    Certifications: ${socioeconomic_certs}                       |
+      |                                                                 |
+      |  From SBIR.gov:                                                 |
+      |    SBIR awards:    ${sbir_award_count} total                    |
+      |    ${sbir_award_list}                                           |
+      |                                                                 |
+      |  From USASpending.gov:                                          |
+      |    Federal awards: ${federal_total} (${transaction_count} txns) |
+      |                                                                 |
+      |  Not found in any API:                                          |
+      |    ${missing_fields_list}                                       |
+      +-------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "enrichment_result"
+        source: "Python enrichment service JSON output"
+        displayed_as: "Multiple fields in enrichment results display"
+        consumers:
+          - "Step 3 (results display)"
+          - "Step 4 (field-by-field review)"
+          - "Step 5 (merge into profile draft)"
+      - name: "missing_fields_list"
+        source: "Computed by enrichment service (schema fields minus API-populated fields)"
+        displayed_as: "${missing_fields_list}"
+        consumers:
+          - "Step 3 (not-found display)"
+          - "Step 5 (drives interview targeting)"
+      - name: "source_attribution"
+        source: "Enrichment service tags each field with API source name"
+        displayed_as: "Source labels next to each field"
+        consumers:
+          - "Step 4 (review display)"
+          - "Profile sources metadata"
+
+    emotional_state:
+      entry: "Curious -- what did the APIs return?"
+      exit: "Impressed and surprised -- found data the user did not expect"
+
+    integration_checkpoint: |
+      Enrichment result is a structured dict: {field_name: {value, source, confidence}}.
+      Fields map to company-profile-schema.json field paths.
+      Missing fields list drives targeted interview in existing Step 3.
+      Source attribution preserved for profile metadata.
+
+    gherkin: |
+      Scenario: SAM.gov returns registration data
+        Given the enrichment service calls SAM.gov for UEI "DKJF84NXLE73"
+        When SAM.gov responds with entity data
+        Then enrichment result includes legal_name "Radiant Defense Systems, LLC"
+        And enrichment result includes cage_code "7X2K9"
+        And enrichment result includes naics_codes ["334511", "541715", "334220"]
+        And enrichment result includes registration_status "Active"
+
+      Scenario: SBIR.gov returns award history
+        Given the enrichment service searches SBIR.gov for "Radiant Defense Systems"
+        When SBIR.gov responds with company data
+        Then enrichment result includes 3 SBIR awards
+        And each award has agency, topic_area, and phase
+
+      Scenario: USASpending returns federal award totals
+        Given the enrichment service queries USASpending for "Radiant Defense Systems"
+        When USASpending responds with recipient data
+        Then enrichment result includes total_federal_awards amount
+        And enrichment result includes business_types for corroboration
+
+  - id: 4
+    name: "Review Enriched Data with Source Attribution"
+    command: "Conversational -- user confirms, edits, or skips each field"
+
+    tui_mockup: |
+      +-- Review Enriched Data -----------------------------------------+
+      |  Please confirm or correct each field.                          |
+      |                                                                 |
+      |  ${field_name}: "${field_value}"                                |
+      |    Source: ${field_source}                                       |
+      |    [confirm] [edit] [skip]                                      |
+      |                                                                 |
+      |  Past performance (${pp_count} found):                          |
+      |    ${past_performance_list}                                     |
+      |    Source: SBIR.gov                                              |
+      |    [confirm all] [edit] [add more] [remove entry]               |
+      +-------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "confirmed_enrichment"
+        source: "User confirmation decisions during review"
+        displayed_as: "Confirmation status per field"
+        consumers:
+          - "Step 5 (merge logic)"
+          - "Profile draft"
+
+    emotional_state:
+      entry: "Reviewing with attention"
+      exit: "Confident -- data verified, sources transparent"
+
+    integration_checkpoint: |
+      Each field has a user decision: confirmed, edited, or skipped.
+      Edited fields retain user value with source "user (overriding {api_name})".
+      Skipped fields remain empty for interview.
+      At least legal_name, CAGE, and registration_status should be confirmed or edited.
+
+    gherkin: |
+      Scenario: User confirms all enriched fields
+        Given enrichment returned legal_name, cage_code, naics_codes, and 3 past_performance entries
+        When Rafael confirms each field
+        Then all fields are marked as accepted with their API source
+        And the profile draft is populated with confirmed values
+
+      Scenario: User edits an enriched field
+        Given enrichment returned cage_code "7X2K9" from SAM.gov
+        When Rafael edits the cage_code to "7X2K8"
+        Then the profile draft uses "7X2K8" as the cage_code value
+        And the source is recorded as "user (overriding SAM.gov)"
+
+      Scenario: User skips an enriched field
+        Given enrichment returned socioeconomic certifications as empty
+        When Rafael chooses to enter certifications manually
+        Then the field is left empty for the interview step
+        And it appears in the missing fields list
+
+  - id: 5
+    name: "Merge Confirmed Data into Profile Draft"
+    command: "System merges confirmed enrichment into draft and lists remaining gaps"
+
+    tui_mockup: |
+      +-- Enrichment Applied -------------------------------------------+
+      |  Profile draft updated with enriched data:                      |
+      |                                                                 |
+      |  Populated from APIs:                                           |
+      |    ${populated_fields_summary}                                  |
+      |                                                                 |
+      |  Still need (will ask in interview):                            |
+      |    ${remaining_gaps_list}                                       |
+      |                                                                 |
+      |  Continuing to interview for remaining fields...                |
+      +-------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "profile_draft"
+        source: "Merged enrichment + existing draft"
+        displayed_as: "Field population summary"
+        consumers:
+          - "Existing profile builder Step 3 (INTERVIEW)"
+          - "Existing profile builder Step 4 (PREVIEW)"
+          - "Existing profile builder Step 5 (SAVE)"
+
+    emotional_state:
+      entry: "Ready to proceed"
+      exit: "Relieved -- significant portion of profile done without typing"
+
+    integration_checkpoint: |
+      Profile draft contains enriched fields (with source metadata).
+      Remaining gaps list feeds into existing INTERVIEW step.
+      INTERVIEW step skips questions for already-populated fields.
+      Draft compatible with existing PREVIEW and SAVE steps.
+
+    gherkin: |
+      Scenario: Enriched data merged into profile draft
+        Given Rafael confirmed company_name, cage_code, naics_codes, registration_status, and 3 past_performance entries
+        When the system merges confirmed data into the profile draft
+        Then the profile draft contains all confirmed values
+        And the interview step receives a list of unpopulated fields only
+        And fields populated by enrichment are not asked about again
+
+      Scenario: Interview targets only remaining gaps after enrichment
+        Given enrichment populated 6 of 12 profile fields
+        When the interview step begins
+        Then the interview asks about capabilities, security_clearance, itar_registered, employee_count, key_personnel, and research_institution_partners
+        And the interview does not ask about company_name, cage_code, uei, naics_codes, registration_status, or past_performance
+
+error_paths:
+  - id: E1
+    name: "SAM.gov API key invalid or expired"
+    trigger: "SAM.gov returns 403 Forbidden"
+    recovery: "Re-enter key, generate new key, skip SAM.gov enrichment, or skip all enrichment"
+
+  - id: E2
+    name: "No entity found for UEI"
+    trigger: "SAM.gov returns empty result for the UEI"
+    recovery: "Re-enter UEI, look up at sam.gov/search, or skip enrichment"
+
+  - id: E3
+    name: "API timeout or unavailability"
+    trigger: "One or more APIs do not respond within 10 seconds"
+    recovery: "Continue with partial data, retry failed API, or skip enrichment"
+
+  - id: E4
+    name: "SBIR.gov company name ambiguous match"
+    trigger: "SBIR.gov returns multiple companies matching the SAM.gov legal name"
+    recovery: "User selects correct company from list or skips SBIR.gov data"
+
+  - id: E5
+    name: "Enrichment conflicts with existing profile data (update flow)"
+    trigger: "API data differs from values already in the profile"
+    recovery: "User chooses per-field: keep current, accept API value, or merge both"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "uei_input"
+      must_match_across: [2, 3, "profile_draft.certifications.sam_gov.uei"]
+      failure_message: "UEI used for API queries must match UEI stored in profile"
+
+    - artifact: "enrichment_result"
+      must_match_across: [3, 4, 5]
+      failure_message: "Enrichment data shown in review must match data merged into draft"
+
+    - artifact: "profile_draft"
+      must_match_across: [5, "existing_journey.step_3_interview", "existing_journey.step_4_preview"]
+      failure_message: "Draft after enrichment must flow correctly into existing interview and preview steps"
+
+    - artifact: "sam_gov_api_key"
+      must_match_across: [1, 3]
+      failure_message: "API key validated in Step 1 must be the same key used in Step 3"
