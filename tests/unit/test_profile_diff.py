@@ -167,3 +167,96 @@ def test_changed_scalar_appears_in_changes():
     assert diff.changes[0].old_value == 45
     assert diff.changes[0].new_value == 50
     assert diff.has_changes is True
+
+
+# ---------------------------------------------------------------------------
+# Mutation kill: immutability, defaults, path resolution, normalization
+# ---------------------------------------------------------------------------
+
+
+def test_diff_entry_and_profile_diff_are_immutable():
+    """Kill frozen=True→False mutations."""
+    entry = DiffEntry(field_path="x", new_value="v")
+    with pytest.raises(AttributeError):
+        entry.field_path = "changed"
+
+    diff = ProfileDiff()
+    with pytest.raises(AttributeError):
+        diff.additions = []
+
+
+def test_diff_entry_defaults():
+    """Kill default value mutations on DiffEntry fields."""
+    entry = DiffEntry(field_path="x")
+    assert entry.new_value is None
+    assert entry.old_value is None
+    assert entry.source == ""
+
+
+def test_profile_diff_defaults_are_empty_lists():
+    """Kill default_factory=list→None mutations."""
+    diff = ProfileDiff()
+    assert diff.additions == []
+    assert diff.changes == []
+    assert diff.matches == []
+    assert diff.api_missing == []
+
+
+def test_has_changes_true_with_additions_only():
+    """Kill 'additions or changes' → 'additions and changes' mutation."""
+    diff = ProfileDiff(additions=[DiffEntry(field_path="x", new_value="v")])
+    assert diff.has_changes is True
+
+
+def test_resolve_path_stops_at_non_dict():
+    """Kill isinstance(current, dict) mutation in _resolve_path."""
+    existing = {"a": "not_a_dict"}
+    enrichment = _enrichment(_field("a.b", "value"))
+    diff = diff_profile(enrichment, existing)
+    assert len(diff.additions) == 1
+    assert diff.additions[0].field_path == "a.b"
+
+
+def test_field_not_in_existing_is_addition():
+    """Kill 'not found' → 'found' inversion in diff_profile."""
+    existing = {}
+    enrichment = _enrichment(_field("brand_new_field", "value"))
+    diff = diff_profile(enrichment, existing)
+    assert len(diff.additions) == 1
+    assert diff.additions[0].new_value == "value"
+    assert diff.additions[0].source == "SAM.gov"
+
+
+def test_source_attribution_preserved_in_diff_entries():
+    """Kill source assignment mutation (source = ef.source.api_name)."""
+    enrichment = _enrichment(_field("company_name", "Acme", "SBIR.gov"))
+    diff = diff_profile(enrichment, {"company_name": "Acme"})
+    assert diff.matches[0].source == "SBIR.gov"
+
+
+def test_list_length_mismatch_is_not_equal():
+    """Kill len(old_list) != len(new_list) boundary in _sets_equal."""
+    existing = {"tags": ["a", "b"]}
+    enrichment = _enrichment(_field("tags", ["a", "b", "c"]))
+    diff = diff_profile(enrichment, existing)
+    # new has more items -> addition (via _list_has_additions)
+    assert len(diff.additions) == 1
+
+
+def test_nested_path_collect_api_missing():
+    """Kill prefix/path construction in _collect_api_missing."""
+    existing = {"level1": {"level2": "value"}}
+    enrichment = _enrichment(_field("other_field", "x"))
+    diff = diff_profile(enrichment, existing)
+    missing_paths = [m.field_path for m in diff.api_missing]
+    assert "level1" in missing_paths
+
+
+def test_enriched_child_prevents_api_missing():
+    """Kill has_enriched_child check in _collect_api_missing."""
+    existing = {"certifications": {"sam_gov": {"cage_code": "ABC"}}}
+    enrichment = _enrichment(_field("certifications.sam_gov.cage_code", "ABC"))
+    diff = diff_profile(enrichment, existing)
+    missing_paths = [m.field_path for m in diff.api_missing]
+    # certifications should NOT be in api_missing because it has an enriched child
+    assert "certifications" not in missing_paths
