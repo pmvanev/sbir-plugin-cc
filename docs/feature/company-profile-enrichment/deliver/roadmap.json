@@ -1,0 +1,225 @@
+{
+  "roadmap": {
+    "project_id": "company-profile-enrichment",
+    "created_at": "2026-03-26T18:28:01Z",
+    "total_steps": 9,
+    "phases": 4
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Enrichment Foundation",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Enrichment domain types and UEI validation",
+          "description": "Pure domain value objects: EnrichedField, FieldSource, EnrichmentResult, SourceError, CompanyCandidate. UEI format validation (12 alphanumeric). Field-to-schema mapping constants. No I/O imports.",
+          "criteria": [
+            "Given a 12-character alphanumeric UEI, when validated, then it is accepted",
+            "Given a UEI with invalid length or non-alphanumeric chars, when validated, then it is rejected with a descriptive message",
+            "Given enriched fields from multiple sources, when assembled into EnrichmentResult, then each field retains its source attribution",
+            "Given an EnrichmentResult and a profile schema, when missing fields computed, then only unpopulated required fields are listed"
+          ],
+          "estimated_hours": 3,
+          "dependencies": [],
+          "stories": ["US-CPE-001"],
+          "files_to_modify": [
+            "scripts/pes/domain/enrichment.py",
+            "tests/unit/test_enrichment_domain.py"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "API key port, adapter, and validation",
+          "description": "ApiKeyPort abstract interface. JsonApiKeyAdapter reads/writes ~/.sbir/api-keys.json. Key validation via SAM.gov test endpoint. Key passed via stdin for save, never as CLI arg.",
+          "criteria": [
+            "Given an existing api-keys.json with a SAM.gov key, when read_key called, then the key is returned",
+            "Given no api-keys.json file, when read_key called, then None returned without error",
+            "Given a malformed api-keys.json, when read_key called, then a clear error is returned without crash",
+            "Given a valid key, when saved, then file written with owner-only permissions",
+            "Given a key value, when the CLI save-key mode is used, then the key is read from stdin and never appears in process arguments"
+          ],
+          "estimated_hours": 3,
+          "dependencies": ["01-01"],
+          "stories": ["US-CPE-004"],
+          "files_to_modify": [
+            "scripts/pes/ports/api_key_port.py",
+            "scripts/pes/adapters/json_api_key_adapter.py",
+            "tests/unit/test_json_api_key_adapter.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Three-API Adapters",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "SAM.gov Entity API adapter",
+          "description": "Implements EnrichmentSourcePort for SAM.gov Entity API v3. Maps entity registration fields to EnrichedField objects. Business type code-to-certification mapping. Timeout and error handling.",
+          "criteria": [
+            "Given a valid UEI and API key, when SAM.gov returns entity data, then legal name, CAGE code, NAICS codes, certifications, and registration status are mapped to EnrichedField objects",
+            "Given a UEI with no matching entity, when SAM.gov returns empty results, then a not-found indicator is returned with no fields",
+            "Given a network timeout, when the adapter call fails, then a SourceError with type 'timeout' is returned and no exception propagates",
+            "Given business type codes in the response, when mapped, then codes like A8, QF, A5 produce human-readable certification names"
+          ],
+          "estimated_hours": 4,
+          "dependencies": ["01-01", "01-02"],
+          "stories": ["US-CPE-001"],
+          "files_to_modify": [
+            "scripts/pes/ports/enrichment_port.py",
+            "scripts/pes/adapters/sam_gov_adapter.py",
+            "tests/unit/test_sam_gov_adapter.py"
+          ]
+        },
+        {
+          "id": "02-02",
+          "name": "SBIR.gov Company and Awards API adapter",
+          "description": "Implements EnrichmentSourcePort for SBIR.gov. Company name search with disambiguation support. Award history fetch with agency, topic, and phase mapping. Parallel development with 02-01; runtime cascade ordering (SAM.gov name resolution) is handled in 03-01 service layer.",
+          "criteria": [
+            "Given a company name matching one SBIR.gov firm, when fetched, then award history returned as EnrichedField objects with per-award agency and phase",
+            "Given a company name matching multiple firms, when fetched, then CompanyCandidate list returned for caller disambiguation",
+            "Given a timeout on SBIR.gov, when the adapter call fails, then a SourceError is returned without blocking other adapters",
+            "Given award data, when mapped, then each award includes agency, topic area, and phase"
+          ],
+          "estimated_hours": 4,
+          "dependencies": ["02-01"],
+          "stories": ["US-CPE-001"],
+          "files_to_modify": [
+            "scripts/pes/adapters/sbir_gov_adapter.py",
+            "tests/unit/test_sbir_gov_adapter.py"
+          ]
+        },
+        {
+          "id": "02-03",
+          "name": "USASpending.gov recipient API adapter",
+          "description": "Implements EnrichmentSourcePort for USASpending.gov. Two-step resolution: POST autocomplete by company name, GET recipient detail by ID. Returns total awards and business types. Parallel development with 02-01; runtime cascade ordering is handled in 03-01 service layer.",
+          "criteria": [
+            "Given a company name, when autocomplete resolves a recipient, then total award amount and transaction count are returned as EnrichedField objects",
+            "Given a company name with no autocomplete match, when fetched, then empty result returned with not-found indicator",
+            "Given a timeout on either the autocomplete or recipient detail step, when the adapter call fails, then a SourceError is returned gracefully",
+            "Given business types in the response, when returned, then they are available for cross-check against SAM.gov certifications"
+          ],
+          "estimated_hours": 4,
+          "dependencies": ["02-01"],
+          "stories": ["US-CPE-001"],
+          "files_to_modify": [
+            "scripts/pes/adapters/usa_spending_adapter.py",
+            "tests/unit/test_usa_spending_adapter.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Service, CLI, and Diff",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Company enrichment service with partial failure handling",
+          "description": "Orchestrates three-API cascade: SAM.gov first (provides company name), then SBIR.gov and USASpending in parallel. Merges results into single EnrichmentResult. Tracks per-source success/failure.",
+          "criteria": [
+            "Given all three APIs succeed, when enrichment runs, then a merged EnrichmentResult contains fields from all three sources",
+            "Given SBIR.gov fails but SAM.gov and USASpending succeed, when enrichment runs, then partial result returned with SBIR.gov in errors list",
+            "Given SAM.gov fails, when enrichment runs, then SBIR.gov and USASpending are skipped (name dependency) and all three marked in errors",
+            "Given a completed enrichment, when missing fields computed, then the list reflects schema required fields minus populated fields"
+          ],
+          "estimated_hours": 4,
+          "dependencies": ["02-01", "02-02", "02-03"],
+          "stories": ["US-CPE-001"],
+          "files_to_modify": [
+            "scripts/pes/domain/enrichment_service.py",
+            "tests/unit/test_enrichment_service.py"
+          ]
+        },
+        {
+          "id": "03-02",
+          "name": "Profile diff logic for re-enrichment",
+          "description": "Pure domain logic comparing EnrichmentResult against existing profile JSON. Detects additions, changes, and matches. Order-independent array comparison for NAICS codes and past performance. Outputs ProfileDiff value object for agent to interpret and display.",
+          "criteria": [
+            "Given a new NAICS code in enrichment not in existing profile, when diffed, then it appears as an addition",
+            "Given a new SBIR award in enrichment not in existing profile, when diffed, then it appears as an addition",
+            "Given NAICS codes in different order but same values, when diffed, then no change is flagged",
+            "Given user-entered fields not present in API responses, when diffed, then they appear in api_missing and are preserved",
+            "Given enrichment matching all existing profile fields, when diffed, then result indicates no changes"
+          ],
+          "estimated_hours": 3,
+          "dependencies": ["01-01"],
+          "stories": ["US-CPE-003"],
+          "files_to_modify": [
+            "scripts/pes/domain/profile_diff.py",
+            "tests/unit/test_profile_diff.py"
+          ]
+        },
+        {
+          "id": "03-03",
+          "name": "Enrichment CLI entry point",
+          "description": "CLI at scripts/pes/enrichment_cli.py with modes: enrich, diff, validate-key, save-key. Composition root wiring adapters to service. JSON stdout output. Structured error responses.",
+          "criteria": [
+            "Given mode 'enrich' and a valid UEI, when invoked, then EnrichmentResult JSON is written to stdout",
+            "Given mode 'diff' with UEI and profile path, when invoked, then ProfileDiff JSON is written to stdout",
+            "Given mode 'validate-key', when invoked, then JSON with valid/invalid status is written to stdout",
+            "Given mode 'save-key' with key on stdin, when invoked, then key is saved and confirmation JSON is written to stdout",
+            "Given any error condition, when invoked, then structured JSON error is written to stdout (no stack traces)"
+          ],
+          "estimated_hours": 3,
+          "dependencies": ["01-02", "03-01", "03-02"],
+          "stories": ["US-CPE-001", "US-CPE-004"],
+          "files_to_modify": [
+            "scripts/pes/enrichment_cli.py",
+            "tests/unit/test_enrichment_cli.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Agent Integration and Schema",
+      "steps": [
+        {
+          "id": "04-01",
+          "name": "Schema extension and agent enrichment phase",
+          "description": "Add naics_codes array and registration_expiration to profile schema. Update profile builder agent with ENRICHMENT phase. Create enrichment-domain skill. Agent invokes CLI, displays results with source attribution, collects confirmations.",
+          "criteria": [
+            "Given a profile with naics_codes populated, when validated against schema, then validation passes",
+            "Given a SAM.gov API key is available, when profile builder starts, then enrichment is offered to the user",
+            "Given the user declines enrichment, when profile builder continues, then the existing manual interview flow runs unchanged",
+            "Given enriched fields displayed to user, when each field shown, then its source API is visible",
+            "Given the user confirms selected fields, when merged, then only confirmed fields enter the profile draft",
+            "Given a re-enrichment during profile update, when diff shown, then per-field accept/reject is available"
+          ],
+          "estimated_hours": 4,
+          "dependencies": ["03-03"],
+          "stories": ["US-CPE-001", "US-CPE-002", "US-CPE-003", "US-CPE-004"],
+          "files_to_modify": [
+            "templates/company-profile-schema.json",
+            "agents/sbir-profile-builder.md",
+            "skills/profile-builder/enrichment-domain.md"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/domain/",
+      "scripts/pes/ports/",
+      "scripts/pes/adapters/",
+      "scripts/pes/"
+    ],
+    "test_directories": [
+      "tests/unit/",
+      "tests/acceptance/company_profile_enrichment/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "approved",
+    "reviewer": "nw-software-crafter-reviewer",
+    "approved_at": "2026-03-26T18:35:00Z"
+  }
+}
