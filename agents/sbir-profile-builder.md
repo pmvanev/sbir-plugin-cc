@@ -6,6 +6,7 @@ tools: Read, Write, Bash, WebSearch, WebFetch
 maxTurns: 30
 skills:
   - profile-domain
+  - enrichment-domain
 ---
 
 # sbir-profile-builder
@@ -37,6 +38,7 @@ You MUST load your skill file before beginning work. The profile-domain skill en
 | Phase | Load | Trigger |
 |-------|------|---------|
 | 1 MODE SELECT | `profile-domain` | Always -- field explanations needed for all modes |
+| 1.5 ENRICHMENT | `enrichment-domain` | When SAM.gov API key is available and user accepts enrichment |
 
 ## Workflow
 
@@ -84,6 +86,97 @@ How would you like to build your profile?
 ```
 
 Gate: Mode selected. Overwrite decision made if applicable.
+
+### Phase 1.5: ENRICHMENT (optional)
+Load: `enrichment-domain` -- read it NOW before proceeding.
+
+Offer API-based enrichment when a SAM.gov API key is available. This phase pre-populates profile fields from authoritative government data before the RESEARCH and GATHER phases.
+
+1. Check if SAM.gov API key exists:
+```
+PYTHONPATH=scripts python scripts/pes/enrichment_cli.py validate-key --service sam_gov
+```
+
+2. If key is NOT valid (`"valid": false`): skip to Phase 2 (RESEARCH) silently. Do not ask the user about enrichment.
+
+3. If key IS valid: present enrichment offer:
+```
+--------------------------------------------
+API ENRICHMENT AVAILABLE
+--------------------------------------------
+
+A SAM.gov API key is configured. I can pull
+authoritative registration data (legal name,
+CAGE code, NAICS codes, certifications) from
+government APIs using your UEI.
+
+  (e) enrich -- provide your UEI for API lookup
+  (s) skip   -- proceed without enrichment
+--------------------------------------------
+```
+
+4. If user selects "skip": proceed to Phase 2 (RESEARCH) unchanged.
+
+5. If user selects "enrich": ask for UEI, then invoke the enrichment CLI:
+```
+PYTHONPATH=scripts python scripts/pes/enrichment_cli.py enrich --uei {UEI}
+```
+
+6. Display each enriched field with source attribution:
+```
+--------------------------------------------
+ENRICHMENT RESULTS
+--------------------------------------------
+
+Legal Name:        Acme Defense Corp          [SAM.gov]
+CAGE Code:         1ABC2                      [SAM.gov]
+UEI:               DKJF84NXLE73              [SAM.gov]
+SAM.gov Active:    Yes                        [SAM.gov]
+Reg. Expiration:   2027-03-15                 [SAM.gov]
+NAICS Codes:       334511 (primary), 541715   [SAM.gov]
+Socioeconomic:     8(a), HUBZone             [SAM.gov]
+Past Performance:  3 awards found             [SBIR.gov]
+
+--------------------------------------------
+For each field, confirm or skip:
+  (a) accept all -- use all enriched values
+  (r) review     -- confirm each field individually
+  (d) discard    -- ignore enrichment results
+--------------------------------------------
+```
+
+7. If "review": present each field one at a time. User can accept, edit, or skip each field. Only confirmed fields pre-populate subsequent phases.
+
+8. If "accept all": all enriched fields pre-populate the INTERVIEW phase.
+
+9. Confirmed fields are carried forward as draft data into RESEARCH and GATHER phases, reducing questions for already-populated fields.
+
+**Re-enrichment (profile update flow)**: When an existing profile is being updated, use the diff mode instead:
+```
+PYTHONPATH=scripts python scripts/pes/enrichment_cli.py diff --uei {UEI} --profile-path {path}
+```
+
+Display per-field diff with accept/reject for each changed or new field:
+```
+--------------------------------------------
+ENRICHMENT DIFF
+--------------------------------------------
+
+CHANGED:
+  CAGE Code:  1ABC2 -> 2DEF3                 [SAM.gov]
+    (a) accept new  (k) keep current
+
+NEW:
+  NAICS Codes: 334511, 541715                [SAM.gov]
+    (a) accept  (s) skip
+
+UNCHANGED:
+  Legal Name: Acme Defense Corp              [match]
+
+--------------------------------------------
+```
+
+Gate: Enrichment completed, skipped, or user declined. Confirmed fields carried forward as draft data.
 
 ### Phase 2: RESEARCH
 

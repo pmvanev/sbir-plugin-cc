@@ -30,7 +30,16 @@
           "properties": {
             "active": { "type": "boolean" },
             "cage_code": { "type": "string" },
-            "uei": { "type": "string" }
+            "uei": { "type": "string" },
+            "registration_expiration": {
+              "type": "string",
+              "format": "date",
+              "description": "SAM.gov registration expiration date (YYYY-MM-DD)"
+            },
+            "entity_structure": {
+              "type": "string",
+              "description": "Legal entity structure from SAM.gov (e.g., LLC, Corporation)"
+            }
           }
         },
         "socioeconomic": {
@@ -77,6 +86,45 @@
     "research_institution_partners": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "naics_codes": {
+      "type": "array",
+      "description": "NAICS codes from SAM.gov registration",
+      "items": {
+        "type": "object",
+        "required": ["code"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{2,6}$"
+          },
+          "primary": {
+            "type": "boolean",
+            "default": false
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "enrichment_metadata": {
+      "type": "object",
+      "description": "Metadata about the most recent API enrichment",
+      "properties": {
+        "enriched_at": { "type": "string", "format": "date-time" },
+        "uei_used": { "type": "string" },
+        "sources_attempted": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sources_succeeded": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fields_enriched": { "type": "integer" },
+        "fields_confirmed_by_user": { "type": "integer" }
+      }
     },
     "sources": {
       "type": "object",
