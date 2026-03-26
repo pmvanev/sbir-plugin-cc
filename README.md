@@ -52,7 +52,7 @@ That's it. The plugin guides you through each step interactively. You don't need
 At any point — before, during, or after a proposal — you can submit feedback directly to the plugin developer:
 
 ```bash
-/sbir:developer-feedback
+/sbir:proposal-developer-feedback
 ```
 
 The agent walks you through three steps: pick a type (bug report, feature suggestion, or quality rating), optionally rate specific proposal sections, and optionally add free text. It automatically attaches a context snapshot (wave, state, rigor profile, corpus size) so bug reports include enough information to reproduce the issue without exposing any proposal content.
@@ -421,7 +421,7 @@ my-proposal-project/
 | `/sbir:proposal config format <fmt>` | Any | Switch output format between `latex` and `docx` (warns about rework at Wave 3+) |
 | `/sbir:proposal rigor [show\|set] <profile>` | Any | View or change the rigor profile (lean / standard / thorough / exhaustive) |
 | `/sbir:proposal switch <topic-id>` | Any | Switch active proposal context in a multi-proposal workspace |
-| `/sbir:developer-feedback` | Any | Submit bug reports, feature suggestions, or quality ratings with automatic context snapshot |
+| `/sbir:proposal-developer-feedback` | Any | Submit bug reports, feature suggestions, or quality ratings with automatic context snapshot |
 
 ## Skills Reference
 
