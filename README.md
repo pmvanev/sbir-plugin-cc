@@ -36,7 +36,7 @@ claude
 /sbir:setup
 
 # 3. Find solicitations that match your company
-/sbir:solicitation find
+/sbir:solicitation-find
 
 # 4. Start a proposal from a topic you like
 /sbir:proposal new AF263-042
@@ -90,7 +90,7 @@ When setup completes, you'll see:
 
   STATUS: READY
 
-  Next: /sbir:solicitation find
+  Next: /sbir:solicitation-find
 ```
 
 Your company profile at `~/.sbir/company-profile.json` carries over across projects. Each completed proposal enriches the corpus — fit scoring improves with more past performance data, the writer pulls better exemplars, and the reviewer cross-references debrief patterns.
@@ -105,7 +105,7 @@ Your company profile at `~/.sbir/company-profile.json` carries over across proje
                  NO                   YES
             Fix & rerun          Build profile
                                       |
-                              /sbir:solicitation find
+                              /sbir:solicitation-find
                              (shows partnership scoring
                               when partner profiles exist)
                                       |
@@ -183,7 +183,7 @@ Set up your environment (profile, corpus, partner profiles), then score topics a
 /sbir:setup                                # First-time setup or re-run to update config
 /sbir:proposal partner-setup               # Create a research institution partner profile
 /sbir:proposal partner-screen "MIT"        # Screen a new potential partner for readiness
-/sbir:solicitation find                    # Search and rank open topics (partnership-aware)
+/sbir:solicitation-find                    # Search and rank open topics (partnership-aware)
 /sbir:proposal new <topic-or-file>         # Start proposal, Go/No-Go checkpoint
 /sbir:proposal partner-set cu-boulder      # Designate partner for active proposal
 /sbir:proposal shape                       # Generate 3-5 candidate approaches (optional)
@@ -399,7 +399,7 @@ my-proposal-project/
 | `/sbir:proposal quality discover` | Pre | Build writing quality intelligence from past proposals |
 | `/sbir:proposal quality update` | Pre | Update quality artifacts from new debrief data |
 | `/sbir:proposal quality status` | Pre | Show quality intelligence status |
-| `/sbir:solicitation find` | 0 | Search and rank open topics by fit |
+| `/sbir:solicitation-find` | 0 | Search and rank open topics by fit |
 | `/sbir:proposal new <topic-or-file>` | 0 | Start proposal with Go/No-Go checkpoint |
 | `/sbir:proposal shape` | 0 | Generate candidate technical approaches |
 | `/sbir:continue` | Any | Detect where you left off and suggest next action |
