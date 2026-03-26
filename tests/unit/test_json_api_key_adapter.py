@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from pes.adapters.json_api_key_adapter import JsonApiKeyAdapter
+from pes.adapters.json_api_key_adapter import API_KEYS_FILENAME, JsonApiKeyAdapter
 from pes.ports.api_key_port import ApiKeyError
 
 
@@ -97,3 +97,104 @@ def test_write_key_sets_owner_only_permissions(adapter, key_dir):
     keys_file = key_dir / "api-keys.json"
     mode = os.stat(keys_file).st_mode & 0o777
     assert mode == 0o600
+
+
+# ---------- Mutation-killing tests ----------
+
+
+class TestJsonApiKeyMutationKillers:
+    """Targeted tests to kill surviving mutants in json_api_key_adapter.py."""
+
+    def test_api_keys_filename_constant(self):
+        """Kill mutant: API_KEYS_FILENAME string mutation."""
+        assert API_KEYS_FILENAME == "api-keys.json"
+
+    def test_read_key_missing_service_returns_none(self, adapter, key_dir):
+        """Kill mutant: data.get(service_name) returns None for missing key."""
+        keys_file = key_dir / "api-keys.json"
+        keys_file.write_text(json.dumps({"other_service": "key-123"}))
+        result = adapter.read_key("sam_gov")
+        assert result is None
+
+    def test_write_key_preserves_existing_keys(self, adapter, key_dir):
+        """Kill mutant: existing key preservation logic."""
+        keys_file = key_dir / "api-keys.json"
+        keys_file.write_text(json.dumps({"other": "existing-key"}))
+
+        adapter.write_key("sam_gov", "new-key")
+
+        stored = json.loads(keys_file.read_text())
+        assert stored["other"] == "existing-key"
+        assert stored["sam_gov"] == "new-key"
+
+    def test_write_key_overwrites_existing_service_key(self, adapter, key_dir):
+        """Kill mutant: existing[service_name] = key assignment."""
+        keys_file = key_dir / "api-keys.json"
+        keys_file.write_text(json.dumps({"sam_gov": "old-key"}))
+
+        adapter.write_key("sam_gov", "new-key")
+
+        stored = json.loads(keys_file.read_text())
+        assert stored["sam_gov"] == "new-key"
+
+    def test_write_key_handles_malformed_existing_file(self, adapter, key_dir):
+        """Kill mutant: except clause resetting existing to {}."""
+        keys_file = key_dir / "api-keys.json"
+        keys_file.write_text("{bad json!!!")
+
+        adapter.write_key("sam_gov", "recovered-key")
+
+        stored = json.loads(keys_file.read_text())
+        assert stored["sam_gov"] == "recovered-key"
+        assert len(stored) == 1  # Old data discarded
+
+    def test_read_key_error_message_contains_file_path(self, adapter, key_dir):
+        """Kill mutant: error message format string mutation."""
+        keys_file = key_dir / "api-keys.json"
+        keys_file.write_text("{not valid")
+
+        with pytest.raises(ApiKeyError) as exc_info:
+            adapter.read_key("sam_gov")
+        assert "malformed" in str(exc_info.value)
+        assert str(keys_file) in str(exc_info.value)
+
+    def test_write_key_uses_atomic_rename(self, adapter, key_dir):
+        """Kill mutant: tmp file path and replace() call."""
+        adapter.write_key("sam_gov", "atomic-key")
+        # tmp file should not exist after write
+        tmp_file = key_dir / f"{API_KEYS_FILENAME}.tmp"
+        assert not tmp_file.exists()
+        # actual file should exist with correct content
+        keys_file = key_dir / API_KEYS_FILENAME
+        assert keys_file.exists()
+        stored = json.loads(keys_file.read_text())
+        assert stored["sam_gov"] == "atomic-key"
+
+    def test_write_key_creates_parents(self, tmp_path):
+        """Kill mutant: parents=True in mkdir."""
+        deep_dir = tmp_path / "a" / "b" / "c"
+        adapter = JsonApiKeyAdapter(str(deep_dir))
+        adapter.write_key("test", "value")
+        assert deep_dir.exists()
+        assert adapter.read_key("test") == "value"
+
+    def test_keys_file_path_construction(self, key_dir):
+        """Kill mutant: key_dir / API_KEYS_FILENAME path join."""
+        adapter = JsonApiKeyAdapter(str(key_dir))
+        assert adapter._keys_file == key_dir / "api-keys.json"
+
+    def test_write_key_json_is_indented(self, adapter, key_dir):
+        """Kill mutant: json.dumps indent=2 parameter."""
+        adapter.write_key("sam_gov", "key-123")
+        keys_file = key_dir / "api-keys.json"
+        text = keys_file.read_text()
+        # Indented JSON has newlines and spaces
+        assert "\n" in text
+        assert "  " in text
+
+    def test_read_key_uses_utf8_encoding(self, adapter, key_dir):
+        """Kill mutant: encoding='utf-8' parameter."""
+        keys_file = key_dir / "api-keys.json"
+        keys_file.write_text(json.dumps({"test": "val\u00fc\u00e9"}), encoding="utf-8")
+        result = adapter.read_key("test")
+        assert result == "val\u00fc\u00e9"

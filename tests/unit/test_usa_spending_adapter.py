@@ -19,7 +19,12 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
-from pes.adapters.usa_spending_adapter import UsaSpendingAdapter
+from pes.adapters.usa_spending_adapter import (
+    USA_SPENDING_AUTOCOMPLETE_URL,
+    USA_SPENDING_RECIPIENT_URL,
+    UsaSpendingAdapter,
+    UsaSpendingResult,
+)
 from pes.domain.enrichment import SourceError
 
 
@@ -205,3 +210,173 @@ def test_http_error_returns_source_error(adapter, mock_client):
     assert result.error.api_name == "USASpending.gov"
     assert result.error.http_status == 500
     assert result.fields == []
+
+
+# ---------- Mutation-killing tests ----------
+
+
+class TestUsaSpendingMutationKillers:
+    """Targeted tests to kill surviving mutants in usa_spending_adapter.py."""
+
+    def test_source_name_exact_value(self, adapter):
+        """Kill mutant: source_name string literal mutation."""
+        assert adapter.source_name == "USASpending.gov"
+
+    def test_autocomplete_url_constant(self):
+        """Kill mutant: URL string mutation."""
+        assert USA_SPENDING_AUTOCOMPLETE_URL == "https://api.usaspending.gov/api/v2/autocomplete/recipient/"
+
+    def test_recipient_url_constant(self):
+        """Kill mutant: URL string mutation."""
+        assert USA_SPENDING_RECIPIENT_URL == "https://api.usaspending.gov/api/v2/recipient/"
+
+    def test_timeout_default_value(self, mock_client):
+        """Kill mutant: default timeout=10.0 mutation."""
+        adapter = UsaSpendingAdapter(client=mock_client)
+        assert adapter._timeout == 10.0
+
+    def test_result_defaults(self):
+        """Kill mutant: UsaSpendingResult default value mutations."""
+        result = UsaSpendingResult()
+        assert result.fields == []
+        assert result.error is None
+        assert result.found is True
+
+    def test_result_found_false(self):
+        """Kill mutant: found=True default."""
+        result = UsaSpendingResult(found=False)
+        assert result.found is False
+
+    def test_result_slots(self):
+        """Kill mutant: __slots__ tuple mutation."""
+        result = UsaSpendingResult()
+        assert hasattr(result, "fields")
+        assert hasattr(result, "error")
+        assert hasattr(result, "found")
+
+    def test_autocomplete_post_body_exact(self, adapter, mock_client):
+        """Kill mutant: search_text key or company_name value mutation."""
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response(results=[]))
+        adapter.fetch_by_company_name("Acme Corp")
+        call_kwargs = mock_client.post.call_args
+        assert call_kwargs[1]["json"] == {"search_text": "Acme Corp"}
+
+    def test_empty_recipient_id_returns_not_found(self, adapter, mock_client):
+        """Kill mutant: empty recipient_id check removal."""
+        mock_client.post.return_value = _mock_response(
+            200, _autocomplete_response(results=[{"recipient_name": "Test", "recipient_id": ""}])
+        )
+        result = adapter.fetch_by_company_name("Test")
+        assert result.found is False
+        assert result.fields == []
+
+    def test_detail_url_contains_recipient_id(self, adapter, mock_client):
+        """Kill mutant: detail_url format string mutation."""
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, _recipient_detail_response())
+        adapter.fetch_by_company_name("Test")
+        get_call = mock_client.get.call_args
+        assert "abc123-R" in get_call[0][0]
+        assert get_call[0][0].endswith("/")
+        assert get_call[1]["params"] == {"year": "all"}
+
+    def test_detail_timeout_returns_error(self, adapter, mock_client):
+        """Kill mutant: timeout handling on detail step."""
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.side_effect = httpx.TimeoutException("timeout")
+        result = adapter.fetch_by_company_name("Test")
+        assert result.error.error_type == "timeout"
+        assert result.error.api_name == "USASpending.gov"
+        assert "10.0" in result.error.message
+
+    def test_detail_http_error_returns_server_error(self, adapter, mock_client):
+        """Kill mutant: detail step HTTP error handling."""
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(502)
+        result = adapter.fetch_by_company_name("Test")
+        assert result.error.error_type == "server_error"
+        assert result.error.http_status == 502
+        assert "502" in result.error.message
+        assert "USASpending.gov" in result.error.message
+
+    def test_autocomplete_http_error_message_format(self, adapter, mock_client):
+        """Kill mutant: error message format for autocomplete step."""
+        mock_client.post.return_value = _mock_response(503)
+        result = adapter.fetch_by_company_name("Test")
+        assert "503" in result.error.message
+        assert "USASpending.gov" in result.error.message
+
+    def test_field_path_exact_strings(self, adapter, mock_client):
+        """Kill mutant: field_path string mutations."""
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, _recipient_detail_response())
+        result = adapter.fetch_by_company_name("Test")
+        paths = [f.field_path for f in result.fields]
+        assert "federal_awards.total_amount" in paths
+        assert "federal_awards.transaction_count" in paths
+        assert "federal_awards.business_types" in paths
+
+    def test_all_fields_have_high_confidence(self, adapter, mock_client):
+        """Kill mutant: confidence string mutation."""
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, _recipient_detail_response())
+        result = adapter.fetch_by_company_name("Test")
+        for f in result.fields:
+            assert f.confidence == "high"
+
+    def test_source_api_url_is_detail_url(self, adapter, mock_client):
+        """Kill mutant: source api_url should be the detail URL."""
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, _recipient_detail_response())
+        result = adapter.fetch_by_company_name("Test")
+        source = result.fields[0].source
+        assert source.api_name == "USASpending.gov"
+        assert "abc123-R" in source.api_url
+
+    def test_missing_total_amount_omits_field(self, adapter, mock_client):
+        """Kill mutant: 'is not None' check on total_transaction_amount."""
+        detail = {"total_transactions": 5, "business_types": ["small"]}
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, detail)
+        result = adapter.fetch_by_company_name("Test")
+        paths = {f.field_path for f in result.fields}
+        assert "federal_awards.total_amount" not in paths
+        assert "federal_awards.transaction_count" in paths
+
+    def test_missing_total_transactions_omits_field(self, adapter, mock_client):
+        """Kill mutant: 'is not None' check on total_transactions."""
+        detail = {"total_transaction_amount": 1000.0, "business_types": ["small"]}
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, detail)
+        result = adapter.fetch_by_company_name("Test")
+        paths = {f.field_path for f in result.fields}
+        assert "federal_awards.total_amount" in paths
+        assert "federal_awards.transaction_count" not in paths
+
+    def test_empty_business_types_omits_field(self, adapter, mock_client):
+        """Kill mutant: business_types truthy check."""
+        detail = {"total_transaction_amount": 1000.0, "total_transactions": 5, "business_types": []}
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, detail)
+        result = adapter.fetch_by_company_name("Test")
+        paths = {f.field_path for f in result.fields}
+        assert "federal_awards.business_types" not in paths
+
+    def test_none_business_types_omits_field(self, adapter, mock_client):
+        """Kill mutant: business_types None check."""
+        detail = {"total_transaction_amount": 1000.0, "total_transactions": 5}
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, detail)
+        result = adapter.fetch_by_company_name("Test")
+        paths = {f.field_path for f in result.fields}
+        assert "federal_awards.business_types" not in paths
+
+    def test_zero_total_amount_still_included(self, adapter, mock_client):
+        """Kill mutant: 'is not None' vs falsy check on total_transaction_amount=0."""
+        detail = {"total_transaction_amount": 0, "total_transactions": 0}
+        mock_client.post.return_value = _mock_response(200, _autocomplete_response())
+        mock_client.get.return_value = _mock_response(200, detail)
+        result = adapter.fetch_by_company_name("Test")
+        paths = {f.field_path for f in result.fields}
+        assert "federal_awards.total_amount" in paths
+        assert "federal_awards.transaction_count" in paths
