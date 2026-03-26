@@ -32,7 +32,7 @@ class ProfileDiff:
 
     @property
     def has_changes(self) -> bool:
-        return len(self.additions) > 0 or len(self.changes) > 0
+        return bool(self.additions or self.changes)
 
 
 def _resolve_path(profile: dict[str, Any], path: str) -> tuple[bool, Any]:
@@ -46,6 +46,13 @@ def _resolve_path(profile: dict[str, Any], path: str) -> tuple[bool, Any]:
     return True, current
 
 
+def _normalize_item(item: Any) -> Any:
+    """Normalize a value for set-based comparison. Dicts become frozensets."""
+    if isinstance(item, dict):
+        return frozenset(item.items())
+    return item
+
+
 def _values_equal(old: Any, new: Any) -> bool:
     """Compare two values, using order-independent comparison for lists."""
     if isinstance(old, list) and isinstance(new, list):
@@ -57,24 +64,13 @@ def _sets_equal(old_list: list, new_list: list) -> bool:
     """Order-independent list comparison. Handles dicts by converting to frozensets."""
     if len(old_list) != len(new_list):
         return False
-
-    def _normalize(item: Any) -> Any:
-        if isinstance(item, dict):
-            return frozenset(item.items())
-        return item
-
-    return set(_normalize(x) for x in old_list) == set(_normalize(x) for x in new_list)
+    return set(_normalize_item(x) for x in old_list) == set(_normalize_item(x) for x in new_list)
 
 
 def _list_has_additions(old_list: list, new_list: list) -> bool:
     """Check if new_list contains items not in old_list."""
-    def _normalize(item: Any) -> Any:
-        if isinstance(item, dict):
-            return frozenset(item.items())
-        return item
-
-    old_set = set(_normalize(x) for x in old_list)
-    new_set = set(_normalize(x) for x in new_list)
+    old_set = set(_normalize_item(x) for x in old_list)
+    new_set = set(_normalize_item(x) for x in new_list)
     return len(new_set - old_set) > 0
 
 
@@ -139,7 +135,7 @@ def _collect_api_missing(
 ) -> None:
     """Recursively find top-level profile keys not covered by enrichment."""
     for key, value in profile.items():
-        path = f"{prefix}{key}" if not prefix else f"{prefix}.{key}"
+        path = f"{prefix}.{key}" if prefix else key
         if path not in enriched_paths:
             # Check if any enriched path is a child of this path
             has_enriched_child = any(ep.startswith(path + ".") for ep in enriched_paths)

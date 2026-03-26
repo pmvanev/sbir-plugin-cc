@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import asdict
 from io import StringIO
 from typing import Any
 
@@ -58,9 +57,8 @@ def create_enrichment_service(key_dir: str) -> EnrichmentService:
 
 def _serialize_enrichment_result(result: EnrichmentResult) -> dict[str, Any]:
     """Convert EnrichmentResult to a JSON-serializable dict."""
-    fields = []
-    for f in result.fields:
-        fields.append({
+    fields = [
+        {
             "field_path": f.field_path,
             "value": f.value,
             "source": {
@@ -69,16 +67,19 @@ def _serialize_enrichment_result(result: EnrichmentResult) -> dict[str, Any]:
                 "accessed_at": f.source.accessed_at,
             },
             "confidence": f.confidence,
-        })
+        }
+        for f in result.fields
+    ]
 
-    errors = []
-    for e in result.errors:
-        errors.append({
+    errors = [
+        {
             "api_name": e.api_name,
             "error_type": e.error_type,
             "message": e.message,
             "http_status": e.http_status,
-        })
+        }
+        for e in result.errors
+    ]
 
     return {
         "uei": result.uei,
@@ -114,20 +115,30 @@ def _error_response(message: str, error_type: str = "error") -> dict[str, Any]:
     return {"error": True, "message": message, "type": error_type}
 
 
-def _cmd_enrich(args: Any, key_dir: str, out: StringIO) -> int:
-    """Handle 'enrich' subcommand."""
-    validation = validate_uei(args.uei)
+def _validate_uei_or_error(uei: str, out: StringIO) -> bool:
+    """Validate UEI and write error response if invalid. Returns True if valid."""
+    validation = validate_uei(uei)
     if not validation.is_valid:
         json.dump(_error_response(validation.error or "Invalid UEI", "validation_error"), out)
         out.write("\n")
-        return 1
+        return False
+    return True
 
+
+def _run_enrichment(uei: str, key_dir: str) -> EnrichmentResult:
+    """Read API key, create service, and run enrichment cascade."""
     key_adapter = JsonApiKeyAdapter(key_dir)
     api_key = key_adapter.read_key("sam_gov")
-
     service = create_enrichment_service(key_dir)
-    result = service.enrich(uei=args.uei, api_key=api_key)
+    return service.enrich(uei=uei, api_key=api_key)
 
+
+def _cmd_enrich(args: Any, key_dir: str, out: StringIO) -> int:
+    """Handle 'enrich' subcommand."""
+    if not _validate_uei_or_error(args.uei, out):
+        return 1
+
+    result = _run_enrichment(args.uei, key_dir)
     json.dump(_serialize_enrichment_result(result), out)
     out.write("\n")
     return 0
@@ -135,13 +146,9 @@ def _cmd_enrich(args: Any, key_dir: str, out: StringIO) -> int:
 
 def _cmd_diff(args: Any, key_dir: str, out: StringIO) -> int:
     """Handle 'diff' subcommand."""
-    validation = validate_uei(args.uei)
-    if not validation.is_valid:
-        json.dump(_error_response(validation.error or "Invalid UEI", "validation_error"), out)
-        out.write("\n")
+    if not _validate_uei_or_error(args.uei, out):
         return 1
 
-    # Load existing profile
     try:
         with open(args.profile_path, encoding="utf-8") as f:
             existing_profile = json.load(f)
@@ -150,12 +157,7 @@ def _cmd_diff(args: Any, key_dir: str, out: StringIO) -> int:
         out.write("\n")
         return 1
 
-    key_adapter = JsonApiKeyAdapter(key_dir)
-    api_key = key_adapter.read_key("sam_gov")
-
-    service = create_enrichment_service(key_dir)
-    result = service.enrich(uei=args.uei, api_key=api_key)
-
+    result = _run_enrichment(args.uei, key_dir)
     diff = diff_profile(result, existing_profile)
     json.dump(_serialize_profile_diff(diff), out)
     out.write("\n")
@@ -168,7 +170,7 @@ def _cmd_validate_key(args: Any, key_dir: str, out: StringIO) -> int:
     key = key_adapter.read_key(args.service)
 
     response = {
-        "valid": key is not None and len(key) > 0,
+        "valid": bool(key),
         "service": args.service,
     }
     json.dump(response, out)
@@ -246,19 +248,20 @@ def run(argv: list[str], out: StringIO | None = None) -> int:
 
     key_dir = args.key_dir
 
+    handlers = {
+        "enrich": _cmd_enrich,
+        "diff": _cmd_diff,
+        "validate-key": _cmd_validate_key,
+        "save-key": _cmd_save_key,
+    }
+
     try:
-        if args.mode == "enrich":
-            return _cmd_enrich(args, key_dir, out)
-        elif args.mode == "diff":
-            return _cmd_diff(args, key_dir, out)
-        elif args.mode == "validate-key":
-            return _cmd_validate_key(args, key_dir, out)
-        elif args.mode == "save-key":
-            return _cmd_save_key(args, key_dir, out)
-        else:
+        handler = handlers.get(args.mode)
+        if handler is None:
             json.dump(_error_response(f"Unknown mode: {args.mode}", "argument_error"), out)
             out.write("\n")
             return 1
+        return handler(args, key_dir, out)
     except Exception as exc:
         json.dump(_error_response(str(exc), "runtime_error"), out)
         out.write("\n")

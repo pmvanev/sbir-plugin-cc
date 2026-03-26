@@ -55,6 +55,17 @@ class UsaSpendingAdapter:
     def source_name(self) -> str:
         return "USASpending.gov"
 
+    def _make_error(self, error_type: str, message: str, http_status: int | None = None) -> UsaSpendingResult:
+        """Build a UsaSpendingResult with a SourceError."""
+        return UsaSpendingResult(
+            error=SourceError(
+                api_name="USASpending.gov",
+                error_type=error_type,
+                message=message,
+                http_status=http_status,
+            ),
+        )
+
     def fetch_by_company_name(self, company_name: str) -> UsaSpendingResult:
         """Search USASpending.gov by company name via two-step resolution.
 
@@ -70,23 +81,10 @@ class UsaSpendingAdapter:
             )
             autocomplete_resp.raise_for_status()
         except httpx.TimeoutException:
-            return UsaSpendingResult(
-                error=SourceError(
-                    api_name="USASpending.gov",
-                    error_type="timeout",
-                    message=f"Connection timed out after {self._timeout}s",
-                ),
-            )
+            return self._make_error("timeout", f"Connection timed out after {self._timeout}s")
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code
-            return UsaSpendingResult(
-                error=SourceError(
-                    api_name="USASpending.gov",
-                    error_type="server_error",
-                    message=f"HTTP {status} from USASpending.gov",
-                    http_status=status,
-                ),
-            )
+            return self._make_error("server_error", f"HTTP {status} from USASpending.gov", status)
 
         results = autocomplete_resp.json().get("results", [])
         if not results:
@@ -105,23 +103,10 @@ class UsaSpendingAdapter:
             )
             detail_resp.raise_for_status()
         except httpx.TimeoutException:
-            return UsaSpendingResult(
-                error=SourceError(
-                    api_name="USASpending.gov",
-                    error_type="timeout",
-                    message=f"Connection timed out after {self._timeout}s",
-                ),
-            )
+            return self._make_error("timeout", f"Connection timed out after {self._timeout}s")
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code
-            return UsaSpendingResult(
-                error=SourceError(
-                    api_name="USASpending.gov",
-                    error_type="server_error",
-                    message=f"HTTP {status} from USASpending.gov",
-                    http_status=status,
-                ),
-            )
+            return self._make_error("server_error", f"HTTP {status} from USASpending.gov", status)
 
         detail = detail_resp.json()
         accessed_at = datetime.now(timezone.utc).isoformat()

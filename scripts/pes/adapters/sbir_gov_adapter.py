@@ -55,20 +55,12 @@ class SbirGovAdapter:
     def source_name(self) -> str:
         return "SBIR.gov"
 
-    def fetch_by_company_name(self, company_name: str) -> SbirGovCompanyResult:
-        """Search SBIR.gov by company name and fetch award history.
-
-        Single match: fetches awards and returns EnrichedField objects.
-        Multiple matches: returns CompanyCandidate list for disambiguation.
-        Timeout/error: returns SourceError without raising.
-        """
+    def _safe_get(self, url: str, params: dict) -> httpx.Response | SbirGovCompanyResult:
+        """Execute GET with error handling. Returns Response on success or SbirGovCompanyResult on failure."""
         try:
-            company_resp = self._client.get(
-                SBIR_GOV_COMPANY_URL,
-                params={"keyword": company_name},
-                timeout=self._timeout,
-            )
-            company_resp.raise_for_status()
+            resp = self._client.get(url, params=params, timeout=self._timeout)
+            resp.raise_for_status()
+            return resp
         except httpx.TimeoutException:
             return SbirGovCompanyResult(
                 error=SourceError(
@@ -88,7 +80,18 @@ class SbirGovAdapter:
                 ),
             )
 
-        firms = company_resp.json()
+    def fetch_by_company_name(self, company_name: str) -> SbirGovCompanyResult:
+        """Search SBIR.gov by company name and fetch award history.
+
+        Single match: fetches awards and returns EnrichedField objects.
+        Multiple matches: returns CompanyCandidate list for disambiguation.
+        Timeout/error: returns SourceError without raising.
+        """
+        resp = self._safe_get(SBIR_GOV_COMPANY_URL, {"keyword": company_name})
+        if isinstance(resp, SbirGovCompanyResult):
+            return resp
+
+        firms = resp.json()
 
         if not firms:
             return SbirGovCompanyResult(found=False)
@@ -114,33 +117,11 @@ class SbirGovAdapter:
 
     def _fetch_awards(self, firm_name: str) -> SbirGovCompanyResult:
         """Fetch award history for a specific firm name."""
-        try:
-            awards_resp = self._client.get(
-                SBIR_GOV_AWARDS_URL,
-                params={"firm": firm_name},
-                timeout=self._timeout,
-            )
-            awards_resp.raise_for_status()
-        except httpx.TimeoutException:
-            return SbirGovCompanyResult(
-                error=SourceError(
-                    api_name="SBIR.gov",
-                    error_type="timeout",
-                    message=f"Connection timed out after {self._timeout}s",
-                ),
-            )
-        except httpx.HTTPStatusError as exc:
-            status = exc.response.status_code
-            return SbirGovCompanyResult(
-                error=SourceError(
-                    api_name="SBIR.gov",
-                    error_type="server_error",
-                    message=f"HTTP {status} from SBIR.gov",
-                    http_status=status,
-                ),
-            )
+        resp = self._safe_get(SBIR_GOV_AWARDS_URL, {"firm": firm_name})
+        if isinstance(resp, SbirGovCompanyResult):
+            return resp
 
-        awards_data = awards_resp.json()
+        awards_data = resp.json()
         accessed_at = datetime.now(timezone.utc).isoformat()
         source = FieldSource(
             api_name="SBIR.gov",
