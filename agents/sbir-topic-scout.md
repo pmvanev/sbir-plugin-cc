@@ -76,24 +76,26 @@ Identify solicitation sources and gather topic data.
 #### 1a. DSIP API Source (primary)
 Use the DSIP CLI (`scripts/dsip_cli.py`) via Bash. **Never import or instantiate Python adapters directly.** The CLI wires all adapters, caching, and error handling internally.
 
+**IMPORTANT**: The CLI lives in the plugin installation directory, not the user's project. Always use `${CLAUDE_PLUGIN_ROOT}` to resolve the path. This environment variable is set automatically by Claude Code when the plugin loads.
+
 **Quick scan** (metadata only, no detail API calls):
 ```bash
-python scripts/dsip_cli.py fetch --status Open
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" fetch --status Open
 ```
 
 **Full enrichment** (descriptions, Q&A, solicitation + component instructions):
 ```bash
-python scripts/dsip_cli.py enrich --status Open
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" enrich --status Open
 ```
 
 **With capability pre-filter** (eliminates irrelevant topics before enrichment):
 ```bash
-python scripts/dsip_cli.py enrich --status Open --capabilities "software,cyber,AI"
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" enrich --status Open --capabilities "software,cyber,AI"
 ```
 
 **Single topic detail** (drill into one topic by hash ID):
 ```bash
-python scripts/dsip_cli.py detail --topic-id 7051b2da4a1e4c52bd0e7daf80d514f7_86352
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" detail --topic-id 7051b2da4a1e4c52bd0e7daf80d514f7_86352
 ```
 
 The CLI outputs JSON to stdout. Parse it to extract topics, messages, and completeness metrics. Cache is automatic -- a second call within 24 hours uses cached data.
@@ -152,7 +154,7 @@ Score each topic against the company capability profile. When enriched descripti
 
 **Batch scoring mode**: Use the DSIP CLI score command which calls TopicScoringService internally:
 ```bash
-python scripts/dsip_cli.py score --status Open
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" score --status Open
 ```
 The `score` command runs the full pipeline (fetch + enrich + score) and returns scored results in JSON.
 - `scored` array contains candidates sorted by composite descending

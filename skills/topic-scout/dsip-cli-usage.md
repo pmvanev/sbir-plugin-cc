@@ -9,14 +9,16 @@ The DSIP CLI (`scripts/dsip_cli.py`) is the entry point for all topic retrieval 
 
 **Always use this CLI. Never import or instantiate adapters directly.**
 
+**Path resolution**: The CLI lives in the plugin installation directory, not the user's project. Always invoke it as `python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py"`. The `CLAUDE_PLUGIN_ROOT` environment variable is set automatically by Claude Code when the plugin loads.
+
 ## Commands
 
 ### fetch -- Topic metadata only (fast, no API detail calls)
 
 ```bash
-python scripts/dsip_cli.py fetch --status Open
-python scripts/dsip_cli.py fetch --status Pre-Release --component NAVY
-python scripts/dsip_cli.py fetch --limit 50
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" fetch --status Open
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" fetch --status Pre-Release --component NAVY
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" fetch --limit 50
 ```
 
 Returns JSON with topic list (topic_id, title, status, component, dates, cycle info, Q&A count) but no descriptions, Q&A text, or instructions. Use for quick scans.
@@ -24,8 +26,8 @@ Returns JSON with topic list (topic_id, title, status, component, dates, cycle i
 ### enrich -- Full enrichment (descriptions, Q&A, instructions)
 
 ```bash
-python scripts/dsip_cli.py enrich --status Open
-python scripts/dsip_cli.py enrich --status Open --capabilities "software,cyber,AI"
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" enrich --status Open
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" enrich --status Open --capabilities "software,cyber,AI"
 ```
 
 Fetches topics, then enriches each candidate via the DSIP API:
@@ -39,8 +41,8 @@ Applies keyword pre-filter if capabilities are provided. Writes cache to `{state
 ### score -- Full pipeline with fit scoring
 
 ```bash
-python scripts/dsip_cli.py score --status Open
-python scripts/dsip_cli.py score --status Open --no-persist
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" score --status Open
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" score --status Open --no-persist
 ```
 
 Runs enrich + five-dimension scoring against the company profile. Requires `~/.sbir/company-profile.json`. Writes scored results to `{state_dir}/finder-results.json` (unless --no-persist).
@@ -50,7 +52,7 @@ Output includes a `scored` array with per-topic: composite_score, recommendation
 ### detail -- Single topic enrichment
 
 ```bash
-python scripts/dsip_cli.py detail --topic-id 7051b2da4a1e4c52bd0e7daf80d514f7_86352
+python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" detail --topic-id 7051b2da4a1e4c52bd0e7daf80d514f7_86352
 ```
 
 Enriches one specific topic by hash ID. Returns description, Q&A, and all detail fields. Use when drilling into a topic from a previous fetch.
