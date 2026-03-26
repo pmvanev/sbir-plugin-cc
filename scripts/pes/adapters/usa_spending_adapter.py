@@ -92,6 +92,8 @@ class UsaSpendingAdapter:
 
         recipient = results[0]
         recipient_id = recipient.get("recipient_id", "")
+        if not recipient_id:
+            return UsaSpendingResult(found=False)
 
         # Step 2: Recipient detail
         detail_url = f"{USA_SPENDING_RECIPIENT_URL}{recipient_id}/"
