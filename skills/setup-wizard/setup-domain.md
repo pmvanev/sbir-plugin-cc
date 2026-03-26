@@ -80,6 +80,18 @@ print(json.dumps({'exists': meta.exists, 'company_name': meta.company_name}))
 "
 ```
 
+## Partner Detection
+
+Check `~/.sbir/partners/` for existing partner profiles:
+
+```bash
+ls ~/.sbir/partners/*.json 2>/dev/null
+```
+
+- Partners found: `[ok]  {count} partner profile(s): {names}` (extract `institution_name` from each JSON)
+- No partners: `[--]  No partner profiles -- STTR topics will score NO-GO. Add with /sbir:proposal partner-setup`
+- Partners are optional. Missing partners do not halt setup, but all STTR topics will be scored NO-GO without at least one partner.
+
 ## Corpus Detection
 
 Check `.sbir/corpus/` for indexed documents. If the directory does not exist or is empty, corpus count is 0.
@@ -177,6 +189,16 @@ After profile builder returns:
 - Re-read profile to confirm it was written
 - Extract summary fields (company_name, capability count, SAM status) for display
 - If profile builder reports cancellation, exit setup cleanly
+
+### Partner Builder Delegation
+
+Invoke `sbir-partner-builder` via Task tool. The partner builder handles its own interview/document/both flow, web research, validation, and atomic write to `~/.sbir/partners/{slug}.json`.
+
+After partner builder returns:
+- Re-read `~/.sbir/partners/` to confirm the profile was written
+- Extract summary fields (institution_name, type, capability count, STTR eligibility) for display
+- If partner builder reports cancellation, display "Partner setup cancelled. Add partners anytime with /sbir:proposal partner-setup" and continue to the next step
+- Ask if user wants to add another partner. If yes, invoke partner builder again.
 
 ### Corpus Ingestion Delegation
 

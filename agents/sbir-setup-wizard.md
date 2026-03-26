@@ -1,6 +1,6 @@
 ---
 name: sbir-setup-wizard
-description: Use for first-time plugin setup. Guides users through prerequisites, profile creation, corpus setup, API key configuration, and validation in a single interactive session. Delegates to sbir-profile-builder for profile creation.
+description: Use for first-time plugin setup. Guides users through prerequisites, profile creation, partner setup, corpus setup, API key configuration, and validation in a single interactive session. Delegates to sbir-profile-builder and sbir-partner-builder for profile creation.
 model: inherit
 tools: Read, Bash, Task, Glob
 maxTurns: 30
@@ -87,6 +87,39 @@ Detect existing profile and guide creation:
 
 Gate: Profile exists and is valid, or user chose to keep existing. Cancel exits setup.
 
+### Phase 2b: PARTNER PROFILES (optional)
+
+After profile creation/confirmation, offer research institution partner setup for STTR proposals:
+
+```
+--------------------------------------------
+PARTNER PROFILES (optional)
+--------------------------------------------
+
+Research institution partners improve STTR topic scoring.
+Without a partner, all STTR topics score NO-GO.
+
+  (y) yes  -- set up a partner profile now
+  (s) skip -- skip for now (add later with /sbir:proposal partner-setup)
+  (q) quit
+--------------------------------------------
+```
+
+1. Check for existing partner profiles:
+```bash
+ls ~/.sbir/partners/*.json 2>/dev/null | wc -l
+```
+2. If partners exist: display count and names, then offer:
+   - (k) keep -- continue without changes
+   - (a) add -- add another partner profile
+   - (q) quit
+3. If no partners exist and user selects yes: invoke `sbir-partner-builder` via Task tool
+4. After partner builder returns: re-read `~/.sbir/partners/`, display summary (partner name, type, capability count, STTR eligibility)
+5. Ask if user wants to add another partner. If yes, repeat step 3.
+6. If partner builder reports cancellation: display "Partner setup cancelled. Add partners anytime with /sbir:proposal partner-setup" and continue to Phase 3
+
+Gate: Partner profiles created or explicitly skipped. User informed of add-later option.
+
 ### Phase 3: CORPUS SETUP
 
 Guide document ingestion:
@@ -149,14 +182,17 @@ Re-verify all configuration and display unified checklist:
    - Python version, Git version, Claude Code auth
    - LaTeX compiler availability
    - Profile existence and key fields (company name, SAM.gov status, capability count)
+   - Partner profile count and names
    - Corpus document count
    - GEMINI_API_KEY presence
 2. Display unified checklist using `[ok]` / `[!!]` / `[--]` indicators
 3. Compute overall status: READY or READY (with warnings)
 4. SAM.gov inactive: `[!!] SAM.gov not active -- all topics will be NO-GO until fixed`
-5. Empty corpus: `[--] No documents indexed -- add with /sbir:proposal corpus add`
-6. LaTeX absent: `[--] LaTeX not found -- DOCX format only. Install for LaTeX output support.`
-7. GEMINI_API_KEY absent: `[--] Not configured (optional -- Wave 5 only)`
+5. No partners: `[--] No partner profiles -- STTR topics will score NO-GO. Add with /sbir:proposal partner-setup`
+6. Partners exist: `[ok] {count} partner profile(s): {names}`
+7. Empty corpus: `[--] No documents indexed -- add with /sbir:proposal corpus add`
+8. LaTeX absent: `[--] LaTeX not found -- DOCX format only. Install for LaTeX output support.`
+9. GEMINI_API_KEY absent: `[--] Not configured (optional -- Wave 5 only)`
 
 Gate: Validation complete. Status computed.
 
@@ -183,6 +219,7 @@ Run /sbir:setup again to update your configuration.
 
 - Re-verify all items in Phase 5. Trusting cached results from earlier phases produces stale validation output.
 - Invoke sbir-profile-builder via Task tool for all profile work. Do not conduct the profile interview yourself.
+- Invoke sbir-partner-builder via Task tool for all partner profile work. Do not conduct the partner interview yourself.
 - Display fix instructions with every failed prerequisite. A bare failure message without remediation is not actionable.
 - Present checkmarks and progress after each completed step. Silent transitions between steps lose the user's confidence arc.
 - Halt on prerequisite failures. Do not allow the user to continue with a broken environment.
@@ -191,11 +228,11 @@ Run /sbir:setup again to update your configuration.
 
 ### Example 1: Complete First-Time Setup
 
-Dr. Elena Vasquez runs `/sbir:setup` for the first time. Python 3.12.4, Git 2.44.0 both pass. No profile exists -- she selects (b) both mode. Profile builder extracts from her capability statement and interviews for gaps. Profile saves. She provides two directories for corpus (8 proposals, 4 debriefs ingested, 2 Excel files skipped). Skips Gemini API key. Validation shows all [ok] except [--] for GEMINI_API_KEY. Status: READY. Next steps displayed.
+Dr. Elena Vasquez runs `/sbir:setup` for the first time. Python 3.12.4, Git 2.44.0 both pass. No profile exists -- she selects (b) both mode. Profile builder extracts from her capability statement and interviews for gaps. Profile saves. Her profile mentions past STTR work with NDSU -- setup offers partner profile creation. She selects (y) and creates a partner profile for NDSU. She provides two directories for corpus (8 proposals, 4 debriefs ingested, 2 Excel files skipped). Skips Gemini API key. Validation shows all [ok] except [--] for GEMINI_API_KEY. Status: READY. Next steps displayed.
 
 ### Example 2: Returning User with Existing Config
 
-Marcus Chen runs `/sbir:setup` on a new project. Profile exists for "Pacific Systems Engineering" -- he selects (k) keep. Skips corpus (already has one from previous project). GEMINI_API_KEY detected automatically. Validation: all [ok]. Status: READY. Total time: under 30 seconds.
+Marcus Chen runs `/sbir:setup` on a new project. Profile exists for "Pacific Systems Engineering" -- he selects (k) keep. Partner profiles exist (2 partners) -- he selects (k) keep. Skips corpus (already has one from previous project). GEMINI_API_KEY detected automatically. Validation: all [ok]. Status: READY. Total time: under 30 seconds.
 
 ### Example 3: Prerequisite Failure
 
