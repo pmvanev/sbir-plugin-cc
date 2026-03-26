@@ -73,7 +73,7 @@ Skip the guard when any ratings or free text is present.
 Build and run the CLI command using Bash:
 
 ```
-python scripts/sbir_feedback_cli.py save \
+python "${CLAUDE_PLUGIN_ROOT}/scripts/sbir_feedback_cli.py" save \
   --type {type_lowercase} \
   [--ratings '{ratings_json}'] \
   [--free-text '{free_text}'] \
@@ -111,7 +111,7 @@ On non-zero exit:
 ### Example 1: BUG report with free text
 User selects BUG. No ratings phase. User types: "Setup wizard crashed when company profile was missing."
 
--> CLI call: `python scripts/sbir_feedback_cli.py save --type bug --free-text "Setup wizard crashed when company profile was missing." --state-dir .sbir --feedback-dir .sbir/feedback`
+-> CLI call: `python "${CLAUDE_PLUGIN_ROOT}/scripts/sbir_feedback_cli.py" save --type bug --free-text "Setup wizard crashed when company profile was missing." --state-dir .sbir --feedback-dir .sbir/feedback`
 -> Parse JSON, confirm: "Feedback saved! ID: feedback-2026-03-25T14-30-00, file: .sbir/feedback/feedback-2026-03-25T14-30-00.json"
 
 ### Example 2: QUALITY with partial ratings
@@ -124,7 +124,7 @@ User selects QUALITY. Rates writing_quality=5, past_performance=3. Leaves image_
 User selects SUGGESTION. Free text is blank (presses Enter). No ratings (not a QUALITY type).
 
 -> Guard activates: "This submission has no ratings and no description -- only a context snapshot will be saved. Proceed anyway? (yes / no)"
--> User says yes -> CLI call: `python scripts/sbir_feedback_cli.py save --type suggestion --state-dir .sbir --feedback-dir .sbir/feedback`
+-> User says yes -> CLI call: `python "${CLAUDE_PLUGIN_ROOT}/scripts/sbir_feedback_cli.py" save --type suggestion --state-dir .sbir --feedback-dir .sbir/feedback`
 
 ### Example 4: CLI returns non-zero exit
 Bash exits with code 1 and stderr: "Error: unrecognized feedback type 'Quality'."
@@ -134,7 +134,7 @@ Bash exits with code 1 and stderr: "Error: unrecognized feedback type 'Quality'.
 ### Example 5: QUALITY with all four ratings and no free text
 User selects QUALITY. Rates all four dimensions: past_performance=4, image_quality=3, writing_quality=5, topic_scoring=4. Free text blank. All ratings present so guard does not trigger.
 
--> CLI call: `python scripts/sbir_feedback_cli.py save --type quality --ratings '{"past_performance": 4, "image_quality": 3, "writing_quality": 5, "topic_scoring": 4}' --state-dir .sbir --feedback-dir .sbir/feedback`
+-> CLI call: `python "${CLAUDE_PLUGIN_ROOT}/scripts/sbir_feedback_cli.py" save --type quality --ratings '{"past_performance": 4, "image_quality": 3, "writing_quality": 5, "topic_scoring": 4}' --state-dir .sbir --feedback-dir .sbir/feedback`
 
 ## Constraints
 

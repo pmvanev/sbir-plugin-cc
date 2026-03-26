@@ -216,9 +216,9 @@ Run validation, then write atomically:
 1. Validate profile against the JSON Schema:
 ```bash
 python3 -c "
-import json, sys
+import json, os, sys
 from jsonschema import validate, ValidationError
-schema = json.load(open('templates/partner-profile-schema.json'))
+schema = json.load(open(os.path.join(os.environ['CLAUDE_PLUGIN_ROOT'], 'templates/partner-profile-schema.json')))
 profile = json.loads(sys.stdin.read())
 try:
     validate(profile, schema)

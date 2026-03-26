@@ -71,7 +71,7 @@ Use Python adapter to check for existing profile:
 
 ```bash
 python -c "
-import sys; sys.path.insert(0, 'scripts')
+import os, sys; sys.path.insert(0, os.path.join(os.environ['CLAUDE_PLUGIN_ROOT'], 'scripts'))
 from pes.adapters.json_profile_adapter import JsonProfileAdapter
 import json
 adapter = JsonProfileAdapter('$HOME/.sbir')

@@ -220,8 +220,8 @@ Run validation, then write atomically:
 1. Validate profile:
 ```
 python -c "
-import json, sys
-sys.path.insert(0, 'scripts')
+import json, os, sys
+sys.path.insert(0, os.path.join(os.environ['CLAUDE_PLUGIN_ROOT'], 'scripts'))
 from pes.domain.profile_validation import validate_profile
 profile = json.load(sys.stdin)
 result = validate_profile(profile)
@@ -244,8 +244,8 @@ Return to Phase 4 preview after fixes.
 3. If validation passes, write atomically:
 ```
 python -c "
-import sys
-sys.path.insert(0, 'scripts')
+import os, sys
+sys.path.insert(0, os.path.join(os.environ['CLAUDE_PLUGIN_ROOT'], 'scripts'))
 from pes.adapters.json_profile_adapter import JsonProfileAdapter
 adapter = JsonProfileAdapter('${profile_dir}')
 import json
