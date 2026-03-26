@@ -1,6 +1,7 @@
 {
   "schema_version": "3.0",
   "project_id": "company-profile-enrichment",
+  "feature_id": "company-profile-enrichment",
   "events": [
     {
       "sid": "01-01",
