@@ -266,3 +266,89 @@ def test_sam_not_found_still_attempts_secondary_apis():
     assert sbir.called is True
     assert usa.called is True
     assert "SAM.gov" not in result.sources_succeeded
+
+
+# ---------------------------------------------------------------------------
+# B6: Company name from SAM.gov is passed to downstream adapters
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SpySbirAdapter:
+    """Records the company_name passed to fetch_by_company_name."""
+
+    received_name: str | None = None
+    fields: list[EnrichedField] = field(default_factory=list)
+
+    @property
+    def source_name(self) -> str:
+        return "SBIR.gov"
+
+    def fetch_by_company_name(self, company_name: str):
+        from pes.adapters.sbir_gov_adapter import SbirGovCompanyResult
+
+        self.received_name = company_name
+        return SbirGovCompanyResult(fields=self.fields)
+
+
+@dataclass
+class SpyUsaSpendingAdapter:
+    """Records the company_name passed to fetch_by_company_name."""
+
+    received_name: str | None = None
+    fields: list[EnrichedField] = field(default_factory=list)
+
+    @property
+    def source_name(self) -> str:
+        return "USASpending.gov"
+
+    def fetch_by_company_name(self, company_name: str):
+        from pes.adapters.usa_spending_adapter import UsaSpendingResult
+
+        self.received_name = company_name
+        return UsaSpendingResult(fields=self.fields)
+
+
+def test_company_name_from_sam_is_passed_to_downstream_adapters():
+    """Kill mutants: company_name extraction, field_path match, value assignment."""
+    sam_fields = [
+        _make_field("company_name", "Radiant Defense Systems", "SAM.gov"),
+        _make_field("certifications.sam_gov.cage_code", "XYZ99", "SAM.gov"),
+    ]
+    sam = FakeSamAdapter(SourceResult.success(sam_fields))
+    sbir = SpySbirAdapter()
+    usa = SpyUsaSpendingAdapter()
+
+    service = EnrichmentService(
+        sam_adapter=sam,
+        sbir_adapter=sbir,
+        usa_spending_adapter=usa,
+        required_fields=REQUIRED_FIELDS,
+    )
+
+    service.enrich(uei="DKJF84NXLE73", api_key="test-key")
+
+    assert sbir.received_name == "Radiant Defense Systems"
+    assert usa.received_name == "Radiant Defense Systems"
+
+
+def test_sam_and_found_condition_requires_both():
+    """Kill mutant: 'found and fields' → 'found or fields'."""
+    # SAM returns found=True but empty fields
+    sam = FakeSamAdapter(SourceResult(found=True, fields=[], error=None))
+    sbir = SpySbirAdapter()
+    usa = SpyUsaSpendingAdapter()
+
+    service = EnrichmentService(
+        sam_adapter=sam,
+        sbir_adapter=sbir,
+        usa_spending_adapter=usa,
+        required_fields=REQUIRED_FIELDS,
+    )
+
+    result = service.enrich(uei="DKJF84NXLE73", api_key="test-key")
+
+    # SAM.gov returned found=True but no fields, so should NOT be in sources_succeeded
+    assert "SAM.gov" not in result.sources_succeeded
+    # Downstream should still be called with empty company name
+    assert sbir.received_name == ""

@@ -161,3 +161,61 @@ def test_company_candidate_captures_disambiguation_fields():
     assert candidate.company_name == "Radiant Defense Systems, LLC"
     assert candidate.award_count == 3
     assert candidate.firm_id == "FIRM-12345"
+
+
+# ---------- Mutation kill: immutability, defaults, factory defaults ----------
+
+
+def test_domain_value_objects_are_immutable():
+    """Kill frozen=True→False mutations on all domain dataclasses."""
+    source = FieldSource(api_name="SAM.gov", api_url="https://api.sam.gov", accessed_at="2026-01-01")
+    with pytest.raises(AttributeError):
+        source.api_name = "changed"
+
+    field = EnrichedField(field_path="x", value="v", source=source, confidence="high")
+    with pytest.raises(AttributeError):
+        field.value = "changed"
+
+    error = SourceError(api_name="X", error_type="timeout", message="msg")
+    with pytest.raises(AttributeError):
+        error.message = "changed"
+
+    candidate = CompanyCandidate(company_name="X", city="Y", state="Z", award_count=0, firm_id="F")
+    with pytest.raises(AttributeError):
+        candidate.city = "changed"
+
+    result = validate_uei("DKJF84NXLE73")
+    with pytest.raises(AttributeError):
+        result.is_valid = False
+
+
+def test_source_error_default_http_status_is_none():
+    """Kill http_status default None→'' mutation."""
+    error = SourceError(api_name="X", error_type="t", message="m")
+    assert error.http_status is None
+
+
+def test_enrichment_result_default_lists_are_empty():
+    """Kill default_factory=list→None mutations on disambiguation_needed and errors."""
+    result = EnrichmentResult(
+        uei="DKJF84NXLE73",
+        fields=[],
+        missing_fields=[],
+        sources_attempted=[],
+        sources_succeeded=[],
+    )
+    assert result.disambiguation_needed == []
+    assert result.errors == []
+
+
+def test_with_missing_fields_handles_none_disambiguation():
+    """Kill 'or []' → 'and []' mutation on disambiguation_needed parameter."""
+    result = EnrichmentResult.with_missing_fields(
+        uei="DKJF84NXLE73",
+        fields=[],
+        required_fields=["company_name"],
+        sources_attempted=[],
+        sources_succeeded=[],
+        disambiguation_needed=None,
+    )
+    assert result.disambiguation_needed == []
