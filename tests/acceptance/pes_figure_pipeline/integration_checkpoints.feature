@@ -5,7 +5,6 @@ Feature: Figure Pipeline Integration Checkpoints
 
   # --- Path Resolution ---
 
-  @skip
   Scenario: Gate works with multi-proposal workspace path layout
     Given an active proposal for topic "af263-042" at Wave 5 with multi-proposal workspace
     And the enforcement rules are loaded from the standard configuration
@@ -13,7 +12,6 @@ Feature: Figure Pipeline Integration Checkpoints
     When the formatter agent attempts to Write "artifacts/af263-042/wave-5-visuals/figure-1.svg"
     Then PES returns decision BLOCK
 
-  @skip
   Scenario: Gate works with legacy single-proposal path layout
     Given an active proposal at Wave 5 with legacy single-proposal workspace
     And the enforcement rules are loaded from the standard configuration
@@ -23,7 +21,6 @@ Feature: Figure Pipeline Integration Checkpoints
 
   # --- Non-interference ---
 
-  @skip
   Scenario: Gate does not affect writes outside visual assets directory
     Given an active proposal for topic "SF25D-T1201" at Wave 4
     And the enforcement rules are loaded from the standard configuration
@@ -31,7 +28,6 @@ Feature: Figure Pipeline Integration Checkpoints
     Then PES returns decision ALLOW
     And the figure pipeline gate is not evaluated
 
-  @skip
   Scenario: Gate does not affect Read operations
     Given an active proposal for topic "SF25D-T1201" at Wave 5
     And the enforcement rules are loaded from the standard configuration
@@ -41,7 +37,6 @@ Feature: Figure Pipeline Integration Checkpoints
 
   # --- Audit Trail ---
 
-  @skip
   Scenario: Blocked figure write is recorded in audit log
     Given an active proposal for topic "SF25D-T1201" at Wave 5
     And the enforcement rules are loaded from the standard configuration
@@ -51,7 +46,6 @@ Feature: Figure Pipeline Integration Checkpoints
     And an audit entry is recorded with event "evaluate" and decision "block"
     And the audit entry includes the rule_id "figure-pipeline-requires-specs"
 
-  @skip
   Scenario: Allowed figure write after gates pass is recorded in audit log
     Given an active proposal for topic "SF25D-T1201" at Wave 5
     And the enforcement rules are loaded from the standard configuration

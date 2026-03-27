@@ -9,7 +9,6 @@ Feature: Style Profile Gate
 
   # --- Blocking without style ---
 
-  @skip
   Scenario: Block figure generation when style-profile.yaml missing and no skip marker
     Given the visual assets directory contains a figure specification plan
     And the visual assets directory does not contain a style profile
@@ -20,7 +19,6 @@ Feature: Style Profile Gate
 
   # --- Allowing with style profile ---
 
-  @skip
   Scenario: Allow figure generation when style-profile.yaml exists
     Given the visual assets directory contains a figure specification plan
     And the visual assets directory contains a style profile
@@ -29,7 +27,6 @@ Feature: Style Profile Gate
 
   # --- Allowing with explicit skip ---
 
-  @skip
   Scenario: Allow figure generation when user explicitly skipped style analysis
     Given the visual assets directory contains a figure specification plan
     And the visual assets directory does not contain a style profile
@@ -39,7 +36,6 @@ Feature: Style Profile Gate
 
   # --- Allowing prerequisite creation ---
 
-  @skip
   Scenario: Allow writing style-profile.yaml itself (prerequisite creation)
     Given the visual assets directory contains a figure specification plan
     And the visual assets directory does not contain a style profile
