@@ -1,0 +1,132 @@
+{
+  "roadmap": {
+    "project_id": "outline-gate-enforcement",
+    "created_at": "2026-03-27T00:00:00Z",
+    "total_steps": 5,
+    "phases": 3
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Domain Evaluator",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "OutlineGateEvaluator domain logic",
+          "description": "Pure domain evaluator. Blocks writes to wave-4-drafting/ when proposal-outline.md absent from outline_artifacts_present. No skip marker. No prerequisite creation exception.",
+          "criteria": [
+            "Write to wave-4-drafting/ blocked when proposal-outline.md not in outline_artifacts_present",
+            "Edit to wave-4-drafting/ blocked same as Write when outline absent",
+            "Writes outside wave-4-drafting/ not affected by this gate",
+            "Block message includes guidance to complete outline in Wave 3",
+            "Block message includes path reference to wave-3-outline/"
+          ],
+          "dependencies": [],
+          "stories": ["US-OGATE-01"],
+          "files_to_modify": [
+            "scripts/pes/domain/outline_gate.py",
+            "tests/unit/test_outline_gate.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Adapter and Wiring",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Hook adapter cross-directory resolution",
+          "description": "Extend resolve_tool_context() to derive wave-3-outline/ from wave-4-drafting/ target path. Check proposal-outline.md at sibling path. Pass outline_artifacts_present in tool_context.",
+          "criteria": [
+            "Multi-proposal path (artifacts/{topic-id}/wave-4-drafting/) resolves to sibling wave-3-outline/",
+            "Legacy path (artifacts/wave-4-drafting/) resolves to sibling wave-3-outline/",
+            "outline_artifacts_present contains proposal-outline.md when file exists",
+            "outline_artifacts_present is empty list when file absent",
+            "Paths outside wave-4-drafting/ produce empty outline_artifacts_present"
+          ],
+          "dependencies": [],
+          "stories": ["US-OGATE-02"],
+          "files_to_modify": [
+            "scripts/pes/adapters/hook_adapter.py",
+            "tests/unit/test_hook_adapter.py"
+          ]
+        },
+        {
+          "id": "02-02",
+          "name": "Engine registration and config rule",
+          "description": "Register OutlineGateEvaluator in engine._evaluators as 'outline_gate'. Add rule 'drafting-requires-outline' to pes-config.json.",
+          "criteria": [
+            "Engine _evaluators contains 'outline_gate' mapped to OutlineGateEvaluator",
+            "pes-config.json contains rule with rule_id 'drafting-requires-outline' and rule_type 'outline_gate'",
+            "Engine dispatches outline_gate rules to correct evaluator",
+            "Rule count in pes-config.json is 12"
+          ],
+          "dependencies": ["01-01"],
+          "stories": ["US-OGATE-02"],
+          "files_to_modify": [
+            "scripts/pes/domain/engine.py",
+            "templates/pes-config.json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Integration and Acceptance",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Integration tests: end-to-end outline gate enforcement",
+          "description": "Integration tests loading real pes-config.json through engine. Verify gate blocks and allows correctly through full hook-to-evaluator path.",
+          "criteria": [
+            "Draft write blocked end-to-end when outline absent (config -> engine -> evaluator -> BLOCK)",
+            "Draft write allowed end-to-end when proposal-outline.md exists in wave-3-outline/",
+            "Gate does not interfere with writes outside wave-4-drafting/",
+            "Cross-directory resolution works for both multi-proposal and legacy layouts"
+          ],
+          "dependencies": ["02-01", "02-02"],
+          "stories": ["US-OGATE-01", "US-OGATE-02"],
+          "test_files": [
+            "tests/integration/test_outline_gate_enforcement.py"
+          ]
+        },
+        {
+          "id": "03-02",
+          "name": "BDD acceptance tests from user story scenarios",
+          "description": "Acceptance tests implementing all 9 Gherkin scenarios from US-OGATE-01 and US-OGATE-02. Validates blocking, allowing, path resolution, non-interference, and audit trail.",
+          "criteria": [
+            "All 9 scenarios from user stories pass",
+            "Audit log entries verified for block and allow decisions",
+            "Multi-proposal and legacy path layouts covered"
+          ],
+          "dependencies": ["03-01"],
+          "stories": ["US-OGATE-01", "US-OGATE-02"],
+          "test_files": [
+            "tests/acceptance/pes_outline_gate/test_outline_gate_enforcement.py"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/domain/",
+      "scripts/pes/adapters/",
+      "templates/"
+    ],
+    "test_directories": [
+      "tests/unit/",
+      "tests/integration/",
+      "tests/acceptance/pes_outline_gate/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "pending_review",
+    "reviewer": "nw-solution-architect-reviewer"
+  }
+}
