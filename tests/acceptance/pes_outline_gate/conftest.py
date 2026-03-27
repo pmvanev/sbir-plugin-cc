@@ -222,5 +222,12 @@ def base_proposal_state() -> dict[str, Any]:
 
 @pytest.fixture()
 def enforcement_context() -> dict[str, Any]:
-    """Mutable container to hold enforcement result, state, and tool_context across steps."""
-    return {}
+    """Mutable container to hold enforcement result, state, and tool_context across steps.
+
+    Pre-populated with global_artifacts_present containing quality-preferences.json
+    so that the WritingStyleGateEvaluator does not interfere with outline gate tests
+    when targeting wave-4-drafting/ paths.
+    """
+    return {
+        "global_artifacts_present": ["quality-preferences.json"],
+    }

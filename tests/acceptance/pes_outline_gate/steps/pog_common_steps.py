@@ -98,13 +98,20 @@ def active_proposal_wave5(
     enforcement_context: dict[str, Any],
     topic_id: str,
 ):
-    """Set up proposal state at Wave 5 (visual assets, not drafting)."""
+    """Set up proposal state at Wave 5 (visual assets, not drafting).
+
+    Satisfies figure pipeline gate (figure-specs.md in artifacts_present)
+    and style profile gate (style_analysis_skipped in state) so that
+    only the outline gate behavior is tested in isolation.
+    """
     state = base_proposal_state.copy()
     state["topic"] = {**state["topic"], "id": topic_id}
     state["proposal_id"] = f"test-uuid-{topic_id.lower()}"
     state["current_wave"] = 5
+    state["style_analysis_skipped"] = True
     enforcement_context["state"] = state
     enforcement_context["artifact_dir"] = f"artifacts/{topic_id.lower()}/wave-5-visuals"
+    enforcement_context["artifacts_present"] = ["figure-specs.md"]
 
 
 @given(
@@ -192,14 +199,21 @@ def _build_tool_context(enforcement_context: dict[str, Any], file_path: str) -> 
     """Build tool_context dict from enforcement_context state.
 
     Includes outline_artifacts_present for cross-directory prerequisite check.
-    No global_artifacts_present needed (outline is a local cross-directory artifact).
+    Also includes artifacts_present and global_artifacts_present when set,
+    so that other gates (figure pipeline, style profile, writing style) can
+    be satisfied without interfering with outline gate isolation.
     """
-    return {
+    ctx: dict[str, Any] = {
         "file_path": file_path,
         "outline_artifacts_present": list(
             enforcement_context.get("outline_artifacts_present", [])
         ),
     }
+    if "artifacts_present" in enforcement_context:
+        ctx["artifacts_present"] = list(enforcement_context["artifacts_present"])
+    if "global_artifacts_present" in enforcement_context:
+        ctx["global_artifacts_present"] = list(enforcement_context["global_artifacts_present"])
+    return ctx
 
 
 @when(

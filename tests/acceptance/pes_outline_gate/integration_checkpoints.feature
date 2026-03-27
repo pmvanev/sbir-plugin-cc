@@ -5,7 +5,6 @@ Feature: Outline Gate Integration Checkpoints
 
   # --- Path Resolution ---
 
-  @skip
   Scenario: Gate works with multi-proposal workspace path layout
     Given an active proposal for topic "af263-042" at Wave 4 with multi-proposal workspace
     And the enforcement rules are loaded from the standard configuration
@@ -13,7 +12,6 @@ Feature: Outline Gate Integration Checkpoints
     When the writer agent attempts to Write "artifacts/af263-042/wave-4-drafting/section-1-approach.md"
     Then PES returns decision BLOCK
 
-  @skip
   Scenario: Gate works with legacy single-proposal path layout
     Given an active proposal at Wave 4 with legacy single-proposal workspace
     And the enforcement rules are loaded from the standard configuration
@@ -21,7 +19,6 @@ Feature: Outline Gate Integration Checkpoints
     When the writer agent attempts to Write "artifacts/wave-4-drafting/section-1-approach.md"
     Then PES returns decision BLOCK
 
-  @skip
   Scenario: Cross-directory resolution derives wave-3-outline from wave-4-drafting
     Given an active proposal for topic "navy-fy26-001" at Wave 4
     And the enforcement rules are loaded from the standard configuration
@@ -31,7 +28,6 @@ Feature: Outline Gate Integration Checkpoints
 
   # --- Non-interference ---
 
-  @skip
   Scenario: Gate does not affect writes outside wave-4-drafting
     Given an active proposal for topic "SF25D-T1201" at Wave 3
     And the enforcement rules are loaded from the standard configuration
@@ -39,7 +35,6 @@ Feature: Outline Gate Integration Checkpoints
     Then PES returns decision ALLOW
     And the outline gate is not evaluated
 
-  @skip
   Scenario: Gate does not affect Read operations on wave-4-drafting
     Given an active proposal for topic "SF25D-T1201" at Wave 4
     And the enforcement rules are loaded from the standard configuration
@@ -47,7 +42,6 @@ Feature: Outline Gate Integration Checkpoints
     When the writer agent uses Read on "artifacts/sf25d-t1201/wave-4-drafting/section-1-technical-approach.md"
     Then PES returns decision ALLOW
 
-  @skip
   Scenario: Gate does not affect wave-5 writes when outline is missing
     Given an active proposal for topic "SF25D-T1201" at Wave 5
     And the enforcement rules are loaded from the standard configuration
@@ -58,7 +52,6 @@ Feature: Outline Gate Integration Checkpoints
 
   # --- Audit Trail ---
 
-  @skip
   Scenario: Blocked draft write is recorded in audit log
     Given an active proposal for topic "SF25D-T1201" at Wave 4
     And the enforcement rules are loaded from the standard configuration
@@ -68,7 +61,6 @@ Feature: Outline Gate Integration Checkpoints
     And an audit entry is recorded with event "evaluate" and decision "block"
     And the audit entry includes the rule_id "drafting-requires-outline"
 
-  @skip
   Scenario: Allowed draft write after outline exists is recorded in audit log
     Given an active proposal for topic "SF25D-T1201" at Wave 4
     And the enforcement rules are loaded from the standard configuration
