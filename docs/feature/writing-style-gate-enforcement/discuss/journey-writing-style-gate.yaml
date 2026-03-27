@@ -1,0 +1,189 @@
+journey:
+  name: "Writing Style Gate Enforcement"
+  goal: "Enforce writing style selection so the writer agent cannot draft sections without a conscious style choice"
+  personas:
+    - "Dr. Rafael Moreno -- SBIR PI, defense tech, strong writing style preferences"
+    - "Dr. Amara Okafor -- first-time SBIR user, no quality profile, needs sensible defaults"
+    - "Phil -- Plugin maintainer, needs hard enforcement at PES layer"
+
+  emotional_arc:
+    start: "Guided (style options presented with context-aware recommendations)"
+    middle: "Empowered (user makes deliberate choice about proposal voice)"
+    end: "Confident (every section drafted with intentional style)"
+
+  job_stories:
+    - id: "JS-1"
+      situation: "Writer agent begins Wave 4 without quality-preferences.json or skip marker"
+      motivation: "Be blocked from writing draft sections before style selection"
+      outcome: "Every proposal reflects a conscious writing style choice"
+    - id: "JS-2"
+      situation: "User starts drafting a new proposal at Wave 4 for the first time"
+      motivation: "Be walked through writing style options with recommendations"
+      outcome: "Informed choice about how the proposal should read"
+
+steps:
+  - id: 1
+    name: "Writer dispatched to Wave 4"
+    trigger: "Orchestrator dispatches sbir-writer for Wave 4"
+    hook_event: "SubagentStart"
+    existing_behavior: true
+    note: "Agent-wave authorization already enforced by existing PES evaluator"
+
+    emotional_state:
+      entry: "Neutral"
+      exit: "Neutral"
+
+  - id: 2
+    name: "Style checkpoint at Wave 4 entry"
+    trigger: "Writer enters Phase 3 (DRAFT) for the first section"
+    hook_event: "None (agent-level checkpoint, not PES)"
+    agent: "sbir-writer"
+
+    condition:
+      writing_style_in_state: false
+      first_section_draft: true
+
+    action: >
+      Present guided style discussion. Read quality artifacts from ~/.sbir/
+      (quality-preferences.json, winning-patterns.json, writing-quality-profile.json).
+      Present available styles with context-aware recommendations.
+      User chooses: apply profile, adjust, choose new, or skip.
+      Record choice in per-proposal state (writing_style or writing_style_selection_skipped).
+
+    shared_artifacts:
+      - name: "quality-preferences.json"
+        source: "~/.sbir/quality-preferences.json"
+        owner: "sbir-quality-discoverer"
+        consumers:
+          - "sbir-writer style checkpoint (recommendation source)"
+          - "WritingStyleGateEvaluator (existence check)"
+      - name: "winning-patterns.json"
+        source: "~/.sbir/winning-patterns.json"
+        owner: "sbir-quality-discoverer"
+        consumers:
+          - "sbir-writer style checkpoint (agency pattern recommendations)"
+      - name: "writing-quality-profile.json"
+        source: "~/.sbir/writing-quality-profile.json"
+        owner: "sbir-quality-discoverer"
+        consumers:
+          - "sbir-writer style checkpoint (quality alerts)"
+
+    emotional_state:
+      entry: "Ready to draft"
+      exit: "Style choice made (empowered)"
+
+    integration_checkpoint: >
+      Quality discovery artifacts at ~/.sbir/ are optional (global, not per-proposal).
+      Writer must handle missing artifacts gracefully -- present default styles
+      when no quality profile exists.
+
+  - id: 3
+    name: "User selects writing style"
+    trigger: "User responds to style checkpoint prompt"
+    hook_event: "None (agent-level interaction)"
+    agent: "sbir-writer"
+
+    action: >
+      Record writing_style in per-proposal state.json.
+      If user chose skip: record writing_style_selection_skipped: true.
+      Load named style skill (e.g., elements-of-style.md).
+
+    shared_artifacts:
+      - name: "writing_style (state field)"
+        source: ".sbir/proposals/{topic-id}/state.json"
+        owner: "sbir-writer style checkpoint"
+        consumers:
+          - "sbir-writer Phase 3 DRAFT (style skill loading)"
+      - name: "writing_style_selection_skipped (state field)"
+        source: ".sbir/proposals/{topic-id}/state.json"
+        owner: "sbir-writer style checkpoint (user explicit skip)"
+        consumers:
+          - "WritingStyleGateEvaluator (skip check)"
+
+    emotional_state:
+      entry: "Choosing"
+      exit: "Confirmed (empowered)"
+
+  - id: 4
+    name: "Writing Style Gate check (PES)"
+    trigger: "Agent attempts Write/Edit to wave-4-drafting/"
+    hook_event: "PreToolUse"
+    evaluator: "WritingStyleGateEvaluator"
+    rule_type: "writing_style_gate"
+
+    condition:
+      tool: "Write or Edit"
+      target_path_contains: "wave-4-drafting/"
+      required_one_of:
+        - global_artifact: "~/.sbir/quality-preferences.json"
+        - state_field: "writing_style_selection_skipped == true"
+
+    decision_when_missing: "BLOCK"
+    decision_when_present: "ALLOW"
+
+    block_message: >
+      Cannot write draft sections to wave-4-drafting/ before writing style
+      selection. Required: either ~/.sbir/quality-preferences.json (run
+      /proposal quality discover) or writing_style_selection_skipped in
+      proposal state (choose skip at the style checkpoint).
+
+    shared_artifacts:
+      - name: "quality-preferences.json"
+        source: "~/.sbir/quality-preferences.json"
+        owner: "sbir-quality-discoverer"
+        consumers:
+          - "WritingStyleGateEvaluator (existence check)"
+      - name: "writing_style_selection_skipped"
+        source: ".sbir/proposals/{topic-id}/state.json field"
+        owner: "sbir-writer style checkpoint (user skip)"
+        consumers:
+          - "WritingStyleGateEvaluator (alternative to artifact existence)"
+
+    emotional_state:
+      entry: "Agent attempting to write without style selection"
+      exit: "Agent redirected to style checkpoint"
+
+    integration_checkpoint: >
+      This evaluator needs access to ~/.sbir/ (global path) for artifact
+      existence AND per-proposal state for the skip marker. The hook adapter
+      must resolve both paths. This differs from figure pipeline gate which
+      only checks the proposal artifact directory.
+
+  - id: 5
+    name: "Section drafting proceeds with style applied"
+    trigger: "Style confirmed (checkpoint passed) and PES gate allows"
+    hook_event: "PreToolUse"
+    evaluator: "WritingStyleGateEvaluator"
+
+    condition:
+      quality_preferences_exists: true
+      or_skip_marker: true
+
+    decision: "ALLOW"
+
+    emotional_state:
+      entry: "Style confirmed, ready to draft"
+      exit: "Confident -- every section reflects intentional style choice"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "quality-preferences.json at ~/.sbir/ OR writing_style_selection_skipped in state"
+      must_exist_before: "any write to wave-4-drafting/"
+      failure_message: "Section drafted without writing style selection"
+
+  evaluator_registration:
+    - rule_type: "writing_style_gate"
+      evaluator_class: "WritingStyleGateEvaluator"
+      registered_in: "EnforcementEngine._evaluators"
+
+  config_rules:
+    - rule_id: "drafting-requires-style-selection"
+      rule_type: "writing_style_gate"
+      added_to: "templates/pes-config.json"
+
+  global_artifact_access:
+    note: >
+      Unlike figure pipeline gate evaluators that check artifacts in the
+      proposal artifact directory, the writing style gate checks ~/.sbir/
+      (global path). The hook adapter must resolve this global path and
+      pass artifact existence information to the evaluator via tool_context.
