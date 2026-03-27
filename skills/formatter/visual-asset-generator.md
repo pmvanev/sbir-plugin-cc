@@ -233,7 +233,7 @@ Approach: Write detailed specification brief. Track as "pending-external" in fig
 
 ## Method Selection Guide
 
-Always prefer the First Choice method. The Fallback column applies only when the First Choice tool is unavailable on the system. "SVG inline" means hand-coded SVG as a last resort — it must still go through the structured critique loop. Never select SVG inline when the First Choice tool is available.
+Use this hierarchy as a **recommendation to present to the user**, not as an automatic selection. For each figure, present the First Choice method with rationale, list available alternatives, and let the user confirm or switch. The Fallback column applies when the First Choice tool is unavailable on the system. "SVG inline" means hand-coded SVG as a last resort — it must still go through the structured critique loop. Never select SVG inline when the First Choice tool is available. Always ask the user about Nano Banana for concept figures and illustrations when GEMINI_API_KEY is set.
 
 | Figure Need | First Choice | Fallback |
 |------------|-------------|----------|

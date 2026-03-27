@@ -28,23 +28,30 @@ Initialize Wave 5 (Visual Assets). Reads the figure plan from the outline, analy
    - Python matplotlib (`python3`)
    - LaTeX compilers (`pdflatex`, `xelatex`, `lualatex`)
    - Nano Banana (`GEMINI_API_KEY` env var)
-4. **Style analysis** -- Match solicitation context (agency, domain, topic area) against the agency-domain style database:
-   - Recommend a style profile with palette hex codes, tone, detail level, and avoid list
-   - Present recommendation with rationale for human review
-   - User can **approve**, **adjust** (modify palette colors, tone, detail level, avoid items), or **skip**
-   - If no Nano Banana figures are planned, style analysis is optional -- inform user and offer to proceed without
-   - If the agency is not in the style database, recommend the generic professional style
+4. **Style analysis (guided discussion)** -- Match solicitation context (agency, domain, topic area) against the agency-domain style database:
+   - Build a recommended style profile with palette hex codes, tone, detail level, and avoid list
+   - **Present recommendation to the user and ask them to choose**: approve, adjust, or skip
+   - Do not auto-approve or proceed without user input -- this is an interactive checkpoint
+   - If user adjusts: present revised profile and confirm again
+   - If no Nano Banana figures are planned, inform user that style analysis is optional and ask whether to proceed without
+   - If the agency is not in the style database, recommend the generic professional style and inform user
    - Persist approved profile to `./artifacts/wave-5-visuals/style-profile.yaml`
-5. **Write figure specifications** -- For each planned figure, produce a specification containing:
+5. **Method selection (guided discussion)** -- For each planned figure, walk through generation options with the user:
+   - Present the recommended method based on figure type and available tools
+   - Show alternative methods that are available and what each is best at
+   - Specifically ask about **Nano Banana** (AI image generation) for concept figures and illustrations
+   - Let the user select the method for each figure -- do not auto-assign without asking
+6. **Write figure specifications** -- For each planned figure, produce a specification containing:
    - Figure type (architecture, timeline, data chart, concept illustration)
-   - Generation method (matched to available tools)
+   - Generation method (user-selected from step 5)
    - Caption text
    - Cross-references to outline sections and compliance matrix items
-6. **Persist specifications** -- Write to `./artifacts/wave-5-visuals/figure-specs.md`
-7. **Human checkpoint** -- Present planned figures, style profile, and selected methods for review:
+7. **Persist specifications** -- Write to `./artifacts/wave-5-visuals/figure-specs.md`
+8. **Human checkpoint** -- Present complete figure plan with style profile and methods for explicit approval:
    - **approve** -- Accept figure plan and proceed to generation
-   - **revise** -- Adjust specifications based on feedback
+   - **revise** -- User provides feedback, loop back to adjust specific figures or methods
    - **skip** -- Record skip and proceed (with PES audit)
+   - Do not proceed to figure generation until user explicitly approves
 
 ## Context Files
 
