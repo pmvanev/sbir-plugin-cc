@@ -1,5 +1,6 @@
 {
   "schema_version": "3.0",
+  "project_id": "writing-style-gate-enforcement",
   "feature_id": "writing-style-gate-enforcement",
   "events": [
     {
