@@ -10,7 +10,7 @@ The hook adapter is responsible for:
 - Extracting file_path from PreToolUse events and resolving artifact context
 - Resolving global artifacts (~/.sbir/) for wave-4-drafting paths
 
-Test Budget: 11 behaviors x 2 = 22 max unit tests (9 existing + 5 new)
+Test Budget: 16 behaviors x 2 = 32 max unit tests (14 existing + 5 new outline)
 """
 
 from __future__ import annotations
@@ -274,3 +274,89 @@ class TestResolveToolContextGlobalArtifacts:
         ctx = resolve_tool_context(hook_input)
 
         assert "quality-preferences.json" in ctx["global_artifacts_present"]
+
+
+class TestResolveToolContextOutlineArtifacts:
+    """Cross-directory outline artifact resolution for wave-4-drafting paths.
+
+    When file_path targets wave-4-drafting/, resolve_tool_context checks
+    the sibling wave-3-outline/ directory for proposal-outline.md and
+    populates outline_artifacts_present.
+    """
+
+    def test_wave4_drafting_with_outline_in_sibling_wave3(self, tmp_path) -> None:
+        """When file_path targets wave-4-drafting/ and proposal-outline.md exists
+        in sibling wave-3-outline/, outline_artifacts_present lists it."""
+        base = tmp_path / "artifacts" / "sf25d-t1201"
+        outline_dir = base / "wave-3-outline"
+        outline_dir.mkdir(parents=True)
+        (outline_dir / "proposal-outline.md").write_text("# Outline")
+
+        drafting_dir = base / "wave-4-drafting"
+        drafting_dir.mkdir(parents=True)
+        file_path = str(drafting_dir / "sections" / "tech.md")
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert "proposal-outline.md" in ctx["outline_artifacts_present"]
+
+    def test_wave4_drafting_without_outline_returns_empty(self, tmp_path) -> None:
+        """When file_path targets wave-4-drafting/ but no proposal-outline.md
+        in wave-3-outline/, outline_artifacts_present is empty."""
+        base = tmp_path / "artifacts" / "sf25d-t1201"
+        drafting_dir = base / "wave-4-drafting"
+        drafting_dir.mkdir(parents=True)
+        # wave-3-outline exists but no proposal-outline.md
+        (base / "wave-3-outline").mkdir(parents=True)
+
+        file_path = str(drafting_dir / "sections" / "tech.md")
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert ctx["outline_artifacts_present"] == []
+
+    def test_non_wave4_path_has_empty_outline_artifacts(self) -> None:
+        """When file_path is outside wave-4-drafting/,
+        outline_artifacts_present is empty list."""
+        file_path = "/some/project/artifacts/wave-2-shaping/brief.md"
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert ctx["outline_artifacts_present"] == []
+
+    def test_legacy_layout_wave4_with_outline(self, tmp_path) -> None:
+        """Legacy single-proposal layout: artifacts/wave-4-drafting/ detects
+        sibling artifacts/wave-3-outline/proposal-outline.md."""
+        base = tmp_path / "artifacts"
+        outline_dir = base / "wave-3-outline"
+        outline_dir.mkdir(parents=True)
+        (outline_dir / "proposal-outline.md").write_text("# Outline")
+
+        drafting_dir = base / "wave-4-drafting"
+        drafting_dir.mkdir(parents=True)
+        file_path = str(drafting_dir / "section-2.md")
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert "proposal-outline.md" in ctx["outline_artifacts_present"]
+
+    def test_existing_artifacts_present_unchanged_with_outline(self, tmp_path) -> None:
+        """Adding outline_artifacts_present does not break existing
+        artifacts_present or global_artifacts_present behavior."""
+        base = tmp_path / "artifacts" / "sf25d-t1201"
+        wave5_dir = base / "wave-5-visuals"
+        wave5_dir.mkdir(parents=True)
+        (wave5_dir / "figure-specs.md").write_text("# Specs")
+
+        file_path = str(wave5_dir / "fig.svg")
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert "figure-specs.md" in ctx["artifacts_present"]
+        assert ctx["outline_artifacts_present"] == []
+        assert ctx["global_artifacts_present"] == []
