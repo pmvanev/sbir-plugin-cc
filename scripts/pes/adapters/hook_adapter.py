@@ -27,6 +27,12 @@ _WAVE5_VISUALS_SEGMENT = "wave-5-visuals"
 # Path segment that identifies drafting directories
 _WAVE4_DRAFTING_SEGMENT = "wave-4-drafting"
 
+# Path segment that identifies outline directories
+_WAVE3_OUTLINE_SEGMENT = "wave-3-outline"
+
+# Outline artifacts checked in sibling wave-3-outline/ when targeting wave-4-drafting/
+_OUTLINE_ARTIFACTS = ("proposal-outline.md",)
+
 # Global artifacts checked when file_path targets wave-4-drafting/
 _GLOBAL_ARTIFACTS = ("quality-preferences.json",)
 
@@ -65,17 +71,25 @@ def resolve_tool_context(hook_input: dict[str, Any]) -> dict[str, Any]:
     files (figure-specs.md, style-profile.yaml) and reports which are present.
     When the path targets a wave-4-drafting/ directory, checks ~/.sbir/ for global
     artifacts (quality-preferences.json) and populates global_artifacts_present.
+    Also checks the sibling wave-3-outline/ directory for proposal-outline.md
+    and populates outline_artifacts_present.
 
     Supports both multi-proposal (artifacts/{topic-id}/wave-N-name/) and
     legacy (artifacts/wave-N-name/) path layouts.
 
     Returns:
-        Dict with 'file_path' (str), 'artifacts_present' (list), and
-        'global_artifacts_present' (list) when relevant wave paths detected.
+        Dict with 'file_path' (str), 'artifacts_present' (list),
+        'global_artifacts_present' (list), and 'outline_artifacts_present' (list)
+        when relevant wave paths detected.
     """
     file_path = hook_input.get("tool", {}).get("file_path", "")
     if not file_path:
-        return {"file_path": "", "artifacts_present": [], "global_artifacts_present": []}
+        return {
+            "file_path": "",
+            "artifacts_present": [],
+            "global_artifacts_present": [],
+            "outline_artifacts_present": [],
+        }
 
     # Normalize path separators for cross-platform compatibility
     normalized = file_path.replace("\\", "/")
@@ -85,7 +99,12 @@ def resolve_tool_context(hook_input: dict[str, Any]) -> dict[str, Any]:
 
     # For paths outside both wave-5-visuals/ and wave-4-drafting/
     if not is_wave5 and not is_wave4:
-        return {"file_path": file_path, "artifacts_present": [], "global_artifacts_present": []}
+        return {
+            "file_path": file_path,
+            "artifacts_present": [],
+            "global_artifacts_present": [],
+            "outline_artifacts_present": [],
+        }
 
     # Resolve wave-5-visuals local prerequisites
     artifacts_present: list[str] = []
@@ -98,13 +117,22 @@ def resolve_tool_context(hook_input: dict[str, Any]) -> dict[str, Any]:
 
     # Resolve global artifacts for wave-4-drafting
     global_artifacts_present: list[str] = []
+    outline_artifacts_present: list[str] = []
     if is_wave4:
         global_artifacts_present = _resolve_global_artifacts()
+
+        # Resolve outline artifacts from sibling wave-3-outline/ directory
+        wave4_dir = _find_wave_dir(file_path, normalized, _WAVE4_DRAFTING_SEGMENT)
+        outline_dir = wave4_dir.replace(_WAVE4_DRAFTING_SEGMENT, _WAVE3_OUTLINE_SEGMENT)
+        for artifact in _OUTLINE_ARTIFACTS:
+            if os.path.isfile(os.path.join(outline_dir, artifact)):
+                outline_artifacts_present.append(artifact)
 
     return {
         "file_path": file_path,
         "artifacts_present": artifacts_present,
         "global_artifacts_present": global_artifacts_present,
+        "outline_artifacts_present": outline_artifacts_present,
     }
 
 
