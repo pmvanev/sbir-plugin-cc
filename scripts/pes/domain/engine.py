@@ -74,16 +74,22 @@ class EnforcementEngine:
         })
         return result
 
-    def evaluate(self, state: dict[str, Any], tool_name: str) -> EnforcementResult:
+    def evaluate(
+        self,
+        state: dict[str, Any],
+        tool_name: str,
+        tool_context: dict[str, Any] | None = None,
+    ) -> EnforcementResult:
         """Evaluate enforcement rules for a tool invocation.
 
         Returns ALLOW if all rules pass, BLOCK with messages if any rule triggers.
         """
+        tool_context = tool_context or {}
         rules = self._rule_loader.load_rules()
         block_messages: list[str] = []
 
         for rule in rules:
-            if self._rule_triggers(rule, state, tool_name):
+            if self._rule_triggers(rule, state, tool_name, tool_context):
                 block_messages.append(self._build_message(rule, state))
 
         decision = Decision.BLOCK if block_messages else Decision.ALLOW
@@ -276,13 +282,17 @@ class EnforcementEngine:
             )
 
     def _rule_triggers(
-        self, rule: EnforcementRule, state: dict[str, Any], tool_name: str
+        self,
+        rule: EnforcementRule,
+        state: dict[str, Any],
+        tool_name: str,
+        tool_context: dict[str, Any] | None = None,
     ) -> bool:
         """Check if a single rule triggers given current state and tool."""
         evaluator = self._evaluators.get(rule.rule_type)
         if evaluator is None:
             return False
-        return evaluator.triggers(rule, state, tool_name)
+        return evaluator.triggers(rule, state, tool_name, tool_context=tool_context or {})
 
     def _build_message(
         self, rule: EnforcementRule, state: dict[str, Any]

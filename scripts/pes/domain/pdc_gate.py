@@ -14,7 +14,7 @@ class PdcGateEvaluator:
     PDC status is read from state['pdc_status'] (schema v2.0.0).
     """
 
-    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str) -> bool:
+    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str, tool_context: dict[str, Any] | None = None) -> bool:
         """Check if a PDC gate rule blocks the given tool invocation.
 
         Returns True if the rule triggers (blocks the action).

@@ -15,7 +15,7 @@ class DeadlineBlockingEvaluator:
     Warns with suggestion to submit available work or skip non-essential waves.
     """
 
-    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str) -> bool:
+    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str, tool_context: dict[str, Any] | None = None) -> bool:
         """Check if deadline blocking rule triggers.
 
         Returns True if the rule triggers (blocks the action).

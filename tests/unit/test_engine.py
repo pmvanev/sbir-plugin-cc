@@ -427,3 +427,76 @@ class TestEnforcementEngineMultiReasonBlock:
         # Audit entry should have all reasons
         assert len(audit_logger.entries) == 1
         assert len(audit_logger.entries[0]["messages"]) >= 2
+
+
+class TestEnforcementEngineToolContext:
+    """evaluate() accepts and forwards tool_context to evaluators.
+
+    Test Budget: 2 behaviors x 2 = 4 max unit tests
+    """
+
+    def test_evaluate_accepts_tool_context_parameter(
+        self, audit_logger: FakeAuditLogger, clean_state: dict[str, Any]
+    ) -> None:
+        """evaluate() accepts optional tool_context dict without error."""
+        engine = EnforcementEngine(FakeRuleLoader([]), audit_logger)
+        result = engine.evaluate(
+            clean_state,
+            tool_name="Write",
+            tool_context={"file_path": "artifacts/wave-5-visuals/fig.svg"},
+        )
+        assert result.decision == Decision.ALLOW
+
+    def test_evaluate_defaults_tool_context_to_empty_dict(
+        self, audit_logger: FakeAuditLogger, clean_state: dict[str, Any]
+    ) -> None:
+        """Existing callers without tool_context continue to work -- backward compat."""
+        rules = [_wave_ordering_rule()]
+        engine = EnforcementEngine(FakeRuleLoader(rules), audit_logger)
+        result = engine.evaluate(clean_state, tool_name="wave_1_strategy")
+        assert result.decision == Decision.ALLOW
+
+    def test_all_five_evaluators_accept_tool_context_kwarg(
+        self, audit_logger: FakeAuditLogger, pending_state: dict[str, Any]
+    ) -> None:
+        """All 5 existing evaluators work when tool_context is passed."""
+        rules = [
+            _wave_ordering_rule(),
+            EnforcementRule(
+                rule_id="pdc-gate",
+                description="PDC gate",
+                rule_type="pdc_gate",
+                condition={"requires_pdc_green": True, "target_wave": 5},
+                message="PDC not green",
+            ),
+            EnforcementRule(
+                rule_id="deadline-blocking",
+                description="Deadline",
+                rule_type="deadline_blocking",
+                condition={"critical_days": 3, "non_essential_waves": [2, 3]},
+                message="Deadline",
+            ),
+            EnforcementRule(
+                rule_id="submission-immutability",
+                description="Submission",
+                rule_type="submission_immutability",
+                condition={"requires_immutable": True},
+                message="Immutable",
+            ),
+            EnforcementRule(
+                rule_id="corpus-integrity",
+                description="Corpus",
+                rule_type="corpus_integrity",
+                condition={"append_only_tags": True},
+                message="Corpus",
+            ),
+        ]
+        engine = EnforcementEngine(FakeRuleLoader(rules), audit_logger)
+        # Should not raise TypeError -- all evaluators accept tool_context
+        result = engine.evaluate(
+            pending_state,
+            tool_name="Write",
+            tool_context={"file_path": "artifacts/wave-5-visuals/fig.svg"},
+        )
+        # We only care that no TypeError is raised; decision depends on rule logic
+        assert result.decision in (Decision.ALLOW, Decision.BLOCK)

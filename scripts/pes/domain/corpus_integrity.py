@@ -14,7 +14,7 @@ class CorpusIntegrityEvaluator:
     Allows appending new tags when no existing tag is recorded.
     """
 
-    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str) -> bool:
+    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str, tool_context: dict[str, Any] | None = None) -> bool:
         """Check if corpus integrity rule triggers.
 
         Returns True if the rule triggers (blocks the action).

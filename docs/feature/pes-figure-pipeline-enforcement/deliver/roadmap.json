@@ -1,0 +1,167 @@
+{
+  "roadmap": {
+    "project_id": "pes-figure-pipeline-enforcement",
+    "created_at": "2026-03-27T00:00:00Z",
+    "total_steps": 7,
+    "phases": 3
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Evaluator Interface Extension",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "Add tool_context parameter to engine evaluate path",
+          "description": "Extend engine.evaluate() and _rule_triggers() to accept and forward tool_context dict. Default empty dict. Existing evaluator behavior unchanged.",
+          "criteria": [
+            "Engine evaluate() accepts optional tool_context parameter",
+            "_rule_triggers() forwards tool_context to evaluator.triggers()",
+            "All 5 existing evaluators continue to pass with tool_context absent",
+            "All 5 existing evaluators continue to pass with tool_context present"
+          ],
+          "dependencies": [],
+          "stories": ["US-FPIPE-03"],
+          "files_to_modify": [
+            "scripts/pes/domain/engine.py",
+            "tests/unit/test_engine.py"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Hook adapter extracts file_path and resolves artifact existence",
+          "description": "PreToolUse handler extracts file_path from hook input. Resolves wave-5-visuals artifact directory. Checks prerequisite file existence. Passes tool_context to engine.evaluate().",
+          "criteria": [
+            "file_path extracted from hook_input['tool']['file_path'] for PreToolUse",
+            "When file_path contains wave-5-visuals/, prerequisite files checked on disk",
+            "tool_context dict passed to engine.evaluate() with file_path and artifacts_present",
+            "When file_path is outside wave-5-visuals/, artifacts_present is empty list",
+            "Both multi-proposal and legacy path layouts resolved correctly"
+          ],
+          "dependencies": ["01-01"],
+          "stories": ["US-FPIPE-03"],
+          "files_to_modify": [
+            "scripts/pes/adapters/hook_adapter.py",
+            "tests/unit/test_hook_adapter.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Figure Pipeline Gate Evaluator",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "FigurePipelineGateEvaluator domain logic",
+          "description": "Pure domain evaluator. Blocks writes to wave-5-visuals/ when figure-specs.md absent. Allows writing figure-specs.md itself. Ignores paths outside wave-5-visuals/.",
+          "criteria": [
+            "Write to wave-5-visuals/ blocked when figure-specs.md not in artifacts_present",
+            "Writing figure-specs.md itself always allowed",
+            "Edit to wave-5-visuals/ blocked same as Write when specs absent",
+            "Writes outside wave-5-visuals/ not affected",
+            "Block message includes guidance to create figure-specs.md first"
+          ],
+          "dependencies": ["01-01"],
+          "stories": ["US-FPIPE-01"],
+          "files_to_modify": [
+            "scripts/pes/domain/figure_pipeline_gate.py",
+            "tests/unit/test_figure_pipeline_gate.py"
+          ]
+        },
+        {
+          "id": "02-02",
+          "name": "StyleProfileGateEvaluator domain logic",
+          "description": "Pure domain evaluator. Blocks figure writes when no style-profile.yaml and no skip marker. Allows writing style-profile.yaml and figure-specs.md. Checks state for style_analysis_skipped.",
+          "criteria": [
+            "Figure write blocked when style-profile.yaml absent and no skip marker in state",
+            "Figure write allowed when style-profile.yaml in artifacts_present",
+            "Figure write allowed when style_analysis_skipped is true in state",
+            "Writing style-profile.yaml itself always allowed",
+            "Block message includes both resolution paths (create profile or record skip)"
+          ],
+          "dependencies": ["01-01"],
+          "stories": ["US-FPIPE-02"],
+          "files_to_modify": [
+            "scripts/pes/domain/style_profile_gate.py",
+            "tests/unit/test_style_profile_gate.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Engine Registration and Config",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Register evaluators in engine and add rules to config",
+          "description": "Register both evaluators in EnforcementEngine._evaluators dict. Add two rules to pes-config.json. Verify dispatch end-to-end.",
+          "criteria": [
+            "Engine _evaluators contains 'figure_pipeline_gate' mapped to FigurePipelineGateEvaluator",
+            "Engine _evaluators contains 'style_profile_gate' mapped to StyleProfileGateEvaluator",
+            "pes-config.json contains rule 'figure-pipeline-requires-specs' with type 'figure_pipeline_gate'",
+            "pes-config.json contains rule 'figure-generation-requires-style' with type 'style_profile_gate'"
+          ],
+          "dependencies": ["02-01", "02-02"],
+          "stories": ["US-FPIPE-03"],
+          "files_to_modify": [
+            "scripts/pes/domain/engine.py",
+            "templates/pes-config.json"
+          ]
+        },
+        {
+          "id": "03-02",
+          "name": "Integration tests: end-to-end pipeline enforcement",
+          "description": "Integration tests loading real pes-config.json through engine. Verify both gates block and allow correctly through full hook-to-evaluator path.",
+          "criteria": [
+            "Figure write blocked end-to-end when specs absent (config -> engine -> evaluator -> BLOCK)",
+            "Figure write allowed end-to-end when both prerequisites met",
+            "Style gate blocks independently when specs present but style absent",
+            "Both gates pass for writes outside wave-5-visuals/"
+          ],
+          "dependencies": ["03-01", "01-02"],
+          "stories": ["US-FPIPE-01", "US-FPIPE-02", "US-FPIPE-03"],
+          "test_files": [
+            "tests/integration/test_figure_pipeline_enforcement.py"
+          ]
+        },
+        {
+          "id": "03-03",
+          "name": "BDD acceptance tests from feature scenarios",
+          "description": "Acceptance tests implementing all 16 Gherkin scenarios from journey-enforcement.feature. Validates blocking, allowing, path resolution, non-interference, and audit trail.",
+          "criteria": [
+            "All 16 scenarios from journey-enforcement.feature pass",
+            "Audit log entries verified for block and allow decisions",
+            "Multi-proposal and legacy path layouts covered"
+          ],
+          "dependencies": ["03-02"],
+          "stories": ["US-FPIPE-01", "US-FPIPE-02", "US-FPIPE-03"],
+          "test_files": [
+            "tests/acceptance/pes_figure_pipeline/test_figure_pipeline_enforcement.py"
+          ]
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/domain/",
+      "scripts/pes/adapters/",
+      "templates/"
+    ],
+    "test_directories": [
+      "tests/unit/",
+      "tests/integration/",
+      "tests/acceptance/pes_figure_pipeline/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "pending_review",
+    "reviewer": "nw-solution-architect-reviewer"
+  }
+}

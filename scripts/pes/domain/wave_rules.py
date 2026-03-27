@@ -21,7 +21,7 @@ class WaveOrderingEvaluator:
         "requires_outline_approval": ("outline", "approved_at"),
     }
 
-    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str) -> bool:
+    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str, tool_context: dict[str, Any] | None = None) -> bool:
         """Check if a wave ordering rule blocks the given tool invocation.
 
         Returns True if the rule triggers (blocks the action).

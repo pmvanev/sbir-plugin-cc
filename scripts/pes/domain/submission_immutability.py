@@ -14,7 +14,7 @@ class SubmissionImmutabilityEvaluator:
     and its artifacts are marked immutable.
     """
 
-    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str) -> bool:
+    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str, tool_context: dict[str, Any] | None = None) -> bool:
         """Check if submission immutability rule triggers.
 
         Returns True if the rule triggers (blocks the action).
