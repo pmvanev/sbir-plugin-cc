@@ -8,8 +8,9 @@ The hook adapter is responsible for:
 - Invoking EnforcementEngine
 - Producing JSON stdout with correct exit code
 - Extracting file_path from PreToolUse events and resolving artifact context
+- Resolving global artifacts (~/.sbir/) for wave-4-drafting paths
 
-Test Budget: 7 behaviors x 2 = 14 max unit tests (3 original + 4 new)
+Test Budget: 11 behaviors x 2 = 22 max unit tests (9 existing + 5 new)
 """
 
 from __future__ import annotations
@@ -189,3 +190,87 @@ class TestResolveToolContext:
         assert ctx["file_path"] == file_path
         assert "style-profile.yaml" in ctx["artifacts_present"]
         assert "figure-specs.md" not in ctx["artifacts_present"]
+
+
+class TestResolveToolContextGlobalArtifacts:
+    """Global artifact resolution for wave-4-drafting paths.
+
+    When file_path targets wave-4-drafting/, resolve_tool_context checks
+    ~/.sbir/ for quality-preferences.json and populates global_artifacts_present.
+    """
+
+    def test_wave4_drafting_path_with_quality_preferences(self, tmp_path, monkeypatch) -> None:
+        """When file_path targets wave-4-drafting/ and quality-preferences.json exists at ~/.sbir/,
+        global_artifacts_present includes quality-preferences.json."""
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        sbir_global = fake_home / ".sbir"
+        sbir_global.mkdir()
+        (sbir_global / "quality-preferences.json").write_text('{"style": "formal"}')
+        monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+
+        drafting = tmp_path / "artifacts" / "sf25d-t1201" / "wave-4-drafting"
+        file_path = str(drafting / "section-1.md")
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert ctx["file_path"] == file_path
+        assert "quality-preferences.json" in ctx["global_artifacts_present"]
+
+    def test_wave4_drafting_path_without_quality_preferences(self, tmp_path, monkeypatch) -> None:
+        """When wave-4-drafting/ targeted but quality-preferences.json missing,
+        global_artifacts_present is empty."""
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        (fake_home / ".sbir").mkdir()
+        monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+
+        drafting = tmp_path / "artifacts" / "sf25d-t1201" / "wave-4-drafting"
+        file_path = str(drafting / "section-1.md")
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert ctx["file_path"] == file_path
+        assert ctx["global_artifacts_present"] == []
+
+    def test_non_wave4_non_wave5_path_no_global_artifacts(self) -> None:
+        """When file_path is outside wave-4-drafting/ and wave-5-visuals/,
+        global_artifacts_present is empty list."""
+        file_path = "/some/project/artifacts/wave-3-strategy/brief.md"
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert ctx["global_artifacts_present"] == []
+
+    def test_wave5_visuals_path_has_empty_global_artifacts(self, tmp_path) -> None:
+        """wave-5-visuals/ paths get global_artifacts_present as empty list (not missing)."""
+        artifact_dir = tmp_path / "artifacts" / "sf25d-t1201" / "wave-5-visuals"
+        artifact_dir.mkdir(parents=True)
+
+        file_path = str(artifact_dir / "figure-1.svg")
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert ctx["global_artifacts_present"] == []
+        # Existing artifacts_present behavior unchanged
+        assert ctx["artifacts_present"] == []
+
+    def test_legacy_layout_wave4_drafting_path(self, tmp_path, monkeypatch) -> None:
+        """Legacy single-proposal layout: artifacts/wave-4-drafting/ (no topic-id)."""
+        fake_home = tmp_path / "home"
+        fake_home.mkdir()
+        sbir_global = fake_home / ".sbir"
+        sbir_global.mkdir()
+        (sbir_global / "quality-preferences.json").write_text("{}")
+        monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+
+        file_path = str(tmp_path / "artifacts" / "wave-4-drafting" / "section-2.md")
+        hook_input = {"tool": {"name": "Write", "file_path": file_path}}
+
+        ctx = resolve_tool_context(hook_input)
+
+        assert "quality-preferences.json" in ctx["global_artifacts_present"]
