@@ -17,6 +17,54 @@ from pes.domain.engine import EnforcementEngine
 from pes.domain.rules import Decision, EnforcementResult
 from pes.domain.state import StateNotFoundError
 
+# Prerequisite files checked when file_path targets wave-5-visuals/
+_WAVE5_PREREQUISITES = ("figure-specs.md", "style-profile.yaml")
+
+# Path segment that identifies visual asset directories
+_WAVE5_VISUALS_SEGMENT = "wave-5-visuals"
+
+
+def resolve_tool_context(hook_input: dict[str, Any]) -> dict[str, Any]:
+    """Extract file_path from hook input and resolve artifact prerequisites.
+
+    For PreToolUse events, extracts file_path from hook_input['tool']['file_path'].
+    When the path targets a wave-5-visuals/ directory, checks disk for prerequisite
+    files (figure-specs.md, style-profile.yaml) and reports which are present.
+
+    Supports both multi-proposal (artifacts/{topic-id}/wave-5-visuals/) and
+    legacy (artifacts/wave-5-visuals/) path layouts.
+
+    Returns:
+        Dict with 'file_path' (str) and 'artifacts_present' (list of filenames).
+    """
+    file_path = hook_input.get("tool", {}).get("file_path", "")
+    if not file_path:
+        return {"file_path": "", "artifacts_present": []}
+
+    # Normalize path separators for cross-platform compatibility
+    normalized = file_path.replace("\\", "/")
+
+    # Check if path targets wave-5-visuals/
+    if f"/{_WAVE5_VISUALS_SEGMENT}/" not in normalized and not normalized.endswith(f"/{_WAVE5_VISUALS_SEGMENT}"):
+        return {"file_path": file_path, "artifacts_present": []}
+
+    # Find the wave-5-visuals directory in the path
+    segment_idx = normalized.find(f"/{_WAVE5_VISUALS_SEGMENT}/")
+    if segment_idx == -1:
+        # Path ends with wave-5-visuals (no trailing slash)
+        visuals_dir = file_path
+    else:
+        visuals_dir = file_path[:segment_idx + len(_WAVE5_VISUALS_SEGMENT) + 1]
+
+    # Check which prerequisite files exist on disk
+    artifacts_present = []
+    for prereq in _WAVE5_PREREQUISITES:
+        prereq_path = os.path.join(visuals_dir, prereq)
+        if os.path.isfile(prereq_path):
+            artifacts_present.append(prereq)
+
+    return {"file_path": file_path, "artifacts_present": artifacts_present}
+
 
 def process_hook_event(
     hook_input: dict[str, Any],
@@ -78,12 +126,19 @@ def _handle_session_start(
 def _handle_pre_tool_use(
     engine: EnforcementEngine, state_dir: str, hook_input: dict[str, Any]
 ) -> dict[str, Any]:
-    """Handle PreToolUse event -- rule evaluation."""
+    """Handle PreToolUse event -- rule evaluation.
+
+    Extracts file_path from tool info, resolves wave-5-visuals artifact
+    prerequisites, and passes tool_context to engine.evaluate().
+    """
     state = _load_state(state_dir)
     if state is None:
         return {"exit_code": 0}
     tool_name = hook_input.get("tool", {}).get("name", "")
-    return _to_exit_response(engine.evaluate(state, tool_name=tool_name))
+    tool_context = resolve_tool_context(hook_input)
+    return _to_exit_response(
+        engine.evaluate(state, tool_name=tool_name, tool_context=tool_context)
+    )
 
 
 def _handle_subagent_start(
