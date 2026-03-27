@@ -1,0 +1,110 @@
+journey:
+  name: "Outline Gate Enforcement"
+  goal: "Enforce that the writer agent cannot draft sections (Wave 4) without an approved outline from Wave 3"
+  personas:
+    - "Dr. Rafael Moreno -- SBIR PI, defense tech, expects outline to be followed exactly"
+    - "Phil -- Plugin maintainer, needs cross-directory artifact check following hexagonal patterns"
+
+  emotional_arc:
+    start: "Invisible (PES works silently when outline exists before drafting)"
+    middle: "Redirective (blocks with clear guidance when outline is missing)"
+    end: "Confident (every draft section traces to the approved outline)"
+
+  job_stories:
+    - id: "JS-1"
+      situation: "Writer agent begins Wave 4 drafting without an approved outline in wave-3-outline/"
+      motivation: "Be blocked from writing draft sections before the outline exists"
+      outcome: "Every section follows the approved structure with page budgets and compliance mapping"
+
+steps:
+  - id: 1
+    name: "Writer dispatched to Wave 4"
+    trigger: "Orchestrator dispatches sbir-writer for Wave 4"
+    hook_event: "SubagentStart"
+    existing_behavior: true
+    note: "Agent-wave authorization already enforced by existing PES evaluator"
+
+    emotional_state:
+      entry: "Neutral"
+      exit: "Neutral"
+
+  - id: 2
+    name: "Outline Gate check"
+    trigger: "Agent attempts Write/Edit to wave-4-drafting/ (any file)"
+    hook_event: "PreToolUse"
+    evaluator: "OutlineGateEvaluator"
+    rule_type: "outline_gate"
+
+    condition:
+      tool: "Write or Edit"
+      target_path_contains: "wave-4-drafting/"
+      required_artifact: "proposal-outline.md in sibling wave-3-outline/"
+
+    decision_when_missing: "BLOCK"
+    decision_when_present: "ALLOW"
+
+    block_message: >
+      Cannot write draft sections to wave-4-drafting/ before the proposal
+      outline is approved. Required: {artifact_base}/wave-3-outline/proposal-outline.md.
+      Complete Wave 3 (outline) with the outliner agent first. The outline
+      provides section structure, page budgets, compliance mapping, and thesis
+      statements that the writer must follow.
+
+    shared_artifacts:
+      - name: "proposal-outline.md"
+        source: "artifacts/{topic-id}/wave-3-outline/proposal-outline.md"
+        owner: "sbir-outliner Wave 3"
+        consumers:
+          - "OutlineGateEvaluator (existence check in sibling wave directory)"
+          - "sbir-writer Wave 4 (reads outline for section structure and page budgets)"
+
+    emotional_state:
+      entry: "Agent attempting to draft without outline"
+      exit: "Agent blocked, redirected to complete Wave 3 first"
+
+    integration_checkpoint: >
+      Cross-directory artifact check: the adapter must derive the
+      wave-3-outline/ path from the wave-4-drafting/ target path. Both
+      multi-proposal (artifacts/{topic-id}/) and legacy (artifacts/) layouts
+      must be supported. The wave directory name is replaced: wave-4-drafting
+      becomes wave-3-outline in the same parent directory.
+
+  - id: 3
+    name: "Draft writing proceeds after outline exists"
+    trigger: "Agent writes draft section files after outline gate passes"
+    hook_event: "PreToolUse"
+    evaluator: "OutlineGateEvaluator"
+
+    condition:
+      proposal_outline_exists: true
+
+    decision: "ALLOW"
+
+    emotional_state:
+      entry: "Outline foundation complete"
+      exit: "Confident -- every section follows the approved plan"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "proposal-outline.md"
+      must_exist_before: "any draft section write to wave-4-drafting/"
+      failure_message: "Draft section written without approved outline"
+
+  cross_directory_resolution:
+    - target_directory: "wave-4-drafting/"
+      prerequisite_directory: "wave-3-outline/"
+      prerequisite_artifact: "proposal-outline.md"
+      resolution_method: "Replace wave directory name in target path"
+      layouts:
+        - multi_proposal: "artifacts/{topic-id}/wave-4-drafting/ -> artifacts/{topic-id}/wave-3-outline/"
+        - legacy: "artifacts/wave-4-drafting/ -> artifacts/wave-3-outline/"
+
+  evaluator_registration:
+    - rule_type: "outline_gate"
+      evaluator_class: "OutlineGateEvaluator"
+      registered_in: "EnforcementEngine._evaluators"
+
+  config_rules:
+    - rule_id: "drafting-requires-outline"
+      rule_type: "outline_gate"
+      added_to: "templates/pes-config.json"
