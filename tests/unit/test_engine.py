@@ -456,10 +456,10 @@ class TestEnforcementEngineToolContext:
         result = engine.evaluate(clean_state, tool_name="wave_1_strategy")
         assert result.decision == Decision.ALLOW
 
-    def test_all_eight_evaluators_accept_tool_context_kwarg(
+    def test_all_nine_evaluators_accept_tool_context_kwarg(
         self, audit_logger: FakeAuditLogger, pending_state: dict[str, Any]
     ) -> None:
-        """All 8 evaluators work when tool_context is passed."""
+        """All 9 evaluators work when tool_context is passed."""
         rules = [
             _wave_ordering_rule(),
             EnforcementRule(
@@ -521,6 +521,17 @@ class TestEnforcementEngineToolContext:
                     "skip_state_field": "writing_style_selection_skipped",
                 },
                 message="Style selection required",
+            ),
+            EnforcementRule(
+                rule_id="drafting-requires-outline",
+                description="Outline gate",
+                rule_type="outline_gate",
+                condition={
+                    "target_directory": "wave-4-drafting",
+                    "required_artifact": "proposal-outline.md",
+                    "artifact_location": "wave-3-outline",
+                },
+                message="Outline required",
             ),
         ]
         engine = EnforcementEngine(FakeRuleLoader(rules), audit_logger)
@@ -672,13 +683,13 @@ class TestEnforcementEngineWritingStyleGateRegistration:
                writing_style_gate allows when prefs present.
     """
 
-    def test_engine_has_eight_evaluators(
+    def test_engine_has_nine_evaluators(
         self, audit_logger: FakeAuditLogger
     ) -> None:
-        """Engine registers 8 evaluators including writing_style_gate."""
+        """Engine registers 9 evaluators including outline_gate."""
         engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
-        assert len(engine._evaluators) == 8
-        assert "writing_style_gate" in engine._evaluators
+        assert len(engine._evaluators) == 9
+        assert "outline_gate" in engine._evaluators
 
     def test_writing_style_gate_blocks_when_prefs_missing(
         self, audit_logger: FakeAuditLogger

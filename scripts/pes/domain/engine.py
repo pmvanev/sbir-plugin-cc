@@ -12,6 +12,7 @@ from pes.domain.corpus_integrity import CorpusIntegrityEvaluator
 from pes.domain.deadline_blocking import DeadlineBlockingEvaluator
 from pes.domain.figure_pipeline_gate import FigurePipelineGateEvaluator
 from pes.domain.housekeeping import AuditLogRotator, CrashSignalCleaner
+from pes.domain.outline_gate import OutlineGateEvaluator
 from pes.domain.pdc_gate import PdcGateEvaluator
 from pes.domain.post_action_validator import PostActionValidator
 from pes.domain.rules import Decision, EnforcementResult, EnforcementRule
@@ -47,6 +48,7 @@ class EnforcementEngine:
             "figure_pipeline_gate": FigurePipelineGateEvaluator(),
             "style_profile_gate": StyleProfileGateEvaluator(),
             "writing_style_gate": WritingStyleGateEvaluator(),
+            "outline_gate": OutlineGateEvaluator(),
         }
 
     def check_session_start(

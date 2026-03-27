@@ -5,7 +5,7 @@ EnforcementEngine, and verifies each new evaluator triggers BLOCK on correct
 conditions and ALLOW otherwise.
 
 Test Budget: 8 behaviors x 2 = 16 max unit tests.
-  1. Config loads all 11 rules through JsonRuleAdapter
+  1. Config loads all 12 rules through JsonRuleAdapter
   2. PDC gate evaluator: BLOCK on RED Tier 1/2, ALLOW otherwise
   3. Deadline blocking evaluator: BLOCK near deadline on non-essential wave, ALLOW otherwise
   4. Submission immutability evaluator: BLOCK on submitted+immutable, ALLOW otherwise
@@ -64,11 +64,11 @@ def engine() -> EnforcementEngine:
 # ---------------------------------------------------------------------------
 
 
-def test_real_config_loads_all_eleven_rules():
-    """JsonRuleAdapter loads all 11 rules from real pes-config.json."""
+def test_real_config_loads_all_twelve_rules():
+    """JsonRuleAdapter loads all 12 rules from real pes-config.json."""
     adapter = JsonRuleAdapter(REAL_CONFIG_PATH)
     rules = adapter.load_rules()
-    assert len(rules) == 11
+    assert len(rules) == 12
     rule_types = [r.rule_type for r in rules]
     assert rule_types.count("wave_ordering") == 4
     assert "pdc_gate" in rule_types
@@ -78,6 +78,7 @@ def test_real_config_loads_all_eleven_rules():
     assert "figure_pipeline_gate" in rule_types
     assert "style_profile_gate" in rule_types
     assert "writing_style_gate" in rule_types
+    assert "outline_gate" in rule_types
 
 
 def test_real_config_figure_pipeline_rule_has_correct_structure():

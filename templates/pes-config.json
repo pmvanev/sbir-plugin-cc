@@ -108,6 +108,17 @@
         "skip_state_field": "writing_style_selection_skipped"
       },
       "message": "Cannot write draft sections before writing style selection. Run /proposal quality discover or skip style selection at the style checkpoint."
+    },
+    {
+      "rule_id": "drafting-requires-outline",
+      "description": "Wave 4 drafting requires approved outline from Wave 3",
+      "rule_type": "outline_gate",
+      "condition": {
+        "target_directory": "wave-4-drafting",
+        "required_artifact": "proposal-outline.md",
+        "artifact_location": "wave-3-outline"
+      },
+      "message": "Cannot write draft sections before completing the proposal outline. Complete Wave 3 outline first."
     }
   ],
   "enforcement": {
