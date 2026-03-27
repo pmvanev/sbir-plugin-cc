@@ -5,7 +5,6 @@ Feature: Writing Style Gate Integration Checkpoints
 
   # --- Path Resolution ---
 
-  @skip
   Scenario: Gate works with multi-proposal workspace path layout
     Given an active proposal for topic "af263-042" at Wave 4 with multi-proposal workspace
     And the enforcement rules are loaded from the standard configuration
@@ -14,7 +13,6 @@ Feature: Writing Style Gate Integration Checkpoints
     When the writer agent attempts to Write "artifacts/af263-042/wave-4-drafting/sections/technical-approach.md"
     Then PES returns decision BLOCK
 
-  @skip
   Scenario: Gate works with legacy single-proposal path layout
     Given an active proposal at Wave 4 with legacy single-proposal workspace
     And the enforcement rules are loaded from the standard configuration
@@ -25,7 +23,6 @@ Feature: Writing Style Gate Integration Checkpoints
 
   # --- Non-interference ---
 
-  @skip
   Scenario: Gate does not affect writes outside wave-4-drafting
     Given an active proposal for topic "SF25D-T1201" at Wave 3
     And the enforcement rules are loaded from the standard configuration
@@ -34,7 +31,6 @@ Feature: Writing Style Gate Integration Checkpoints
     Then PES returns decision ALLOW
     And the writing style gate is not evaluated
 
-  @skip
   Scenario: Gate does not affect Read operations
     Given an active proposal for topic "SF25D-T1201" at Wave 4
     And the enforcement rules are loaded from the standard configuration
@@ -42,7 +38,6 @@ Feature: Writing Style Gate Integration Checkpoints
     When the writer agent uses Read on "artifacts/sf25d-t1201/wave-4-drafting/sections/technical-approach.md"
     Then PES returns decision ALLOW
 
-  @skip
   Scenario: Gate does not affect writes to wave-5-visuals
     Given an active proposal for topic "SF25D-T1201" at Wave 5
     And the enforcement rules are loaded from the standard configuration
@@ -52,7 +47,6 @@ Feature: Writing Style Gate Integration Checkpoints
 
   # --- Audit Trail ---
 
-  @skip
   Scenario: Blocked draft write is recorded in audit log
     Given an active proposal for topic "SF25D-T1201" at Wave 4
     And the enforcement rules are loaded from the standard configuration
@@ -63,7 +57,6 @@ Feature: Writing Style Gate Integration Checkpoints
     And an audit entry is recorded with event "evaluate" and decision "block"
     And the audit entry includes the rule_id "drafting-requires-style-selection"
 
-  @skip
   Scenario: Allowed draft write after style selection is recorded in audit log
     Given an active proposal for topic "SF25D-T1201" at Wave 4
     And the enforcement rules are loaded from the standard configuration

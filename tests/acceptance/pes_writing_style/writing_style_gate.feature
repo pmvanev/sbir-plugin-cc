@@ -9,7 +9,6 @@ Feature: Writing Style Gate
 
   # --- Blocking without quality preferences ---
 
-  @skip
   Scenario: Block draft write when quality-preferences.json missing and no skip marker
     Given no quality preferences file exists at the global configuration location
     And the proposal does not have a writing style selection skip marker
@@ -18,7 +17,6 @@ Feature: Writing Style Gate
     And the block message includes "writing style selection"
     And the block message includes "quality-preferences.json"
 
-  @skip
   Scenario: Block Edit to existing draft when no style selection
     Given no quality preferences file exists at the global configuration location
     And the proposal does not have a writing style selection skip marker
@@ -27,7 +25,6 @@ Feature: Writing Style Gate
     Then PES returns decision BLOCK
     And the block message includes "writing style selection"
 
-  @skip
   Scenario: Block message includes both resolution paths
     Given no quality preferences file exists at the global configuration location
     And the proposal does not have a writing style selection skip marker
@@ -38,7 +35,6 @@ Feature: Writing Style Gate
 
   # --- Allowing with quality preferences ---
 
-  @skip
   Scenario: Allow draft write when quality-preferences.json exists
     Given the global configuration location contains quality preferences
     When the writer agent attempts to Write "artifacts/sf25d-t1201/wave-4-drafting/sections/technical-approach.md"
@@ -46,7 +42,6 @@ Feature: Writing Style Gate
 
   # --- Allowing with explicit skip ---
 
-  @skip
   Scenario: Allow draft write when user explicitly skipped style selection
     Given no quality preferences file exists at the global configuration location
     And the proposal has a writing style selection skip marker
@@ -55,7 +50,6 @@ Feature: Writing Style Gate
 
   # --- Allowing prerequisite creation ---
 
-  @skip
   Scenario: Allow writing quality-preferences.json itself
     Given no quality preferences file exists at the global configuration location
     When the writer agent attempts to Write "~/.sbir/quality-preferences.json"
