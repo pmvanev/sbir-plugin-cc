@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from pes.adapters.file_audit_adapter import FileAuditAdapter
@@ -23,6 +24,38 @@ _WAVE5_PREREQUISITES = ("figure-specs.md", "style-profile.yaml")
 # Path segment that identifies visual asset directories
 _WAVE5_VISUALS_SEGMENT = "wave-5-visuals"
 
+# Path segment that identifies drafting directories
+_WAVE4_DRAFTING_SEGMENT = "wave-4-drafting"
+
+# Global artifacts checked when file_path targets wave-4-drafting/
+_GLOBAL_ARTIFACTS = ("quality-preferences.json",)
+
+
+def _detect_wave_segment(normalized: str, segment_name: str) -> bool:
+    """Check if a normalized path contains a wave segment directory."""
+    marker = f"/{segment_name}/"
+    return marker in normalized or normalized.endswith(f"/{segment_name}")
+
+
+def _find_wave_dir(file_path: str, normalized: str, segment_name: str) -> str:
+    """Extract the wave directory portion from a file path."""
+    marker = f"/{segment_name}/"
+    segment_idx = normalized.find(marker)
+    if segment_idx == -1:
+        # Path ends with segment (no trailing slash)
+        return file_path
+    return file_path[: segment_idx + len(segment_name) + 1]
+
+
+def _resolve_global_artifacts() -> list[str]:
+    """Check ~/.sbir/ for global artifact files (quality-preferences.json)."""
+    sbir_global = Path.home() / ".sbir"
+    found = []
+    for artifact in _GLOBAL_ARTIFACTS:
+        if (sbir_global / artifact).is_file():
+            found.append(artifact)
+    return found
+
 
 def resolve_tool_context(hook_input: dict[str, Any]) -> dict[str, Any]:
     """Extract file_path from hook input and resolve artifact prerequisites.
@@ -30,41 +63,49 @@ def resolve_tool_context(hook_input: dict[str, Any]) -> dict[str, Any]:
     For PreToolUse events, extracts file_path from hook_input['tool']['file_path'].
     When the path targets a wave-5-visuals/ directory, checks disk for prerequisite
     files (figure-specs.md, style-profile.yaml) and reports which are present.
+    When the path targets a wave-4-drafting/ directory, checks ~/.sbir/ for global
+    artifacts (quality-preferences.json) and populates global_artifacts_present.
 
-    Supports both multi-proposal (artifacts/{topic-id}/wave-5-visuals/) and
-    legacy (artifacts/wave-5-visuals/) path layouts.
+    Supports both multi-proposal (artifacts/{topic-id}/wave-N-name/) and
+    legacy (artifacts/wave-N-name/) path layouts.
 
     Returns:
-        Dict with 'file_path' (str) and 'artifacts_present' (list of filenames).
+        Dict with 'file_path' (str), 'artifacts_present' (list), and
+        'global_artifacts_present' (list) when relevant wave paths detected.
     """
     file_path = hook_input.get("tool", {}).get("file_path", "")
     if not file_path:
-        return {"file_path": "", "artifacts_present": []}
+        return {"file_path": "", "artifacts_present": [], "global_artifacts_present": []}
 
     # Normalize path separators for cross-platform compatibility
     normalized = file_path.replace("\\", "/")
 
-    # Check if path targets wave-5-visuals/
-    segment = f"/{_WAVE5_VISUALS_SEGMENT}/"
-    if segment not in normalized and not normalized.endswith(f"/{_WAVE5_VISUALS_SEGMENT}"):
-        return {"file_path": file_path, "artifacts_present": []}
+    is_wave5 = _detect_wave_segment(normalized, _WAVE5_VISUALS_SEGMENT)
+    is_wave4 = _detect_wave_segment(normalized, _WAVE4_DRAFTING_SEGMENT)
 
-    # Find the wave-5-visuals directory in the path
-    segment_idx = normalized.find(f"/{_WAVE5_VISUALS_SEGMENT}/")
-    if segment_idx == -1:
-        # Path ends with wave-5-visuals (no trailing slash)
-        visuals_dir = file_path
-    else:
-        visuals_dir = file_path[:segment_idx + len(_WAVE5_VISUALS_SEGMENT) + 1]
+    # For paths outside both wave-5-visuals/ and wave-4-drafting/
+    if not is_wave5 and not is_wave4:
+        return {"file_path": file_path, "artifacts_present": [], "global_artifacts_present": []}
 
-    # Check which prerequisite files exist on disk
-    artifacts_present = []
-    for prereq in _WAVE5_PREREQUISITES:
-        prereq_path = os.path.join(visuals_dir, prereq)
-        if os.path.isfile(prereq_path):
-            artifacts_present.append(prereq)
+    # Resolve wave-5-visuals local prerequisites
+    artifacts_present: list[str] = []
+    if is_wave5:
+        visuals_dir = _find_wave_dir(file_path, normalized, _WAVE5_VISUALS_SEGMENT)
+        for prereq in _WAVE5_PREREQUISITES:
+            prereq_path = os.path.join(visuals_dir, prereq)
+            if os.path.isfile(prereq_path):
+                artifacts_present.append(prereq)
 
-    return {"file_path": file_path, "artifacts_present": artifacts_present}
+    # Resolve global artifacts for wave-4-drafting
+    global_artifacts_present: list[str] = []
+    if is_wave4:
+        global_artifacts_present = _resolve_global_artifacts()
+
+    return {
+        "file_path": file_path,
+        "artifacts_present": artifacts_present,
+        "global_artifacts_present": global_artifacts_present,
+    }
 
 
 def process_hook_event(
