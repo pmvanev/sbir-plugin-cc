@@ -36,6 +36,7 @@ from pes.domain.finder_service import FinderService
 from pes.domain.topic_scoring import TopicScoringService
 
 PROFILE_PATH = Path.home() / ".sbir" / "company-profile.json"
+PARTNERS_DIR = Path.home() / ".sbir" / "partners"
 DEFAULT_STATE_DIR = Path(".sbir")
 
 
@@ -43,6 +44,42 @@ def _load_profile(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_partner_profiles(partners_dir: Path) -> list[dict[str, Any]]:
+    """Load all partner profiles from the partners directory."""
+    if not partners_dir.is_dir():
+        return []
+    profiles = []
+    for f in sorted(partners_dir.glob("*.json")):
+        try:
+            profiles.append(json.loads(f.read_text(encoding="utf-8")))
+        except (json.JSONDecodeError, OSError):
+            continue
+    return profiles
+
+
+def _select_best_partner(
+    topic: dict[str, Any],
+    partners: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Select the partner whose capabilities best match a topic."""
+    if not partners:
+        return None
+    topic_text = " ".join([
+        topic.get("title", ""),
+        topic.get("description", ""),
+        " ".join(topic.get("keywords", [])),
+    ]).lower()
+    best_partner = None
+    best_overlap = 0
+    for partner in partners:
+        caps = partner.get("capabilities", [])
+        overlap = sum(1 for c in caps if c.lower() in topic_text)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_partner = partner
+    return best_partner if best_overlap > 0 else (partners[0] if partners else None)
 
 
 def _build_filters(args: argparse.Namespace) -> dict[str, str]:
@@ -143,8 +180,14 @@ def cmd_score(args: argparse.Namespace) -> None:
     service = _build_service(args, profile, with_enrichment=True)
     result = service.search_and_enrich(filters=_build_filters(args))
 
+    partners_dir = Path(getattr(args, "partners_dir", str(PARTNERS_DIR)))
+    partners = _load_partner_profiles(partners_dir)
+
     scorer = TopicScoringService()
-    scored = scorer.score_batch(result.topics, profile)
+    scored = []
+    for topic in result.topics:
+        partner = _select_best_partner(topic, partners) if partners else None
+        scored.append(scorer.score_topic(topic, profile, partner))
 
     # Persist
     if not args.no_persist:
@@ -248,6 +291,8 @@ def main() -> None:
     _add_common_args(p_score)
     p_score.add_argument("--no-persist", action="store_true",
                          help="Skip writing finder-results.json")
+    p_score.add_argument("--partners-dir", type=str, default=str(PARTNERS_DIR),
+                         help="Partner profiles directory (default ~/.sbir/partners)")
 
     p_detail = sub.add_parser("detail", help="Enrich a single topic by ID")
     p_detail.add_argument("--topic-id", required=True, help="DSIP topic ID")

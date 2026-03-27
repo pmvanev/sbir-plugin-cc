@@ -151,7 +151,7 @@ class DsipEnrichmentAdapter(TopicEnrichmentPort):
                 has_failure = True
 
             # --- Source 2: Q&A API ---
-            if published_qa_count > 0:
+            if (published_qa_count or 0) > 0:
                 try:
                     qa_raw = self._fetch_qa(topic_id)
                     entry["qa_entries"] = self._parse_qa_entries(qa_raw)
