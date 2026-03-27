@@ -44,8 +44,8 @@ You MUST load your skill files before beginning work. Skills encode SBIR proposa
 | 2 OUTLINE | `skills/corpus-librarian/proposal-archive-reader.md` | Always -- retrieval patterns for exemplar section structures |
 | 3 DRAFT | `skills/corpus-librarian/proposal-archive-reader.md` | Already loaded -- use Wave 4 retrieval strategy for section drafting |
 | 3 DRAFT | `skills/reviewer/reviewer-persona-simulator.md` | When available -- self-check drafts against evaluation criteria |
-| 3 DRAFT | `skills/writer/{writing_style}.md` | When `writing_style` is set in `{state_dir}/proposal-state.json` -- load the named style skill (e.g., `elements-of-style.md` for Strunk & White). If not set, no style skill is loaded and standard prose conventions apply. |
-| 3 DRAFT | Quality artifacts from `~/.sbir/` | When available -- quality-preferences.json, winning-patterns.json, writing-quality-profile.json. Supplements elements-of-style with company-specific intelligence. Missing artifacts = proceed with defaults. |
+| 3 DRAFT | `skills/writer/{writing_style}.md` | After style checkpoint -- load the style skill matching the user's selection (e.g., `elements-of-style.md` for "elements"). If user selected "standard" or "skip", no style skill loaded. |
+| 3 DRAFT | Quality artifacts from `~/.sbir/` | At style checkpoint and per-section -- quality-preferences.json, winning-patterns.json, writing-quality-profile.json. Read at checkpoint for recommendations, apply per-section for tone/patterns/alerts. |
 
 ## Path Resolution
 
@@ -89,6 +89,27 @@ Gate: Every compliance item mapped to a section. Page budgets total to solicitat
 ### Phase 3: DRAFT (Wave 4)
 Load: `skills/reviewer/reviewer-persona-simulator.md` -- read it NOW if available.
 
+**Style checkpoint (mandatory before first section -- MUST get user input):**
+
+Before drafting ANY section, check `{state_dir}/proposal-state.json` for `writing_style`. If not set:
+
+1. Read quality artifacts from `~/.sbir/` (quality-preferences.json, winning-patterns.json, writing-quality-profile.json) — note which exist
+2. **Present available writing styles to the user using AskUserQuestion:**
+   - **Elements of Style** — concise, active voice, Strunk & White principles (loads `skills/writer/elements-of-style.md`)
+   - **Agency Default** — matches conventions from winning proposals for the target agency (if winning-patterns.json exists with agency data, summarize: "Your {N} winning {agency} proposals used {patterns}")
+   - **Academic** — formal, citation-heavy, detailed technical prose
+   - **Conversational** — accessible, direct, emphasis on readability
+   - **Standard** — balanced professional prose, no special rules
+   - **Custom** — user describes their preferred style
+3. If quality-preferences.json exists, highlight the user's stored preferences: "Your quality profile suggests: tone={tone}, detail={detail_level}, evidence={evidence_style}"
+4. If writing-quality-profile.json has alerts for the target agency, mention them: "Past {agency} evaluators noted: {alert}"
+5. **Do not proceed until the user selects a style.** Do not auto-select. Do not default silently.
+6. Record the choice in `{state_dir}/proposal-state.json` as `writing_style: "{choice}"` (e.g., "elements", "academic", "conversational", "standard", "custom")
+7. If user chooses "skip style selection": record `writing_style_selection_skipped: true` in state. Drafting proceeds with standard prose defaults.
+8. Load the corresponding style skill file if one exists (e.g., `skills/writer/elements-of-style.md` for "elements")
+
+If `writing_style` IS already set in state: skip the checkpoint, load the corresponding style skill, and proceed.
+
 Draft each section following the approved outline, in this order:
 1. Technical approach (core narrative -- largest allocation, write first)
 2. Statement of Work -- milestone-based, contractual language, maps to technical approach
@@ -109,12 +130,13 @@ For each section:
 - Write to `{artifact_base}/wave-4-drafting/sections/{section-name}.md`
 - Present checkpoint for human review
 
-Quality intelligence integration (if quality artifacts available):
-- Read `~/.sbir/quality-preferences.json`: apply tone (formal/direct/conversational), organization (paragraph length), evidence style (inline/narrative/table). These preferences supplement, not replace, the loaded writing_style skill.
-- Read `~/.sbir/winning-patterns.json`: for sections matching the current agency, apply winning practices as drafting guidance. Cite pattern source and confidence.
-- Read `~/.sbir/writing-quality-profile.json`: for the current agency and section, check for quality alerts. If past evaluator feedback matches (e.g., "organization_clarity" negative for Air Force on technical_approach), surface an alert:
+Quality intelligence integration (applied per-section after style checkpoint):
+- Apply the writing_style selected at the style checkpoint. If a style skill was loaded (e.g., elements-of-style.md), follow its rules for every section.
+- Read `~/.sbir/quality-preferences.json` (if exists): apply tone (formal/direct/conversational), organization (paragraph length), evidence style (inline/narrative/table). These preferences supplement, not replace, the loaded writing_style skill.
+- Read `~/.sbir/winning-patterns.json` (if exists): for sections matching the current agency, apply winning practices as drafting guidance. Cite pattern source and confidence.
+- Read `~/.sbir/writing-quality-profile.json` (if exists): for the current agency and section, check for quality alerts. If past evaluator feedback matches (e.g., "organization_clarity" negative for Air Force on technical_approach), surface an alert:
   "Warning -- Quality alert: Past Air Force evaluators noted 'Technical approach was difficult to follow' -- ensure clear subheading structure and short paragraphs for this section."
-- Missing artifacts: no error, no alert. Use standard prose conventions or loaded writing_style skill.
+- Missing quality artifacts after style checkpoint: no error. Use the selected writing_style skill or standard prose conventions.
 
 After all sections drafted:
 - Verify compliance matrix -- all items addressed somewhere
