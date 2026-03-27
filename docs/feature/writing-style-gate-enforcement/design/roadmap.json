@@ -1,0 +1,167 @@
+{
+  "roadmap": {
+    "project_id": "writing-style-gate-enforcement",
+    "created_at": "2026-03-27T00:00:00Z",
+    "total_steps": 7,
+    "phases": 3
+  },
+  "phases": [
+    {
+      "id": "01",
+      "name": "Evaluator and Hook Adapter Extension",
+      "steps": [
+        {
+          "id": "01-01",
+          "name": "WritingStyleGateEvaluator domain logic",
+          "description": "Pure domain evaluator. Blocks Write/Edit to wave-4-drafting/ when quality-preferences.json absent from global_artifacts_present and no writing_style_selection_skipped in state.",
+          "criteria": [
+            "Write to wave-4-drafting/ blocked when quality-preferences.json not in global_artifacts_present and no skip marker",
+            "Write to wave-4-drafting/ allowed when quality-preferences.json in global_artifacts_present",
+            "Write to wave-4-drafting/ allowed when writing_style_selection_skipped is true in state",
+            "Both Write and Edit operations subject to the gate",
+            "Writes outside wave-4-drafting/ not affected"
+          ],
+          "dependencies": [],
+          "stories": ["US-WSTYLE-01"],
+          "files_to_modify": [
+            "scripts/pes/domain/writing_style_gate.py",
+            "tests/unit/test_writing_style_gate.py"
+          ]
+        },
+        {
+          "id": "01-02",
+          "name": "Hook adapter global artifact resolution for wave-4-drafting",
+          "description": "Extend resolve_tool_context to detect wave-4-drafting/ in file_path. Resolve ~/.sbir/ for global artifact existence. Populate tool_context['global_artifacts_present'].",
+          "criteria": [
+            "When file_path targets wave-4-drafting/, global_artifacts_present populated",
+            "quality-preferences.json at ~/.sbir/ detected and listed in global_artifacts_present",
+            "When file_path is outside wave-4-drafting/, global_artifacts_present is empty list",
+            "Existing wave-5-visuals/ resolution and artifacts_present behavior unchanged",
+            "Both multi-proposal and legacy path layouts resolved correctly"
+          ],
+          "dependencies": [],
+          "stories": ["US-WSTYLE-03"],
+          "files_to_modify": [
+            "scripts/pes/adapters/hook_adapter.py",
+            "tests/unit/test_hook_adapter.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Engine Registration, Config, and Integration",
+      "steps": [
+        {
+          "id": "02-01",
+          "name": "Register evaluator in engine and add config rule",
+          "description": "Register WritingStyleGateEvaluator in EnforcementEngine._evaluators dict. Add rule to pes-config.json. Verify dispatch end-to-end.",
+          "criteria": [
+            "Engine _evaluators contains 'writing_style_gate' mapped to WritingStyleGateEvaluator",
+            "pes-config.json contains rule 'drafting-requires-style-selection' with type 'writing_style_gate'",
+            "Engine total evaluator count is 8",
+            "Engine total rule count in config is 11"
+          ],
+          "dependencies": ["01-01"],
+          "stories": ["US-WSTYLE-03"],
+          "files_to_modify": [
+            "scripts/pes/domain/engine.py",
+            "templates/pes-config.json"
+          ]
+        },
+        {
+          "id": "02-02",
+          "name": "Integration tests: end-to-end writing style gate enforcement",
+          "description": "Integration tests loading real pes-config.json through engine. Verify gate blocks and allows correctly through full hook-to-evaluator path including global artifact resolution.",
+          "criteria": [
+            "Draft write blocked end-to-end when quality-preferences.json absent (config -> adapter -> engine -> evaluator -> BLOCK)",
+            "Draft write allowed end-to-end when quality-preferences.json present at ~/.sbir/",
+            "Draft write allowed when writing_style_selection_skipped in state",
+            "Gate does not interfere with existing wave-5-visuals/ gates"
+          ],
+          "dependencies": ["02-01", "01-02"],
+          "stories": ["US-WSTYLE-01", "US-WSTYLE-03"],
+          "test_files": [
+            "tests/integration/test_writing_style_gate_enforcement.py"
+          ]
+        },
+        {
+          "id": "02-03",
+          "name": "BDD acceptance tests from feature scenarios",
+          "description": "Acceptance tests implementing all 17 Gherkin scenarios from journey-writing-style-gate.feature. Validates blocking, allowing, path resolution, non-interference, and audit trail.",
+          "criteria": [
+            "All 17 scenarios from journey-writing-style-gate.feature pass",
+            "Audit log entries verified for block and allow decisions",
+            "Multi-proposal and legacy path layouts covered"
+          ],
+          "dependencies": ["02-02"],
+          "stories": ["US-WSTYLE-01", "US-WSTYLE-02", "US-WSTYLE-03"],
+          "test_files": [
+            "tests/acceptance/writing_style_gate/test_writing_style_gate_enforcement.py"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Writer Agent Style Checkpoint (Markdown)",
+      "steps": [
+        {
+          "id": "03-01",
+          "name": "Writer agent style checkpoint in Phase 3 DRAFT",
+          "description": "Add mandatory style checkpoint to sbir-writer.md Phase 3 before first section draft. Present styles with quality-profile-aware recommendations. Record choice or skip in state.",
+          "criteria": [
+            "Style checkpoint presented before first section draft when writing_style not in state",
+            "Checkpoint skipped when writing_style already set in state",
+            "Quality artifacts from ~/.sbir/ used for recommendations when present",
+            "Skip option records writing_style_selection_skipped in state",
+            "Style choice records writing_style in state and loads corresponding skill"
+          ],
+          "dependencies": ["02-01"],
+          "stories": ["US-WSTYLE-02"],
+          "files_to_modify": [
+            "agents/sbir-writer.md"
+          ],
+          "notes": "Markdown editing only -- no TDD. Validate via /nw:forge checklist."
+        },
+        {
+          "id": "03-02",
+          "name": "Draft command prerequisites update",
+          "description": "Update proposal-draft.md prerequisites to reference style checkpoint. Add note that style selection (or skip) is required before first section draft.",
+          "criteria": [
+            "Prerequisites section mentions style checkpoint",
+            "Help text references /proposal quality discover as preparation step"
+          ],
+          "dependencies": ["03-01"],
+          "stories": ["US-WSTYLE-02"],
+          "files_to_modify": [
+            "commands/proposal-draft.md"
+          ],
+          "notes": "Markdown editing only -- no TDD."
+        }
+      ]
+    }
+  ],
+  "implementation_scope": {
+    "source_directories": [
+      "scripts/pes/domain/",
+      "scripts/pes/adapters/",
+      "templates/",
+      "agents/",
+      "commands/"
+    ],
+    "test_directories": [
+      "tests/unit/",
+      "tests/integration/",
+      "tests/acceptance/writing_style_gate/"
+    ],
+    "excluded_patterns": [
+      "__init__.py",
+      "__pycache__/**"
+    ]
+  },
+  "validation": {
+    "status": "pending_review",
+    "reviewer": "nw-solution-architect-reviewer"
+  }
+}
