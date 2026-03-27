@@ -42,12 +42,13 @@ Draft a specific proposal section from the approved outline. Each section is com
 
 ## Flow
 
-1. **Load inputs** -- Read approved outline from `./artifacts/wave-3-outline/proposal-outline.md`, discrimination table from `./artifacts/wave-3-outline/discrimination-table.md`, compliance matrix from `.sbir/compliance-matrix.json`
-2. **Load exemplars** -- Pull corpus exemplars for tone and structure calibration
-3. **Draft** -- Write the section addressing all mapped compliance items, within page budget, reinforcing discriminators
-4. **Self-check** -- Run acronym audit, cross-reference check, jargon scan
-5. **Write** -- Save to `./artifacts/wave-4-drafts/sections/{section-name}.md`
-6. **Checkpoint** -- Present for human review: approve, revise, skip
+1. **Style checkpoint** -- If `writing_style` is not set in proposal state, present available styles (Elements of Style, Agency Default, Academic, Conversational, Standard, Custom) with recommendations from quality discovery artifacts. User selects or skips. Choice recorded in state.
+2. **Load inputs** -- Read approved outline from `./artifacts/wave-3-outline/proposal-outline.md`, discrimination table from `./artifacts/wave-3-outline/discrimination-table.md`, compliance matrix from `.sbir/compliance-matrix.json`
+3. **Load exemplars** -- Pull corpus exemplars for tone and structure calibration
+4. **Draft** -- Write the section addressing all mapped compliance items, within page budget, reinforcing discriminators, applying selected writing style
+5. **Self-check** -- Run acronym audit, cross-reference check, jargon scan
+6. **Write** -- Save to `./artifacts/wave-4-drafts/sections/{section-name}.md`
+7. **Checkpoint** -- Present for human review: approve, revise, skip
 
 ## Iterate Flow (--iterate)
 
@@ -63,6 +64,7 @@ Draft a specific proposal section from the approved outline. Each section is com
 - Compliance matrix generated
 - Strategy brief available at `./artifacts/wave-1-strategy/strategy-brief.md`
 - Company profile at `~/.sbir/company-profile.json`
+- **Writing style selected** (or explicitly skipped): The writer will present a style checkpoint before the first section draft. Run `/sbir:proposal quality discover` beforehand for best recommendations. PES blocks drafting until style selection is complete.
 
 ## Agent Invocation
 
