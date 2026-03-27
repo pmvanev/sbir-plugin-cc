@@ -144,3 +144,39 @@ class TestWritingStyleGateBlockMessage:
         message = evaluator.build_block_message(rule, state)
 
         assert rule.message in message
+
+    def test_block_message_mentions_both_options_explicitly(self) -> None:
+        evaluator = _evaluator()
+        rule = _writing_style_gate_rule()
+        state: dict[str, Any] = {}
+
+        message = evaluator.build_block_message(rule, state)
+
+        assert "Resolve by either" in message
+        assert "/proposal quality discover" in message
+        assert "style checkpoint" in message
+
+
+class TestWritingStyleGateBackslashPaths:
+    """Ensure backslash paths (Windows) are handled correctly."""
+
+    def test_blocks_with_backslash_path(self) -> None:
+        evaluator = _evaluator()
+        rule = _writing_style_gate_rule()
+        state: dict[str, Any] = {}
+        ctx = _wave4_tool_context(
+            file_path="artifacts\\sf25d-t1201\\wave-4-drafting\\sections\\tech.md"
+        )
+
+        assert evaluator.triggers(rule, state, "Write", ctx) is True
+
+    def test_allows_with_backslash_path_when_prefs_present(self) -> None:
+        evaluator = _evaluator()
+        rule = _writing_style_gate_rule()
+        state: dict[str, Any] = {}
+        ctx = _wave4_tool_context(
+            file_path="artifacts\\sf25d-t1201\\wave-4-drafting\\sections\\tech.md",
+            global_artifacts_present=["quality-preferences.json"],
+        )
+
+        assert evaluator.triggers(rule, state, "Write", ctx) is False
