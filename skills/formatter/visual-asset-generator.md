@@ -233,6 +233,8 @@ Approach: Write detailed specification brief. Track as "pending-external" in fig
 
 ## Method Selection Guide
 
+Always prefer the First Choice method. The Fallback column applies only when the First Choice tool is unavailable on the system. "SVG inline" means hand-coded SVG as a last resort — it must still go through the structured critique loop. Never select SVG inline when the First Choice tool is available.
+
 | Figure Need | First Choice | Fallback |
 |------------|-------------|----------|
 | Figure exists in corpus at HIGH quality | Corpus Reuse | Generate with standard method |
