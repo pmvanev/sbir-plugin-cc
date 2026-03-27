@@ -1,0 +1,191 @@
+journey:
+  name: "PES Figure Pipeline Enforcement"
+  goal: "Enforce the structured figure generation pipeline so the formatter agent cannot bypass planning or style analysis"
+  personas:
+    - "Dr. Rafael Moreno -- SBIR PI, defense tech, limited graphic design skills"
+    - "Phil -- Plugin maintainer, needs reliable enforcement beyond markdown instructions"
+
+  emotional_arc:
+    start: "Invisible (PES works silently when pipeline is followed)"
+    middle: "Redirective (blocks with clear guidance when pipeline is skipped)"
+    end: "Confident (every figure traces to a spec and style choice)"
+
+  job_stories:
+    - id: "JS-1"
+      situation: "Formatter agent begins Wave 5 without creating figure specifications"
+      motivation: "Be blocked from writing figure files before planning is complete"
+      outcome: "Every figure follows the structured pipeline"
+    - id: "JS-2"
+      situation: "Formatter agent attempts figure generation without style conversation"
+      motivation: "Be blocked until style profile exists or user explicitly skipped"
+      outcome: "User was consulted about visual preferences before generation"
+
+steps:
+  - id: 1
+    name: "Formatter dispatched to Wave 5"
+    trigger: "Orchestrator dispatches sbir-formatter for Wave 5"
+    hook_event: "SubagentStart"
+    existing_behavior: true
+    note: "Agent-wave authorization already enforced by existing PES evaluator"
+
+    emotional_state:
+      entry: "Neutral"
+      exit: "Neutral"
+
+  - id: 2
+    name: "Figure Pipeline Gate check"
+    trigger: "Agent attempts Write/Edit to wave-5-visuals/ (any file except figure-specs.md)"
+    hook_event: "PreToolUse"
+    evaluator: "FigurePipelineGateEvaluator"
+    rule_type: "figure_pipeline_gate"
+
+    condition:
+      tool: "Write or Edit"
+      target_path_contains: "wave-5-visuals/"
+      target_file_is_not: "figure-specs.md"
+      required_artifact: "figure-specs.md in wave-5-visuals/"
+
+    decision_when_missing: "BLOCK"
+    decision_when_present: "ALLOW (pass to next gate)"
+
+    block_message: >
+      Cannot write figure files to wave-5-visuals/ before creating figure
+      specifications. Required: {artifact_base}/wave-5-visuals/figure-specs.md.
+      Create the figure specification plan first by reading the figure plan,
+      checking tool availability, and writing figure-specs.md.
+
+    shared_artifacts:
+      - name: "figure-specs.md"
+        source: "artifacts/{topic-id}/wave-5-visuals/figure-specs.md"
+        owner: "sbir-formatter Phase 1"
+        consumers:
+          - "FigurePipelineGateEvaluator (existence check)"
+          - "sbir-formatter Phase 2 (figure generation source)"
+
+    emotional_state:
+      entry: "Agent attempting shortcut"
+      exit: "Agent redirected to Phase 1 planning"
+
+    integration_checkpoint: >
+      figure-plan.md must exist in wave-3-outline/ before figure-specs.md
+      can be meaningfully created. This is an upstream dependency.
+
+  - id: 3
+    name: "Prerequisite artifact creation (figure-specs.md)"
+    trigger: "Agent writes figure-specs.md to wave-5-visuals/"
+    hook_event: "PreToolUse"
+    evaluator: "FigurePipelineGateEvaluator"
+
+    condition:
+      tool: "Write or Edit"
+      target_file_is: "figure-specs.md"
+
+    decision: "ALLOW (prerequisite artifact creation)"
+
+    emotional_state:
+      entry: "Agent following correct workflow"
+      exit: "Foundation established"
+
+  - id: 4
+    name: "Style Profile Gate check"
+    trigger: "Agent attempts Write/Edit to wave-5-visuals/ (file is not figure-specs.md or style-profile.yaml)"
+    hook_event: "PreToolUse"
+    evaluator: "StyleProfileGateEvaluator"
+    rule_type: "style_profile_gate"
+
+    condition:
+      tool: "Write or Edit"
+      target_path_contains: "wave-5-visuals/"
+      target_file_is_not:
+        - "figure-specs.md"
+        - "style-profile.yaml"
+      required_one_of:
+        - artifact: "style-profile.yaml in wave-5-visuals/"
+        - state_field: "style_analysis_skipped == true"
+
+    decision_when_missing: "BLOCK"
+    decision_when_present: "ALLOW"
+
+    block_message: >
+      Cannot generate figures before style analysis. Required: either
+      {artifact_base}/wave-5-visuals/style-profile.yaml or style analysis
+      skip recorded in proposal state. Complete the style recommendation
+      conversation with the user first.
+
+    shared_artifacts:
+      - name: "style-profile.yaml"
+        source: "artifacts/{topic-id}/wave-5-visuals/style-profile.yaml"
+        owner: "sbir-formatter Phase 1 (style analysis)"
+        consumers:
+          - "StyleProfileGateEvaluator (existence check)"
+          - "sbir-formatter Phase 2 (palette/tone application)"
+      - name: "style_analysis_skipped"
+        source: "state.json field: style_analysis_skipped"
+        owner: "sbir-formatter Phase 1 (user skip decision)"
+        consumers:
+          - "StyleProfileGateEvaluator (skip check)"
+
+    emotional_state:
+      entry: "Agent has specs but no style direction"
+      exit: "Agent redirected to style conversation"
+
+    integration_checkpoint: >
+      Style profile gate requires access to both the artifact directory
+      (for style-profile.yaml existence) and proposal state (for skip marker).
+
+  - id: 5
+    name: "Style conversation and profile creation"
+    trigger: "Agent runs style analysis workflow"
+    hook_event: "PreToolUse"
+    evaluator: "StyleProfileGateEvaluator"
+
+    condition:
+      tool: "Write or Edit"
+      target_file_is: "style-profile.yaml"
+
+    decision: "ALLOW (prerequisite artifact creation)"
+
+    emotional_state:
+      entry: "User engaged in style choice"
+      exit: "Visual identity established (or consciously skipped)"
+
+  - id: 6
+    name: "Figure generation proceeds"
+    trigger: "Agent writes figure files after both gates pass"
+    hook_event: "PreToolUse"
+    evaluator: "Both evaluators"
+
+    condition:
+      figure_specs_exists: true
+      style_profile_or_skip: true
+
+    decision: "ALLOW"
+
+    emotional_state:
+      entry: "Pipeline foundation complete"
+      exit: "Confident -- every figure follows the full lifecycle"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "figure-specs.md"
+      must_exist_before: "any figure file write"
+      failure_message: "Figure written without specification plan"
+    - artifact: "style-profile.yaml OR style_analysis_skipped state"
+      must_exist_before: "any figure file write (except figure-specs.md)"
+      failure_message: "Figure generated without style analysis"
+
+  evaluator_registration:
+    - rule_type: "figure_pipeline_gate"
+      evaluator_class: "FigurePipelineGateEvaluator"
+      registered_in: "EnforcementEngine._evaluators"
+    - rule_type: "style_profile_gate"
+      evaluator_class: "StyleProfileGateEvaluator"
+      registered_in: "EnforcementEngine._evaluators"
+
+  config_rules:
+    - rule_id: "figure-pipeline-requires-specs"
+      rule_type: "figure_pipeline_gate"
+      added_to: "templates/pes-config.json"
+    - rule_id: "figure-generation-requires-style"
+      rule_type: "style_profile_gate"
+      added_to: "templates/pes-config.json"
