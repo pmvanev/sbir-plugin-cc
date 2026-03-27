@@ -39,7 +39,7 @@ claude
 /sbir:solicitation-find
 
 # 4. Start a proposal from a topic you like
-/sbir:proposal new AF263-042
+/sbir:proposal-new AF263-042
 
 # 5. Coming back later? Pick up where you left off
 /sbir:continue
@@ -111,26 +111,26 @@ Your company profile at `~/.sbir/company-profile.json` carries over across proje
                                       |
                               Pick a topic
                                       |
-                            STTR topic? ──YES──> /sbir:proposal partner-setup
-                              |                  /sbir:proposal partner-screen (optional)
+                            STTR topic? ──YES──> /sbir:proposal-partner-setup
+                              |                  /sbir:proposal-partner-screen (optional)
                               NO                        |
                               |   <─────────────────────+
-                         /sbir:proposal new <topic>
+                         /sbir:proposal-new <topic>
                                       |
                                Go / No-Go?
                               /       |       \
                            NO-GO   DEFER     GO
                           archive   pause      |
-                                     |    /sbir:proposal shape (optional)
+                                     |    /sbir:proposal-shape (optional)
                                      |         |
-                                     |    /sbir:proposal check
-                                     |    /sbir:proposal tpoc questions
+                                     |    /sbir:proposal-check
+                                     |    /sbir:proposal-tpoc-questions
                                      |         |
                                      |    [TPOC call happens]
                                      |         |
-                                     |    /sbir:proposal tpoc ingest
+                                     |    /sbir:proposal-tpoc-ingest
                                      |         |
-                                     |    /sbir:proposal wave strategy
+                                     |    /sbir:proposal-wave-strategy
                                      |         |
                                      |    Approve strategy? -----> Revise
                                      |         |
@@ -140,28 +140,28 @@ Your company profile at `~/.sbir/company-profile.json` carries over across proje
                                      |         |
                                      |    Approve outline? ------> Revise
                                      |         |
-                                     |    /sbir:proposal draft <section>
-                                     |    /sbir:proposal iterate <section>
+                                     |    /sbir:proposal-draft <section>
+                                     |    /sbir:proposal-iterate <section>
                                      |         |  (max 2 revision cycles)
                                      |         |
-                                     |    /sbir:proposal wave visuals
+                                     |    /sbir:proposal-wave-visuals
                                      |         |
-                                     |    /sbir:proposal format
+                                     |    /sbir:proposal-format
                                      |         |
-                                     |    /sbir:proposal wave final-review
+                                     |    /sbir:proposal-wave-final-review
                                      |         |
                                      |    Sign off? ----------------> Revise
                                      |         |
-                                     |    /sbir:proposal submit prep
+                                     |    /sbir:proposal-submit-prep
                                      |         |
                                      |    [You upload to portal]
                                      |         |
-                                     |    /sbir:proposal submit confirm
+                                     |    /sbir:proposal-submit
                                      |         |
                                      |    [Archive locked — read-only]
                                      |         |
-                                     |    /sbir:proposal debrief outcome
-                                     |    /sbir:proposal debrief lessons
+                                     |    /sbir:proposal-debrief outcome
+                                     |    /sbir:proposal-debrief lessons
                                      |         |
                                      |    [Lessons feed back into corpus]
                                      |         |
@@ -181,12 +181,12 @@ Set up your environment (profile, corpus, partner profiles), then score topics a
 
 ```bash
 /sbir:setup                                # First-time setup or re-run to update config
-/sbir:proposal partner-setup               # Create a research institution partner profile
-/sbir:proposal partner-screen "MIT"        # Screen a new potential partner for readiness
+/sbir:proposal-partner-setup               # Create a research institution partner profile
+/sbir:proposal-partner-screen "MIT"        # Screen a new potential partner for readiness
 /sbir:solicitation-find                    # Search and rank open topics (partnership-aware)
-/sbir:proposal new <topic-or-file>         # Start proposal, Go/No-Go checkpoint
-/sbir:proposal partner-set cu-boulder      # Designate partner for active proposal
-/sbir:proposal shape                       # Generate 3-5 candidate approaches (optional)
+/sbir:proposal-new <topic-or-file>         # Start proposal, Go/No-Go checkpoint
+/sbir:proposal-partner-set cu-boulder      # Designate partner for active proposal
+/sbir:proposal-shape                       # Generate 3-5 candidate approaches (optional)
 /sbir:continue                             # Pick up where you left off (works in any wave)
 ```
 
@@ -197,11 +197,11 @@ Set up your environment (profile, corpus, partner profiles), then score topics a
 Extract compliance requirements, prepare for TPOC call, build strategy brief.
 
 ```bash
-/sbir:proposal check                       # View compliance matrix status
-/sbir:proposal compliance add "<text>"     # Add a missed compliance item
-/sbir:proposal tpoc questions              # Generate prioritized TPOC questions
-/sbir:proposal tpoc ingest ./notes.txt     # Parse TPOC call notes (after the call)
-/sbir:proposal wave strategy               # Generate strategy brief → approve/revise/skip
+/sbir:proposal-check                       # View compliance matrix status
+/sbir:proposal-compliance-add "<text>"     # Add a missed compliance item
+/sbir:proposal-tpoc-questions              # Generate prioritized TPOC questions
+/sbir:proposal-tpoc-ingest ./notes.txt     # Parse TPOC call notes (after the call)
+/sbir:proposal-wave-strategy               # Generate strategy brief → approve/revise/skip
 ```
 
 **Artifacts:** `artifacts/wave-1-strategy/` — compliance matrix, TPOC questions, TPOC Q&A log, solicitation delta, strategy brief
@@ -227,10 +227,10 @@ Competitive positioning, section-by-section outline with page budgets, figure pl
 Draft each proposal section with iterative human review (max 2 revision cycles per section).
 
 ```bash
-/sbir:proposal draft technical-approach    # Draft a section
-/sbir:proposal draft sow
-/sbir:proposal draft key-personnel
-/sbir:proposal iterate technical-approach  # Submit for reviewer iteration
+/sbir:proposal-draft technical-approach    # Draft a section
+/sbir:proposal-draft sow
+/sbir:proposal-draft key-personnel
+/sbir:proposal-iterate technical-approach  # Submit for reviewer iteration
 ```
 
 **Artifacts:** `artifacts/wave-4-drafts/sections/` — all proposal sections; `artifacts/wave-4-drafts/review-records/` — reviewer feedback per iteration
@@ -240,8 +240,8 @@ Draft each proposal section with iterative human review (max 2 revision cycles p
 Generate figures, diagrams, and concept illustrations.
 
 ```bash
-/sbir:proposal wave visuals                # Initialize figure specs + tool detection
-/sbir:proposal draft figure "system-arch"  # Generate a specific figure
+/sbir:proposal-wave-visuals                # Initialize figure specs + tool detection
+/sbir:proposal-draft-figure "system-arch"  # Generate a specific figure
 ```
 
 **Artifacts:** `artifacts/wave-5-visuals/` — figure inventory, cross-reference log, generated figures (SVG/PNG/Mermaid)
@@ -251,7 +251,7 @@ Generate figures, diagrams, and concept illustrations.
 Apply agency-specific formatting rules, assemble submission volumes.
 
 ```bash
-/sbir:proposal format                      # Format and assemble → approve/revise
+/sbir:proposal-format                      # Format and assemble → approve/revise
 ```
 
 **Artifacts:** `artifacts/wave-6-format/` — compliance final check, jargon audit, assembled volumes
@@ -261,7 +261,7 @@ Apply agency-specific formatting rules, assemble submission volumes.
 Simulated government evaluator scoring and red team analysis.
 
 ```bash
-/sbir:proposal wave final-review           # Run review → iterate/sign-off
+/sbir:proposal-wave-final-review           # Run review → iterate/sign-off
 ```
 
 **Artifacts:** `artifacts/wave-7-review/` — reviewer scorecard, red team findings, debrief cross-check, sign-off record
@@ -273,8 +273,8 @@ Simulated government evaluator scoring and red team analysis.
 Package files for the submission portal. You perform the actual upload manually.
 
 ```bash
-/sbir:proposal submit prep                 # Prepare package → approve/revise
-/sbir:proposal submit confirm              # Confirm submission, create immutable archive
+/sbir:proposal-submit-prep                 # Prepare package → approve/revise
+/sbir:proposal-submit                      # Confirm submission, create immutable archive
 ```
 
 **Artifacts:** `artifacts/wave-8-submission/` — pre-submission checklist, portal-ready package, immutable archive
@@ -286,10 +286,10 @@ After confirmation, the proposal archive becomes **read-only** (PES-enforced).
 Record outcomes, request debriefs, extract lessons learned.
 
 ```bash
-/sbir:proposal debrief outcome WIN         # Record result
-/sbir:proposal debrief request-letter      # Draft debrief request (if LOSS)
-/sbir:proposal debrief ingest ./debrief.pdf  # Parse agency feedback
-/sbir:proposal debrief lessons             # Generate lessons learned
+/sbir:proposal-debrief outcome WIN         # Record result
+/sbir:proposal-debrief request-letter      # Draft debrief request (if LOSS)
+/sbir:proposal-debrief ingest ./debrief.pdf  # Parse agency feedback
+/sbir:proposal-debrief lessons             # Generate lessons learned
 ```
 
 **Artifacts:** `artifacts/wave-9-learning/` — debrief request draft, structured debrief, critique section map, pattern analysis, lessons learned
@@ -390,37 +390,36 @@ my-proposal-project/
 | Command | Wave | Purpose |
 |---------|------|---------|
 | `/sbir:setup` | Pre | Guided first-time setup (profile, corpus, API key, validation) |
-| `/sbir:proposal profile setup` | Pre | Create company profile (standalone) |
-| `/sbir:proposal profile update` | Pre | Update company profile |
-| `/sbir:proposal partner-setup` | Pre | Create or update a research institution partner profile |
-| `/sbir:proposal partner-set <slug>` | 0+ | Designate a partner for the active proposal |
-| `/sbir:proposal partner-screen <name>` | Pre | Screen a potential partner for readiness (5 signals) |
-| `/sbir:proposal corpus add <dir>` | Pre | Ingest past proposals and documents (standalone) |
-| `/sbir:proposal quality discover` | Pre | Build writing quality intelligence from past proposals |
-| `/sbir:proposal quality update` | Pre | Update quality artifacts from new debrief data |
-| `/sbir:proposal quality status` | Pre | Show quality intelligence status |
+| `/sbir:proposal-profile-setup` | Pre | Create company profile (standalone) |
+| `/sbir:proposal-profile-update` | Pre | Update company profile |
+| `/sbir:proposal-partner-setup` | Pre | Create or update a research institution partner profile |
+| `/sbir:proposal-partner-set <slug>` | 0+ | Designate a partner for the active proposal |
+| `/sbir:proposal-partner-screen <name>` | Pre | Screen a potential partner for readiness (5 signals) |
+| `/sbir:proposal-quality-discover` | Pre | Build writing quality intelligence from past proposals |
+| `/sbir:proposal-quality-update` | Pre | Update quality artifacts from new debrief data |
+| `/sbir:proposal-quality-status` | Pre | Show quality intelligence status |
 | `/sbir:solicitation-find` | 0 | Search and rank open topics by fit |
-| `/sbir:proposal new <topic-or-file>` | 0 | Start proposal with Go/No-Go checkpoint |
-| `/sbir:proposal shape` | 0 | Generate candidate technical approaches |
+| `/sbir:proposal-new <topic-or-file>` | 0 | Start proposal with Go/No-Go checkpoint |
+| `/sbir:proposal-shape` | 0 | Generate candidate technical approaches |
 | `/sbir:continue` | Any | Detect where you left off and suggest next action |
-| `/sbir:proposal status` | Any | Show current wave, progress, next actions |
-| `/sbir:proposal check` | 1+ | View compliance matrix coverage |
-| `/sbir:proposal compliance add` | 1+ | Add missed compliance item |
-| `/sbir:proposal tpoc questions` | 1 | Generate TPOC call questions |
-| `/sbir:proposal tpoc ingest <file>` | 1 | Parse TPOC call notes |
-| `/sbir:proposal wave strategy` | 1 | Generate and approve strategy brief |
-| `/sbir:proposal draft <section>` | 4 | Draft a proposal section |
-| `/sbir:proposal iterate <section>` | 4 | Submit section for reviewer iteration |
-| `/sbir:proposal wave visuals` | 5 | Initialize figure generation |
-| `/sbir:proposal draft figure <name>` | 5 | Generate a specific figure |
-| `/sbir:proposal format` | 6 | Format and assemble volumes |
-| `/sbir:proposal wave final-review` | 7 | Red team review and evaluator simulation |
-| `/sbir:proposal submit prep` | 8 | Prepare submission package |
-| `/sbir:proposal submit confirm` | 8 | Confirm submission, lock archive |
-| `/sbir:proposal debrief <action>` | 9 | Outcome, debrief request, ingest, lessons |
-| `/sbir:proposal config format <fmt>` | Any | Switch output format between `latex` and `docx` (warns about rework at Wave 3+) |
-| `/sbir:proposal rigor [show\|set] <profile>` | Any | View or change the rigor profile (lean / standard / thorough / exhaustive) |
-| `/sbir:proposal switch <topic-id>` | Any | Switch active proposal context in a multi-proposal workspace |
+| `/sbir:proposal-status` | Any | Show current wave, progress, next actions |
+| `/sbir:proposal-check` | 1+ | View compliance matrix coverage |
+| `/sbir:proposal-compliance-add` | 1+ | Add missed compliance item |
+| `/sbir:proposal-tpoc-questions` | 1 | Generate TPOC call questions |
+| `/sbir:proposal-tpoc-ingest <file>` | 1 | Parse TPOC call notes |
+| `/sbir:proposal-wave-strategy` | 1 | Generate and approve strategy brief |
+| `/sbir:proposal-draft <section>` | 4 | Draft a proposal section |
+| `/sbir:proposal-iterate <section>` | 4 | Submit section for reviewer iteration |
+| `/sbir:proposal-wave-visuals` | 5 | Initialize figure generation |
+| `/sbir:proposal-draft-figure <name>` | 5 | Generate a specific figure |
+| `/sbir:proposal-format` | 6 | Format and assemble volumes |
+| `/sbir:proposal-wave-final-review` | 7 | Red team review and evaluator simulation |
+| `/sbir:proposal-submit-prep` | 8 | Prepare submission package |
+| `/sbir:proposal-submit` | 8 | Confirm submission, lock archive |
+| `/sbir:proposal-debrief <action>` | 9 | Outcome, debrief request, ingest, lessons |
+| `/sbir:proposal-config-format <fmt>` | Any | Switch output format between `latex` and `docx` (warns about rework at Wave 3+) |
+| `/sbir:proposal-rigor [show\|set] <profile>` | Any | View or change the rigor profile (lean / standard / thorough / exhaustive) |
+| `/sbir:proposal-switch <topic-id>` | Any | Switch active proposal context in a multi-proposal workspace |
 | `/sbir:proposal-developer-feedback` | Any | Submit bug reports, feature suggestions, or quality ratings with automatic context snapshot |
 
 ## Skills Reference
