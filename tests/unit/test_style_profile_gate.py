@@ -121,6 +121,28 @@ class TestStyleProfileGateBlocking:
 
         assert evaluator.triggers(rule, state, "Write", ctx) is True
 
+    def test_blocks_edit_without_profile_or_skip(self) -> None:
+        evaluator = _evaluator()
+        rule = _style_profile_gate_rule()
+        state: dict[str, Any] = {}
+        ctx = _wave5_tool_context()
+
+        assert evaluator.triggers(rule, state, "Edit", ctx) is True
+
+    def test_does_not_block_when_tool_context_is_none(self) -> None:
+        evaluator = _evaluator()
+        rule = _style_profile_gate_rule()
+        state: dict[str, Any] = {}
+
+        assert evaluator.triggers(rule, state, "Write", None) is False
+
+    def test_does_not_block_when_tool_context_absent(self) -> None:
+        evaluator = _evaluator()
+        rule = _style_profile_gate_rule()
+        state: dict[str, Any] = {}
+
+        assert evaluator.triggers(rule, state, "Write") is False
+
 
 class TestStyleProfileGateBlockMessage:
     """Block message includes both resolution paths."""
@@ -134,3 +156,22 @@ class TestStyleProfileGateBlockMessage:
 
         assert "style-profile.yaml" in message
         assert "style_analysis_skipped" in message or "skip" in message.lower()
+
+    def test_block_message_includes_rule_message(self) -> None:
+        evaluator = _evaluator()
+        rule = _style_profile_gate_rule()
+        state: dict[str, Any] = {}
+
+        message = evaluator.build_block_message(rule, state)
+
+        assert rule.message in message
+
+    def test_block_message_mentions_both_options(self) -> None:
+        evaluator = _evaluator()
+        rule = _style_profile_gate_rule()
+        state: dict[str, Any] = {}
+
+        message = evaluator.build_block_message(rule, state)
+
+        assert "style analysis conversation" in message
+        assert "bypass" in message or "skip" in message.lower()
