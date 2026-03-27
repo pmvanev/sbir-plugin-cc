@@ -89,6 +89,7 @@ def test_draft_write_blocked_when_quality_preferences_absent(
         "file_path": "artifacts/sf25d-t1201/wave-4-drafting/section-a.md",
         "artifacts_present": [],
         "global_artifacts_present": [],
+        "outline_artifacts_present": ["proposal-outline.md"],
     }
 
     result = engine.evaluate(state, "Write", tool_context=tool_context)
@@ -115,6 +116,7 @@ def test_draft_write_allowed_when_quality_preferences_present(
         "file_path": "artifacts/sf25d-t1201/wave-4-drafting/section-a.md",
         "artifacts_present": [],
         "global_artifacts_present": ["quality-preferences.json"],
+        "outline_artifacts_present": ["proposal-outline.md"],
     }
 
     result = engine.evaluate(state, "Write", tool_context=tool_context)
@@ -138,6 +140,7 @@ def test_draft_write_allowed_when_style_selection_skipped(
         "file_path": "artifacts/sf25d-t1201/wave-4-drafting/section-a.md",
         "artifacts_present": [],
         "global_artifacts_present": [],
+        "outline_artifacts_present": ["proposal-outline.md"],
     }
 
     result = engine.evaluate(state, "Write", tool_context=tool_context)

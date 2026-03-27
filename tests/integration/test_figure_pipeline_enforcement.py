@@ -169,14 +169,15 @@ def test_gates_not_triggered_for_writes_outside_wave5_visuals(
 ) -> None:
     """Write outside wave-5-visuals/ -> ALLOW (figure gates not triggered).
 
-    Includes global_artifacts_present with quality-preferences.json to avoid
-    triggering the writing_style_gate for wave-4-drafting paths.
+    Includes global_artifacts_present and outline_artifacts_present to avoid
+    triggering the writing_style_gate and outline_gate for wave-4-drafting paths.
     """
     state = _base_state()
     tool_context = {
         "file_path": "artifacts/sf25d-t1201/wave-4-drafting/section-a.md",
         "artifacts_present": [],
         "global_artifacts_present": ["quality-preferences.json"],
+        "outline_artifacts_present": ["proposal-outline.md"],
     }
 
     result = engine.evaluate(state, "Write", tool_context=tool_context)
