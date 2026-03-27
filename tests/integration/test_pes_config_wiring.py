@@ -4,14 +4,15 @@ Loads the REAL templates/pes-config.json through JsonRuleAdapter, feeds it to
 EnforcementEngine, and verifies each new evaluator triggers BLOCK on correct
 conditions and ALLOW otherwise.
 
-Test Budget: 7 behaviors x 2 = 14 max unit tests.
-  1. Config loads all 10 rules through JsonRuleAdapter
+Test Budget: 8 behaviors x 2 = 16 max unit tests.
+  1. Config loads all 11 rules through JsonRuleAdapter
   2. PDC gate evaluator: BLOCK on RED Tier 1/2, ALLOW otherwise
   3. Deadline blocking evaluator: BLOCK near deadline on non-essential wave, ALLOW otherwise
   4. Submission immutability evaluator: BLOCK on submitted+immutable, ALLOW otherwise
   5. Corpus integrity evaluator: BLOCK on outcome change, ALLOW otherwise
   6. Figure pipeline rule has correct structure (rule_id, condition)
   7. Style profile rule has correct structure (rule_id, condition)
+  8. Writing style gate rule has correct structure (rule_id, condition)
 """
 
 from __future__ import annotations
@@ -63,11 +64,11 @@ def engine() -> EnforcementEngine:
 # ---------------------------------------------------------------------------
 
 
-def test_real_config_loads_all_ten_rules():
-    """JsonRuleAdapter loads all 10 rules from real pes-config.json."""
+def test_real_config_loads_all_eleven_rules():
+    """JsonRuleAdapter loads all 11 rules from real pes-config.json."""
     adapter = JsonRuleAdapter(REAL_CONFIG_PATH)
     rules = adapter.load_rules()
-    assert len(rules) == 10
+    assert len(rules) == 11
     rule_types = [r.rule_type for r in rules]
     assert rule_types.count("wave_ordering") == 4
     assert "pdc_gate" in rule_types
@@ -76,6 +77,7 @@ def test_real_config_loads_all_ten_rules():
     assert "corpus_integrity" in rule_types
     assert "figure_pipeline_gate" in rule_types
     assert "style_profile_gate" in rule_types
+    assert "writing_style_gate" in rule_types
 
 
 def test_real_config_figure_pipeline_rule_has_correct_structure():
@@ -277,3 +279,20 @@ def test_corpus_integrity_evaluator_wiring(
         state["requested_outcome_change"] = requested_change
     result = engine.evaluate(state, "record_outcome")
     assert result.decision.value == expected_decision
+
+
+# ---------------------------------------------------------------------------
+# 8. Writing style gate rule structure
+# ---------------------------------------------------------------------------
+
+
+def test_real_config_writing_style_gate_rule_has_correct_structure():
+    """drafting-requires-style-selection rule has correct rule_id and condition."""
+    adapter = JsonRuleAdapter(REAL_CONFIG_PATH)
+    rules = adapter.load_rules()
+    wsg_rules = [r for r in rules if r.rule_type == "writing_style_gate"]
+    assert len(wsg_rules) == 1
+    rule = wsg_rules[0]
+    assert rule.rule_id == "drafting-requires-style-selection"
+    assert rule.condition["target_directory"] == "wave-4-drafting"
+    assert rule.condition["required_global_artifact"] == "quality-preferences.json"

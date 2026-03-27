@@ -456,10 +456,10 @@ class TestEnforcementEngineToolContext:
         result = engine.evaluate(clean_state, tool_name="wave_1_strategy")
         assert result.decision == Decision.ALLOW
 
-    def test_all_seven_evaluators_accept_tool_context_kwarg(
+    def test_all_eight_evaluators_accept_tool_context_kwarg(
         self, audit_logger: FakeAuditLogger, pending_state: dict[str, Any]
     ) -> None:
-        """All 7 evaluators work when tool_context is passed."""
+        """All 8 evaluators work when tool_context is passed."""
         rules = [
             _wave_ordering_rule(),
             EnforcementRule(
@@ -510,6 +510,17 @@ class TestEnforcementEngineToolContext:
                     "skip_state_key": "style_analysis_skipped",
                 },
                 message="Style required",
+            ),
+            EnforcementRule(
+                rule_id="drafting-requires-style-selection",
+                description="Writing style gate",
+                rule_type="writing_style_gate",
+                condition={
+                    "target_directory": "wave-4-drafting",
+                    "required_global_artifact": "quality-preferences.json",
+                    "skip_state_field": "writing_style_selection_skipped",
+                },
+                message="Style selection required",
             ),
         ]
         engine = EnforcementEngine(FakeRuleLoader(rules), audit_logger)
@@ -648,6 +659,84 @@ class TestEnforcementEngineFigurePipelineRegistration:
             tool_context={
                 "file_path": "artifacts/wave-5-visuals/figure-1.svg",
                 "artifacts_present": ["figure-specs.md", "style-profile.yaml"],
+            },
+        )
+        assert result.decision == Decision.ALLOW
+
+
+class TestEnforcementEngineWritingStyleGateRegistration:
+    """Evaluator registration for writing style gate.
+
+    Test Budget: 2 behaviors x 2 = 4 max unit tests
+    Behaviors: writing_style_gate dispatches and blocks when prefs missing,
+               writing_style_gate allows when prefs present.
+    """
+
+    def test_engine_has_eight_evaluators(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        """Engine registers 8 evaluators including writing_style_gate."""
+        engine = EnforcementEngine(FakeRuleLoader(), audit_logger)
+        assert len(engine._evaluators) == 8
+        assert "writing_style_gate" in engine._evaluators
+
+    def test_writing_style_gate_blocks_when_prefs_missing(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        """Engine dispatches writing_style_gate rule and blocks without quality-preferences.json."""
+        rule = EnforcementRule(
+            rule_id="drafting-requires-style-selection",
+            description="Wave 4 drafting requires writing style selection",
+            rule_type="writing_style_gate",
+            condition={
+                "target_directory": "wave-4-drafting",
+                "required_global_artifact": "quality-preferences.json",
+                "skip_state_field": "writing_style_selection_skipped",
+            },
+            message="Cannot write draft sections before writing style selection",
+        )
+        state = {
+            "proposal_id": "test-uuid-wsg",
+            "current_wave": 4,
+        }
+        engine = EnforcementEngine(FakeRuleLoader([rule]), audit_logger)
+        result = engine.evaluate(
+            state,
+            tool_name="Write",
+            tool_context={
+                "file_path": "artifacts/wave-4-drafting/sections/technical-approach.md",
+                "global_artifacts_present": [],
+            },
+        )
+        assert result.decision == Decision.BLOCK
+        assert "style" in result.messages[0].lower()
+
+    def test_writing_style_gate_allows_when_prefs_present(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        """Engine dispatches writing_style_gate rule and allows with quality-preferences.json."""
+        rule = EnforcementRule(
+            rule_id="drafting-requires-style-selection",
+            description="Wave 4 drafting requires writing style selection",
+            rule_type="writing_style_gate",
+            condition={
+                "target_directory": "wave-4-drafting",
+                "required_global_artifact": "quality-preferences.json",
+                "skip_state_field": "writing_style_selection_skipped",
+            },
+            message="Cannot write draft sections before writing style selection",
+        )
+        state = {
+            "proposal_id": "test-uuid-wsg",
+            "current_wave": 4,
+        }
+        engine = EnforcementEngine(FakeRuleLoader([rule]), audit_logger)
+        result = engine.evaluate(
+            state,
+            tool_name="Write",
+            tool_context={
+                "file_path": "artifacts/wave-4-drafting/sections/technical-approach.md",
+                "global_artifacts_present": ["quality-preferences.json"],
             },
         )
         assert result.decision == Decision.ALLOW

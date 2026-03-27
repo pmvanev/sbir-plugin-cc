@@ -19,6 +19,7 @@ from pes.domain.session_checker import SessionChecker
 from pes.domain.style_profile_gate import StyleProfileGateEvaluator
 from pes.domain.submission_immutability import SubmissionImmutabilityEvaluator
 from pes.domain.wave_rules import WaveOrderingEvaluator
+from pes.domain.writing_style_gate import WritingStyleGateEvaluator
 from pes.ports.audit_port import AuditLogger
 from pes.ports.rule_port import RuleLoader
 
@@ -45,6 +46,7 @@ class EnforcementEngine:
             "corpus_integrity": CorpusIntegrityEvaluator(),
             "figure_pipeline_gate": FigurePipelineGateEvaluator(),
             "style_profile_gate": StyleProfileGateEvaluator(),
+            "writing_style_gate": WritingStyleGateEvaluator(),
         }
 
     def check_session_start(

@@ -97,6 +97,17 @@
         "required_artifact": "style-profile.yaml"
       },
       "message": "Cannot generate figures before style analysis"
+    },
+    {
+      "rule_id": "drafting-requires-style-selection",
+      "description": "Wave 4 drafting requires writing style selection or explicit skip",
+      "rule_type": "writing_style_gate",
+      "condition": {
+        "target_directory": "wave-4-drafting",
+        "required_global_artifact": "quality-preferences.json",
+        "skip_state_field": "writing_style_selection_skipped"
+      },
+      "message": "Cannot write draft sections before writing style selection. Run /proposal quality discover or skip style selection at the style checkpoint."
     }
   ],
   "enforcement": {

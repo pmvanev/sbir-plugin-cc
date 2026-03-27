@@ -167,11 +167,16 @@ def test_both_gates_allow_when_style_analysis_skipped(
 def test_gates_not_triggered_for_writes_outside_wave5_visuals(
     engine: EnforcementEngine,
 ) -> None:
-    """Write outside wave-5-visuals/ -> ALLOW (gates not triggered)."""
+    """Write outside wave-5-visuals/ -> ALLOW (figure gates not triggered).
+
+    Includes global_artifacts_present with quality-preferences.json to avoid
+    triggering the writing_style_gate for wave-4-drafting paths.
+    """
     state = _base_state()
     tool_context = {
         "file_path": "artifacts/sf25d-t1201/wave-4-drafting/section-a.md",
         "artifacts_present": [],
+        "global_artifacts_present": ["quality-preferences.json"],
     }
 
     result = engine.evaluate(state, "Write", tool_context=tool_context)
