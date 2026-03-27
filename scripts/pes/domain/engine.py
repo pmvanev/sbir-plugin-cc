@@ -10,11 +10,13 @@ from typing import Any
 from pes.domain.agent_wave_mapping import is_agent_authorized_for_wave, is_agent_recognized
 from pes.domain.corpus_integrity import CorpusIntegrityEvaluator
 from pes.domain.deadline_blocking import DeadlineBlockingEvaluator
+from pes.domain.figure_pipeline_gate import FigurePipelineGateEvaluator
 from pes.domain.housekeeping import AuditLogRotator, CrashSignalCleaner
 from pes.domain.pdc_gate import PdcGateEvaluator
 from pes.domain.post_action_validator import PostActionValidator
 from pes.domain.rules import Decision, EnforcementResult, EnforcementRule
 from pes.domain.session_checker import SessionChecker
+from pes.domain.style_profile_gate import StyleProfileGateEvaluator
 from pes.domain.submission_immutability import SubmissionImmutabilityEvaluator
 from pes.domain.wave_rules import WaveOrderingEvaluator
 from pes.ports.audit_port import AuditLogger
@@ -41,6 +43,8 @@ class EnforcementEngine:
             "deadline_blocking": DeadlineBlockingEvaluator(),
             "submission_immutability": SubmissionImmutabilityEvaluator(),
             "corpus_integrity": CorpusIntegrityEvaluator(),
+            "figure_pipeline_gate": FigurePipelineGateEvaluator(),
+            "style_profile_gate": StyleProfileGateEvaluator(),
         }
 
     def check_session_start(

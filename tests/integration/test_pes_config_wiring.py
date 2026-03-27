@@ -4,12 +4,14 @@ Loads the REAL templates/pes-config.json through JsonRuleAdapter, feeds it to
 EnforcementEngine, and verifies each new evaluator triggers BLOCK on correct
 conditions and ALLOW otherwise.
 
-Test Budget: 5 behaviors x 2 = 10 max unit tests.
-  1. Config loads all 8 rules through JsonRuleAdapter
+Test Budget: 7 behaviors x 2 = 14 max unit tests.
+  1. Config loads all 10 rules through JsonRuleAdapter
   2. PDC gate evaluator: BLOCK on RED Tier 1/2, ALLOW otherwise
   3. Deadline blocking evaluator: BLOCK near deadline on non-essential wave, ALLOW otherwise
   4. Submission immutability evaluator: BLOCK on submitted+immutable, ALLOW otherwise
   5. Corpus integrity evaluator: BLOCK on outcome change, ALLOW otherwise
+  6. Figure pipeline rule has correct structure (rule_id, condition)
+  7. Style profile rule has correct structure (rule_id, condition)
 """
 
 from __future__ import annotations
@@ -61,17 +63,43 @@ def engine() -> EnforcementEngine:
 # ---------------------------------------------------------------------------
 
 
-def test_real_config_loads_all_eight_rules():
-    """JsonRuleAdapter loads all 8 rules from real pes-config.json."""
+def test_real_config_loads_all_ten_rules():
+    """JsonRuleAdapter loads all 10 rules from real pes-config.json."""
     adapter = JsonRuleAdapter(REAL_CONFIG_PATH)
     rules = adapter.load_rules()
-    assert len(rules) == 8
+    assert len(rules) == 10
     rule_types = [r.rule_type for r in rules]
     assert rule_types.count("wave_ordering") == 4
     assert "pdc_gate" in rule_types
     assert "deadline_blocking" in rule_types
     assert "submission_immutability" in rule_types
     assert "corpus_integrity" in rule_types
+    assert "figure_pipeline_gate" in rule_types
+    assert "style_profile_gate" in rule_types
+
+
+def test_real_config_figure_pipeline_rule_has_correct_structure():
+    """figure-pipeline-requires-specs rule has correct rule_id and condition."""
+    adapter = JsonRuleAdapter(REAL_CONFIG_PATH)
+    rules = adapter.load_rules()
+    fig_rules = [r for r in rules if r.rule_type == "figure_pipeline_gate"]
+    assert len(fig_rules) == 1
+    rule = fig_rules[0]
+    assert rule.rule_id == "figure-pipeline-requires-specs"
+    assert rule.condition["target_directory"] == "wave-5-visuals"
+    assert rule.condition["required_artifact"] == "figure-specs.md"
+
+
+def test_real_config_style_profile_rule_has_correct_structure():
+    """figure-generation-requires-style rule has correct rule_id and condition."""
+    adapter = JsonRuleAdapter(REAL_CONFIG_PATH)
+    rules = adapter.load_rules()
+    style_rules = [r for r in rules if r.rule_type == "style_profile_gate"]
+    assert len(style_rules) == 1
+    rule = style_rules[0]
+    assert rule.rule_id == "figure-generation-requires-style"
+    assert rule.condition["target_directory"] == "wave-5-visuals"
+    assert rule.condition["required_artifact"] == "style-profile.yaml"
 
 
 # ---------------------------------------------------------------------------

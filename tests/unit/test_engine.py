@@ -456,10 +456,10 @@ class TestEnforcementEngineToolContext:
         result = engine.evaluate(clean_state, tool_name="wave_1_strategy")
         assert result.decision == Decision.ALLOW
 
-    def test_all_five_evaluators_accept_tool_context_kwarg(
+    def test_all_seven_evaluators_accept_tool_context_kwarg(
         self, audit_logger: FakeAuditLogger, pending_state: dict[str, Any]
     ) -> None:
-        """All 5 existing evaluators work when tool_context is passed."""
+        """All 7 evaluators work when tool_context is passed."""
         rules = [
             _wave_ordering_rule(),
             EnforcementRule(
@@ -490,6 +490,27 @@ class TestEnforcementEngineToolContext:
                 condition={"append_only_tags": True},
                 message="Corpus",
             ),
+            EnforcementRule(
+                rule_id="figure-pipeline-requires-specs",
+                description="Figure pipeline gate",
+                rule_type="figure_pipeline_gate",
+                condition={
+                    "target_directory": "wave-5-visuals",
+                    "required_artifact": "figure-specs.md",
+                },
+                message="Specs required",
+            ),
+            EnforcementRule(
+                rule_id="figure-generation-requires-style",
+                description="Style profile gate",
+                rule_type="style_profile_gate",
+                condition={
+                    "target_directory": "wave-5-visuals",
+                    "required_artifact": "style-profile.yaml",
+                    "skip_state_key": "style_analysis_skipped",
+                },
+                message="Style required",
+            ),
         ]
         engine = EnforcementEngine(FakeRuleLoader(rules), audit_logger)
         # Should not raise TypeError -- all evaluators accept tool_context
@@ -500,3 +521,133 @@ class TestEnforcementEngineToolContext:
         )
         # We only care that no TypeError is raised; decision depends on rule logic
         assert result.decision in (Decision.ALLOW, Decision.BLOCK)
+
+
+class TestEnforcementEngineFigurePipelineRegistration:
+    """Evaluator registration for figure pipeline and style profile gates.
+
+    Test Budget: 4 behaviors x 2 = 8 max unit tests
+    Behaviors: figure_pipeline_gate dispatches, style_profile_gate dispatches,
+               figure_pipeline_gate blocks when specs missing,
+               style_profile_gate blocks when style missing.
+    """
+
+    def test_figure_pipeline_gate_evaluator_blocks_when_specs_missing(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        """Engine dispatches figure_pipeline_gate rule to registered evaluator."""
+        rule = EnforcementRule(
+            rule_id="figure-pipeline-requires-specs",
+            description="Figure writes require figure-specs.md",
+            rule_type="figure_pipeline_gate",
+            condition={
+                "target_directory": "wave-5-visuals",
+                "required_artifact": "figure-specs.md",
+            },
+            message="Cannot write figure files before creating figure specifications",
+        )
+        state = {
+            "proposal_id": "test-uuid-fig",
+            "current_wave": 5,
+        }
+        engine = EnforcementEngine(FakeRuleLoader([rule]), audit_logger)
+        result = engine.evaluate(
+            state,
+            tool_name="Write",
+            tool_context={
+                "file_path": "artifacts/wave-5-visuals/figure-1.svg",
+                "artifacts_present": [],
+            },
+        )
+        assert result.decision == Decision.BLOCK
+        assert "figure" in result.messages[0].lower()
+
+    def test_style_profile_gate_evaluator_blocks_when_style_missing(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        """Engine dispatches style_profile_gate rule to registered evaluator."""
+        rule = EnforcementRule(
+            rule_id="figure-generation-requires-style",
+            description="Figure writes require style profile",
+            rule_type="style_profile_gate",
+            condition={
+                "target_directory": "wave-5-visuals",
+                "required_artifact": "style-profile.yaml",
+                "skip_state_key": "style_analysis_skipped",
+            },
+            message="Cannot generate figures before style analysis",
+        )
+        state = {
+            "proposal_id": "test-uuid-style",
+            "current_wave": 5,
+        }
+        engine = EnforcementEngine(FakeRuleLoader([rule]), audit_logger)
+        result = engine.evaluate(
+            state,
+            tool_name="Write",
+            tool_context={
+                "file_path": "artifacts/wave-5-visuals/figure-1.svg",
+                "artifacts_present": ["figure-specs.md"],
+            },
+        )
+        assert result.decision == Decision.BLOCK
+        assert "style" in result.messages[0].lower()
+
+    def test_figure_pipeline_gate_allows_when_specs_present(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        """Figure pipeline gate allows when figure-specs.md is present."""
+        rule = EnforcementRule(
+            rule_id="figure-pipeline-requires-specs",
+            description="Figure writes require figure-specs.md",
+            rule_type="figure_pipeline_gate",
+            condition={
+                "target_directory": "wave-5-visuals",
+                "required_artifact": "figure-specs.md",
+            },
+            message="Cannot write figure files before creating figure specifications",
+        )
+        state = {
+            "proposal_id": "test-uuid-fig",
+            "current_wave": 5,
+        }
+        engine = EnforcementEngine(FakeRuleLoader([rule]), audit_logger)
+        result = engine.evaluate(
+            state,
+            tool_name="Write",
+            tool_context={
+                "file_path": "artifacts/wave-5-visuals/figure-1.svg",
+                "artifacts_present": ["figure-specs.md"],
+            },
+        )
+        assert result.decision == Decision.ALLOW
+
+    def test_style_profile_gate_allows_when_style_present(
+        self, audit_logger: FakeAuditLogger
+    ) -> None:
+        """Style profile gate allows when style-profile.yaml is present."""
+        rule = EnforcementRule(
+            rule_id="figure-generation-requires-style",
+            description="Figure writes require style profile",
+            rule_type="style_profile_gate",
+            condition={
+                "target_directory": "wave-5-visuals",
+                "required_artifact": "style-profile.yaml",
+                "skip_state_key": "style_analysis_skipped",
+            },
+            message="Cannot generate figures before style analysis",
+        )
+        state = {
+            "proposal_id": "test-uuid-style",
+            "current_wave": 5,
+        }
+        engine = EnforcementEngine(FakeRuleLoader([rule]), audit_logger)
+        result = engine.evaluate(
+            state,
+            tool_name="Write",
+            tool_context={
+                "file_path": "artifacts/wave-5-visuals/figure-1.svg",
+                "artifacts_present": ["figure-specs.md", "style-profile.yaml"],
+            },
+        )
+        assert result.decision == Decision.ALLOW

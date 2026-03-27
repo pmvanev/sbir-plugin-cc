@@ -77,6 +77,26 @@
         "append_only_tags": true
       },
       "message": "Win/loss tags are append-only and cannot be modified"
+    },
+    {
+      "rule_id": "figure-pipeline-requires-specs",
+      "description": "Wave 5 figure writes require figure-specs.md",
+      "rule_type": "figure_pipeline_gate",
+      "condition": {
+        "target_directory": "wave-5-visuals",
+        "required_artifact": "figure-specs.md"
+      },
+      "message": "Cannot write figure files before creating figure specifications"
+    },
+    {
+      "rule_id": "figure-generation-requires-style",
+      "description": "Figure generation requires style profile or explicit skip",
+      "rule_type": "style_profile_gate",
+      "condition": {
+        "target_directory": "wave-5-visuals",
+        "required_artifact": "style-profile.yaml"
+      },
+      "message": "Cannot generate figures before style analysis"
     }
   ],
   "enforcement": {
