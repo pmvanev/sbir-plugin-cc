@@ -1,5 +1,6 @@
 {
   "schema_version": "3.0",
+  "project_id": "outline-gate-enforcement",
   "feature_id": "outline-gate-enforcement",
   "events": [
     {
