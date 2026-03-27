@@ -45,7 +45,8 @@ def resolve_tool_context(hook_input: dict[str, Any]) -> dict[str, Any]:
     normalized = file_path.replace("\\", "/")
 
     # Check if path targets wave-5-visuals/
-    if f"/{_WAVE5_VISUALS_SEGMENT}/" not in normalized and not normalized.endswith(f"/{_WAVE5_VISUALS_SEGMENT}"):
+    segment = f"/{_WAVE5_VISUALS_SEGMENT}/"
+    if segment not in normalized and not normalized.endswith(f"/{_WAVE5_VISUALS_SEGMENT}"):
         return {"file_path": file_path, "artifacts_present": []}
 
     # Find the wave-5-visuals directory in the path
@@ -223,7 +224,10 @@ def main() -> None:
     import sys
 
     if len(sys.argv) < 2:
-        msg = "Usage: hook_adapter <session-start|subagent-start|subagent-stop|pre-tool-use|post-tool-use>"
+        msg = (
+            "Usage: hook_adapter "
+            "<session-start|subagent-start|subagent-stop|pre-tool-use|post-tool-use>"
+        )
         print(json.dumps({"error": msg}))
         sys.exit(2)
 

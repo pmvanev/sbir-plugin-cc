@@ -17,7 +17,13 @@ class FigurePipelineGateEvaluator:
     _VISUAL_DIR = "wave-5-visuals/"
     _SPECS_FILENAME = "figure-specs.md"
 
-    def triggers(self, rule: EnforcementRule, state: dict[str, Any], tool_name: str, tool_context: dict[str, Any] | None = None) -> bool:
+    def triggers(
+        self,
+        rule: EnforcementRule,
+        state: dict[str, Any],
+        tool_name: str,
+        tool_context: dict[str, Any] | None = None,
+    ) -> bool:
         """Check if the figure pipeline gate blocks the given tool invocation.
 
         Returns True (BLOCK) when writing to wave-5-visuals/ without figure-specs.md.
@@ -41,10 +47,7 @@ class FigurePipelineGateEvaluator:
 
         # Block if figure-specs.md not in artifacts_present
         artifacts_present = tool_context.get("artifacts_present", [])
-        if self._SPECS_FILENAME not in artifacts_present:
-            return True
-
-        return False
+        return self._SPECS_FILENAME not in artifacts_present
 
     def build_block_message(self, rule: EnforcementRule, state: dict[str, Any]) -> str:
         """Build block message guiding user to create figure-specs.md first."""

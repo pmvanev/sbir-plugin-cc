@@ -53,10 +53,7 @@ class StyleProfileGateEvaluator:
             return False
 
         # Check if style analysis was explicitly skipped
-        if state.get("style_analysis_skipped") is True:
-            return False
-
-        return True
+        return state.get("style_analysis_skipped") is not True
 
     def build_block_message(
         self, rule: EnforcementRule, state: dict[str, Any]
