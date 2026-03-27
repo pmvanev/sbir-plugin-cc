@@ -14,16 +14,11 @@ Tracked enforcement gaps across the proposal lifecycle. Prioritized by likelihoo
 | Figure specs before figures | FigurePipelineGateEvaluator | 5 | 2026-03-27 |
 | Style profile before generation | StyleProfileGateEvaluator | 5 | 2026-03-27 |
 | Writing style before drafting | WritingStyleGateEvaluator | 4 | 2026-03-27 |
+| Outline before drafting | OutlineGateEvaluator | 4 | 2026-03-27 |
 
 ## Backlog (prioritized)
 
-### P1: Outline gate for Wave 4
-
-- **Gap**: Writer can draft sections to wave-4-drafting/ without an approved outline in wave-3-outline/
-- **Gate**: Block wave-4-drafting/ writes when proposal-outline.md does not exist in wave-3-outline/
-- **Pattern**: Same as FigurePipelineGateEvaluator (local artifact check)
-- **Risk**: High — writer fabricates structure without outline, sections don't match approved plan
-- **Scope**: 1 evaluator + engine wiring + config rule + hook adapter (wave-4 already detected)
+### ~~P1: Outline gate for Wave 4~~ — DELIVERED 2026-03-27
 
 ### P2: Figure plan gate for Wave 5
 
