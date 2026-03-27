@@ -142,3 +142,48 @@ class TestOutlineGateBlockMessage:
 
         assert "proposal-outline.md" in message
         assert "wave 3" in message.lower() or "outline" in message.lower()
+
+    def test_block_message_includes_rule_message(self) -> None:
+        evaluator = _evaluator()
+        rule = _outline_gate_rule()
+        state: dict[str, Any] = {"proposal_id": "p-001"}
+
+        message = evaluator.build_block_message(rule, state)
+
+        assert rule.message in message
+
+    def test_block_message_mentions_completing_outline(self) -> None:
+        evaluator = _evaluator()
+        rule = _outline_gate_rule()
+        state: dict[str, Any] = {"proposal_id": "p-001"}
+
+        message = evaluator.build_block_message(rule, state)
+
+        assert "Complete" in message
+        assert "drafting" in message.lower()
+
+
+class TestOutlineGateBackslashPaths:
+    """Ensure backslash paths are handled correctly."""
+
+    def test_blocks_with_backslash_path(self) -> None:
+        evaluator = _evaluator()
+        rule = _outline_gate_rule()
+        state: dict[str, Any] = {"proposal_id": "p-001"}
+        ctx = {
+            "file_path": "artifacts\\sf25d-t1201\\wave-4-drafting\\sections\\tech.md",
+            "outline_artifacts_present": [],
+        }
+
+        assert evaluator.triggers(rule, state, "Write", ctx) is True
+
+    def test_allows_with_backslash_path_when_outline_present(self) -> None:
+        evaluator = _evaluator()
+        rule = _outline_gate_rule()
+        state: dict[str, Any] = {"proposal_id": "p-001"}
+        ctx = {
+            "file_path": "artifacts\\sf25d-t1201\\wave-4-drafting\\sections\\tech.md",
+            "outline_artifacts_present": ["proposal-outline.md"],
+        }
+
+        assert evaluator.triggers(rule, state, "Write", ctx) is False
