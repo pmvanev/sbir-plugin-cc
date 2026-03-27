@@ -71,10 +71,10 @@ Load: `dsip-cli-usage` -- read it NOW before proceeding. This skill defines the 
 Load: `solicitation-intelligence` -- read it NOW before proceeding.
 Load: `dsip-enrichment` -- read it NOW before proceeding.
 
-Identify solicitation sources and gather topic data.
+Identify solicitation sources and gather topic data. **The DSIP CLI is your primary tool -- load the `dsip-cli-usage` skill first and use the CLI commands it describes.** Do not attempt to access SBIR/STTR websites directly.
 
-#### 1a. DSIP API Source (primary)
-Use the DSIP CLI (`scripts/dsip_cli.py`) via Bash. **Never import or instantiate Python adapters directly.** The CLI wires all adapters, caching, and error handling internally.
+#### 1a. DSIP API Source (primary -- always try this first)
+Use the DSIP CLI (`scripts/dsip_cli.py`) via Bash. **Never import or instantiate Python adapters directly. Never access dodsbirsttr.mil or sbir.gov via curl/wget/WebFetch.** The CLI wires all adapters, caching, and error handling internally.
 
 **IMPORTANT**: The CLI lives in the plugin installation directory, not the user's project. Always use `${CLAUDE_PLUGIN_ROOT}` to resolve the path. This environment variable is set automatically by Claude Code when the plugin loads.
 
@@ -100,11 +100,11 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py" detail --topic-id 7051b2da4a1
 
 The CLI outputs JSON to stdout. Parse it to extract topics, messages, and completeness metrics. Cache is automatic -- a second call within 24 hours uses cached data.
 
-#### 1b. Local File Source (fallback)
-When the DSIP API is unavailable or the user provides a file:
-1. For URLs: fetch page content using Bash (curl/wget) | extract solicitation text
-2. For local files: read directly using Read tool
-3. For directories: scan for .pdf, .txt, .md files and process each
+#### 1b. Local File Source (fallback -- user-provided files only)
+When the DSIP CLI returns an error or the user explicitly provides a local file via `--file`:
+1. For local files: read directly using Read tool
+2. For directories: scan for .pdf, .txt, .md files and process each
+3. This fallback is for user-provided BAA documents only -- do not use it to scrape SBIR/STTR websites
 
 #### 1c. Report Completeness
 After DSIP CLI enrichment, report completeness from the JSON output `messages` array. The CLI reports 4 data types:
@@ -231,6 +231,7 @@ After human selects topic(s) and makes Go/No-Go decision:
 
 ## Critical Rules
 
+- **DSIP CLI is the only way to access SBIR/STTR topic data.** Always use `python "${CLAUDE_PLUGIN_ROOT}/scripts/dsip_cli.py"` via Bash. Never try to access dodsbirsttr.mil, sbir.gov, or any DSIP/SBIR URLs directly via curl, wget, WebFetch, or any other web access method. These sites require authentication and will return HTML login pages, not data. The CLI handles all API access, authentication, caching, and error handling internally. If the CLI fails, report the error to the user -- do not fall back to web scraping.
 - Parse solicitation metadata into `TopicInfo` schema before scoring. The `SolicitationParseResult` and `TopicInfo` dataclasses in `scripts/pes/domain/solicitation.py` define the canonical fields.
 - Read `~/.sbir/company-profile.json` for scoring. If the file is missing, warn and score with available data only -- do not fabricate company capabilities.
 - Use the `FitScoring` dataclass structure from `scripts/pes/domain/proposal_service.py` when recording scores to state. Fields: `subject_matter`, `past_performance`, `certifications`, `recommendation`.
